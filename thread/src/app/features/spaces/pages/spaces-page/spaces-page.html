@@ -1,0 +1,386 @@
+<section class="spaces-page">
+  <!-- TOP BAR -->
+  <header class="topbar">
+    <span class="brand"> THREAD </span>
+
+    <div class="topbar-actions">
+      <div class="search">
+        <span class="search-symbol"> ⌕ </span>
+
+        <input
+          type="text"
+          placeholder="Search spaces..."
+          [value]="searchQuery()"
+          (input)="updateSearch($event)"
+        />
+
+        @if (searchQuery()) {
+          <button type="button" (click)="clearSearch()">×</button>
+        }
+      </div>
+
+      <button type="button" class="avatar">O</button>
+    </div>
+  </header>
+
+  <!-- VIEWPORT -->
+  <main
+    #viewport
+    class="viewport"
+    [class]="cursorClass()"
+    [class.is-panning]="isPanning()"
+    [style.background-size]="gridSize()"
+    [style.background-position]="gridPosition()"
+    (pointerdown)="viewportPointerDown($event)"
+    (pointermove)="viewportPointerMove($event)"
+    (pointerup)="viewportPointerUp($event)"
+    (pointercancel)="viewportPointerUp($event)"
+    (wheel)="handleWheel($event)"
+  >
+    <!-- INTRO -->
+    <aside class="intro-panel">
+      <h1>
+        Your world,
+        <span> your spaces. </span>
+      </h1>
+
+      <p>A place for everything you're working on.</p>
+    </aside>
+
+    <!-- WORLD -->
+    <div class="world" [style.transform]="worldTransform()">
+      @for (space of visibleSpaces(); track space.id) {
+        <article
+          class="space-card"
+          [class.selected]="selectedSpaceId() === space.id"
+          [class.dragging]="draggingSpaceId() === space.id"
+          [class.tone-red]="space.tone === 'red'"
+          [class.tone-blue]="space.tone === 'blue'"
+          [class.tone-yellow]="space.tone === 'yellow'"
+          [class.tone-green]="space.tone === 'green'"
+          [style.left.px]="space.x"
+          [style.top.px]="space.y"
+          tabindex="0"
+          (pointerdown)="spacePointerDown($event, space)"
+          (pointermove)="spacePointerMove($event)"
+          (pointerup)="spacePointerUp($event)"
+          (pointercancel)="spacePointerUp($event)"
+          (dblclick)="openSpace(space)"
+        >
+          <div class="card-accent"></div>
+
+          <div class="card-heading">
+            <h2>
+              {{ space.title }}
+            </h2>
+
+            <span>
+              {{ space.itemCount }}
+              items
+            </span>
+          </div>
+
+          <div class="card-preview">
+            @if (space.preview === 'mixed') {
+              <div class="mock-note">
+                <span></span>
+                <span></span>
+                <span></span>
+              </div>
+
+              <div class="mock-list">
+                <i>
+                  <b></b>
+                  <span></span>
+                </i>
+
+                <i>
+                  <b></b>
+                  <span></span>
+                </i>
+
+                <i>
+                  <b></b>
+                  <span></span>
+                </i>
+              </div>
+
+              <div class="mock-picture">
+                <i></i>
+              </div>
+            }
+
+            @if (space.preview === 'checklist') {
+              <div class="mock-list large">
+                <i>
+                  <b class="checked"></b>
+                  <span></span>
+                </i>
+
+                <i>
+                  <b></b>
+                  <span></span>
+                </i>
+
+                <i>
+                  <b></b>
+                  <span></span>
+                </i>
+              </div>
+
+              <div class="mock-picture">
+                <i></i>
+              </div>
+            }
+
+            @if (space.preview === 'notes') {
+              <div class="mock-note">
+                <span></span>
+                <span></span>
+              </div>
+
+              <div class="mock-note red">
+                <span></span>
+                <span></span>
+                <span></span>
+              </div>
+
+              <div class="mock-note dark">
+                <span></span>
+                <span></span>
+              </div>
+            }
+
+            @if (space.preview === 'visual') {
+              <div class="mock-list">
+                <i>
+                  <b></b>
+                  <span></span>
+                </i>
+
+                <i>
+                  <b></b>
+                  <span></span>
+                </i>
+              </div>
+
+              <div class="mock-picture wide">
+                <i></i>
+              </div>
+            }
+          </div>
+        </article>
+      }
+    </div>
+
+    <!-- NO RESULTS -->
+    @if (searchQuery() && visibleSpaces().length === 0) {
+      <div class="empty-search">
+        <strong> No Spaces found </strong>
+
+        <span> Try another search. </span>
+      </div>
+    }
+
+    <!-- =====================
+         FIGMA-STYLE TOOLBAR
+    ====================== -->
+
+    <nav class="toolbox" (pointerdown)="$event.stopPropagation()">
+      <!-- SELECT -->
+      <button
+        type="button"
+        title="Select / Move (V)"
+        [class.active]="activeTool() === 'select'"
+        (click)="setTool('select')"
+      >
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M5 3L18 12L12 13.5L9.5 20L5 3Z" />
+        </svg>
+
+        <span class="tool-key"> V </span>
+      </button>
+
+      <!-- HAND -->
+      <button
+        type="button"
+        title="Hand / Pan (H)"
+        [class.active]="activeTool() === 'hand'"
+        (click)="setTool('hand')"
+      >
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path
+            d="M7.5 11V6.5C7.5 5.7 8.1 5 9 5C9.8 5 10.5 5.7 10.5 6.5V10M10.5 10V5C10.5 4.2 11.2 3.5 12 3.5C12.8 3.5 13.5 4.2 13.5 5V10M13.5 10V6C13.5 5.2 14.2 4.5 15 4.5C15.8 4.5 16.5 5.2 16.5 6V11M16.5 11V8.5C16.5 7.7 17.2 7 18 7C18.8 7 19.5 7.7 19.5 8.5V14C19.5 18 16.5 21 12.5 21H11C8.8 21 7 20 5.7 18.2L3.2 14.7C2.7 14 2.8 13 3.5 12.5C4.2 12 5.2 12.1 5.8 12.8L7.5 15"
+          />
+        </svg>
+
+        <span class="tool-key"> H </span>
+      </button>
+
+      <!-- EDIT PEN -->
+      <button
+        type="button"
+        title="Edit Space (E)"
+        [class.active]="activeTool() === 'edit'"
+        (click)="setTool('edit')"
+      >
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path
+            d="M4 20L8.2 19L19 8.2C19.8 7.4 19.8 6.2 19 5.4L18.6 5C17.8 4.2 16.6 4.2 15.8 5L5 15.8L4 20Z"
+          />
+
+          <path d="M14.5 6.3L17.7 9.5" />
+        </svg>
+
+        <span class="tool-key"> E </span>
+      </button>
+
+      <div class="tool-divider"></div>
+
+      <!-- ADD -->
+      <button
+        type="button"
+        title="Add Space (N)"
+        [class.active]="activeTool() === 'add'"
+        (click)="addSpaceFromToolbar()"
+      >
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M12 5V19M5 12H19" />
+        </svg>
+
+        <span class="tool-key"> N </span>
+      </button>
+    </nav>
+
+    <!-- =====================
+         SPACE EDITOR
+    ====================== -->
+
+    @if (activeTool() === 'edit' && selectedSpace(); as space) {
+      <aside class="editor-panel" (pointerdown)="$event.stopPropagation()">
+        <div class="editor-header">
+          <div>
+            <span class="editor-eyebrow"> SPACE </span>
+
+            <strong> Edit Space </strong>
+          </div>
+
+          <button type="button" (click)="selectedSpaceId.set(null)">×</button>
+        </div>
+
+        <div class="editor-section">
+          <label> Name </label>
+
+          <input
+            type="text"
+            [value]="titleDraft()"
+            (input)="updateTitleDraft($event)"
+            (blur)="saveTitle()"
+            (keydown.enter)="saveTitle()"
+          />
+        </div>
+
+        <div class="editor-section">
+          <label> Cover tone </label>
+
+          <div class="tone-picker">
+            <button
+              class="tone red"
+              [class.selected]="space.tone === 'red'"
+              (click)="changeTone('red')"
+            ></button>
+
+            <button
+              class="tone blue"
+              [class.selected]="space.tone === 'blue'"
+              (click)="changeTone('blue')"
+            ></button>
+
+            <button
+              class="tone yellow"
+              [class.selected]="space.tone === 'yellow'"
+              (click)="changeTone('yellow')"
+            ></button>
+
+            <button
+              class="tone green"
+              [class.selected]="space.tone === 'green'"
+              (click)="changeTone('green')"
+            ></button>
+
+            <button
+              class="tone neutral"
+              [class.selected]="space.tone === 'neutral'"
+              (click)="changeTone('neutral')"
+            ></button>
+          </div>
+        </div>
+
+        <div class="editor-section">
+          <label> Cover style </label>
+
+          <div class="preview-options">
+            <button [class.selected]="space.preview === 'mixed'" (click)="changePreview('mixed')">
+              Mixed
+            </button>
+
+            <button
+              [class.selected]="space.preview === 'checklist'"
+              (click)="changePreview('checklist')"
+            >
+              List
+            </button>
+
+            <button [class.selected]="space.preview === 'notes'" (click)="changePreview('notes')">
+              Notes
+            </button>
+
+            <button [class.selected]="space.preview === 'visual'" (click)="changePreview('visual')">
+              Visual
+            </button>
+          </div>
+        </div>
+
+        <div class="editor-actions">
+          <button type="button" (click)="duplicateSelectedSpace()">Duplicate</button>
+
+          <button type="button" class="danger" (click)="deleteSelectedSpace()">Delete Space</button>
+        </div>
+      </aside>
+    }
+
+    <!-- ZOOM -->
+    <div class="zoom-controls" (pointerdown)="$event.stopPropagation()">
+      <button type="button" (click)="zoomOut()">−</button>
+
+      <button type="button" class="zoom-percentage" (click)="resetView()">
+        {{ zoomPercent() }}%
+      </button>
+
+      <button type="button" (click)="zoomIn()">+</button>
+
+      <button type="button" title="Fit all Spaces" (click)="fitSpaces()">⛶</button>
+    </div>
+
+    <!-- CURRENT MODE -->
+    <div class="mode-indicator">
+      @switch (activeTool()) {
+        @case ('select') {
+          Select
+        }
+
+        @case ('hand') {
+          Hand
+        }
+
+        @case ('edit') {
+          Edit
+        }
+
+        @case ('add') {
+          Click to place Space
+        }
+      }
+    </div>
+  </main>
+</section>

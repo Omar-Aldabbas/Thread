@@ -1,0 +1,260 @@
+<section class="canvas-page">
+
+  <!-- TOPBAR -->
+  <header class="canvas-topbar surface-bar">
+
+    <div class="canvas-navigation">
+      <span class="brand-word">
+        THREAD
+      </span>
+
+      <span class="topbar-divider"></span>
+
+      <button
+        type="button"
+        class="breadcrumb-button"
+      >
+        All spaces
+      </button>
+
+      <span class="breadcrumb-separator">
+        /
+      </span>
+
+      <span class="breadcrumb-current">
+        {{ spaceName() }}
+      </span>
+    </div>
+
+
+    <div class="canvas-topbar-actions">
+
+      <div class="canvas-search">
+        <span>
+          ⌕
+        </span>
+
+        <input
+          type="text"
+          placeholder="Search this space..."
+        />
+      </div>
+
+
+      <button
+        type="button"
+        class="avatar-btn"
+      >
+        O
+      </button>
+
+    </div>
+
+  </header>
+
+
+  <!-- VIEWPORT -->
+  <div
+    class="canvas-viewport board-grid"
+    [class.is-panning]="isPanning()"
+    (pointerdown)="startPan($event)"
+    (pointermove)="pan($event)"
+    (pointerup)="stopPan()"
+    (pointercancel)="stopPan()"
+    (wheel)="handleWheel($event)"
+  >
+
+    <!-- WORLD -->
+    <div
+      class="canvas-world"
+      [style.transform]="worldTransform()"
+    >
+
+      <!-- SPACE TITLE -->
+      <div class="space-heading">
+
+        <div class="space-heading-accent"></div>
+
+        <h1>
+          {{ spaceName() }}
+        </h1>
+
+        <p>
+          {{ items().length }} items
+        </p>
+
+      </div>
+
+
+      <!-- ITEMS -->
+      @for (item of items(); track item.id) {
+
+        <article
+          class="board-item card-base"
+          [style.left.px]="item.x"
+          [style.top.px]="item.y"
+        >
+
+          <!-- CARD HEADER -->
+          <header class="board-item-header">
+
+            <div class="board-item-heading">
+
+              <div class="board-item-accent"></div>
+
+              <h2>
+                {{ item.title }}
+              </h2>
+
+            </div>
+
+            <button
+              type="button"
+              class="item-menu"
+            >
+              •••
+            </button>
+
+          </header>
+
+
+          <!-- NOTE -->
+          @if (item.type === 'note') {
+
+            <div class="note-content">
+
+              @for (
+                line of item.content?.split('\n');
+                track $index
+              ) {
+
+                <p>
+                  {{ line }}
+                </p>
+
+              }
+
+            </div>
+
+          }
+
+
+          <!-- CHECKLIST -->
+          @if (item.type === 'checklist') {
+
+            <div class="checklist">
+
+              @for (task of item.tasks; track task.label) {
+
+                <label
+                  class="checklist-item"
+                  [class.completed]="task.completed"
+                >
+
+                  <input
+                    type="checkbox"
+                    [checked]="task.completed"
+                  />
+
+                  <span>
+                    {{ task.label }}
+                  </span>
+
+                </label>
+
+              }
+
+            </div>
+
+          }
+
+
+          <!-- FILE -->
+          @if (item.type === 'file') {
+
+            <div class="file-preview">
+
+              <div class="file-icon">
+                PDF
+              </div>
+
+              <div>
+                <strong>
+                  {{ item.content }}
+                </strong>
+
+                <p>
+                  PDF document
+                </p>
+              </div>
+
+            </div>
+
+          }
+
+
+          <!-- IMAGE -->
+          @if (item.type === 'image') {
+
+            <div class="image-preview">
+
+              <div class="image-placeholder">
+                <span>
+                  IMAGE
+                </span>
+              </div>
+
+            </div>
+
+          }
+
+        </article>
+
+      }
+
+    </div>
+
+
+    <!-- CREATE -->
+    <button
+      type="button"
+      class="canvas-add-button"
+      (click)="addNote()"
+    >
+      +
+    </button>
+
+
+    <!-- ZOOM CONTROLS -->
+    <div class="canvas-controls card-base">
+
+      <button
+        type="button"
+        (click)="zoomIn()"
+      >
+        +
+      </button>
+
+      <div class="zoom-value">
+        {{ (zoom() * 100).toFixed(0) }}%
+      </div>
+
+      <button
+        type="button"
+        (click)="zoomOut()"
+      >
+        −
+      </button>
+
+      <button
+        type="button"
+        (click)="resetView()"
+      >
+        ⌾
+      </button>
+
+    </div>
+
+  </div>
+
+</section>
