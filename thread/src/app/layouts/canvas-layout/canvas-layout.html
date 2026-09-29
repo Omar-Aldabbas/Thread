@@ -1,1 +1,194 @@
-<p>canvas-layout works!</p>
+<div class="canvas-layout">
+  <!-- ===================================
+       TOP BAR
+  ==================================== -->
+
+  <header class="canvas-header">
+    <!-- LEFT -->
+    <div class="header-left">
+      <!-- BRAND -->
+      <button type="button" class="brand-button" (click)="goToSpaces()">THREAD</button>
+
+      <div class="header-divider"></div>
+
+      <!-- BREADCRUMBS -->
+      <nav class="breadcrumbs">
+        <button type="button" class="breadcrumb-link" (click)="goToSpaces()">Spaces</button>
+
+        <span class="breadcrumb-divider"> / </span>
+
+        <span class="breadcrumb-current">
+          {{ spaceName() }}
+        </span>
+      </nav>
+    </div>
+
+    <!-- CENTER -->
+    <div class="header-center">
+      <div class="search-box" [class.expanded]="isSearchExpanded()">
+        <button
+          type="button"
+          class="search-trigger"
+          title="Search this Space"
+          (click)="openSearch()"
+        >
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <circle cx="11" cy="11" r="7" />
+
+            <path d="M20 20L16.5 16.5" />
+          </svg>
+        </button>
+
+        @if (isSearchExpanded()) {
+          <input
+            #searchInput
+            type="text"
+            placeholder="Search this space..."
+            [value]="searchQuery()"
+            (input)="updateSearch($event)"
+            (blur)="closeSearch()"
+          />
+
+          @if (searchQuery()) {
+            <button
+              type="button"
+              class="clear-search"
+              (mousedown)="$event.preventDefault()"
+              (click)="clearSearch()"
+            >
+              ×
+            </button>
+          }
+        }
+
+        @if (!isSearchExpanded()) {
+          <span class="search-shortcut"> / </span>
+        }
+      </div>
+    </div>
+
+    <!-- RIGHT -->
+    <div class="header-right">
+      <!-- INFO -->
+      <button
+        type="button"
+        class="header-icon-button"
+        [class.active]="isInfoPanelOpen()"
+        title="Space information"
+        (click)="toggleInfoPanel()"
+      >
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <circle cx="12" cy="12" r="9" />
+
+          <path d="M12 11V16" />
+
+          <path d="M12 8H12.01" />
+        </svg>
+      </button>
+
+      <!-- SHARE — visual only for now -->
+      <button type="button" class="share-button">Share</button>
+
+      <!-- PROFILE -->
+      <div class="profile-wrapper">
+        <button
+          type="button"
+          class="avatar-button"
+          [class.active]="isProfileOpen()"
+          (click)="toggleProfile()"
+        >
+          O
+        </button>
+
+        @if (isProfileOpen()) {
+          <div class="profile-menu">
+            <div class="profile-summary">
+              <div class="profile-avatar">O</div>
+
+              <div>
+                <strong> Omar </strong>
+
+                <span> Personal workspace </span>
+              </div>
+            </div>
+
+            <div class="menu-divider"></div>
+
+            <button type="button">Settings</button>
+
+            <button type="button" (click)="goToSpaces()">All Spaces</button>
+          </div>
+        }
+      </div>
+    </div>
+  </header>
+
+  <!-- ===================================
+       MAIN CONTENT
+  ==================================== -->
+
+  <div class="canvas-content">
+    <router-outlet />
+  </div>
+
+  <!-- ===================================
+       SPACE INFO PANEL
+  ==================================== -->
+
+  @if (isInfoPanelOpen()) {
+    <aside class="space-info-panel">
+      <header class="info-header">
+        <div>
+          <span class="info-eyebrow"> SPACE </span>
+
+          <h2>
+            {{ spaceName() }}
+          </h2>
+        </div>
+
+        <button type="button" (click)="closeInfoPanel()">×</button>
+      </header>
+
+      <div class="info-section">
+        <span class="info-label"> Items </span>
+
+        <strong>
+          {{ spaceItemCount() }}
+        </strong>
+      </div>
+
+      <div class="info-section">
+        <span class="info-label"> Last updated </span>
+
+        <strong>
+          {{ spaceUpdatedAt() }}
+        </strong>
+      </div>
+
+      <div class="info-section">
+        <span class="info-label"> Space ID </span>
+
+        <code>
+          {{ spaceId() }}
+        </code>
+      </div>
+
+      <div class="info-divider"></div>
+
+      <div class="info-section">
+        <span class="info-label"> About this Space </span>
+
+        <p>Organize notes, tasks, files and Zones freely across the canvas.</p>
+      </div>
+    </aside>
+  }
+
+  @if (isInfoPanelOpen()) {
+    <button
+      type="button"
+      class="panel-backdrop"
+      aria-label="Close information panel"
+      (click)="closeInfoPanel()"
+    ></button>
+  }
+</div>
