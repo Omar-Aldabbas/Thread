@@ -100,7 +100,7 @@ export class CanvasPage implements AfterViewInit {
   setTool(tool: Tool): void { this.finishEditing(); this.tool.set(tool); this.paletteOpen.set(tool === 'add'); if (tool !== 'add') this.pendingType.set(null); if (tool !== 'sketch') this.sketchEraser.set(false); this.pendingAsset.set(null); this.mediaPicker.set(null); this.connectionSourceId.set(null); }
   chooseType(type: ItemType): void { if (type === 'gif' || type === 'sticker') { this.openMedia(type); return; } this.pendingType.set(type); this.paletteOpen.set(false); this.tool.set('select'); }
   openMedia(kind: 'gif' | 'sticker'): void { this.paletteOpen.set(false); this.mediaPicker.set(kind); this.pendingAsset.set(null); }
-  pickMedia(asset: PickedMedia): void { this.mediaPicker.set(null); this.pendingAsset.set(asset); this.assetPreview.set(this.centerPoint()); this.tool.set('select'); }
+  pickMedia(asset: PickedMedia): void { this.mediaPicker.set(null); this.pendingAsset.set(asset); this.assetPreview.set(this.centerPoint()); this.sketchEraser.set(false); this.tool.set('select'); }
   placeMedia(asset: PickedMedia, point: { x: number; y: number }): void {
     const scale = Math.min(1, 280 / asset.width, 220 / asset.height);
     const width = Math.round(asset.width * scale), height = Math.round(asset.height * scale);
@@ -275,7 +275,7 @@ export class CanvasPage implements AfterViewInit {
   startCrop(): void { const item = this.selected(); if (item?.type !== 'image') return; this.cropBefore = this.state(); this.cropId.set(item.id); this.inspectorOpen.set(false); }
   cropZoom(factor: number): void { const item = this.selected(); if (item?.type === 'image') this.update(item.id, { cropScale: Math.max(1, Math.min(5, (item.cropScale || 1) * factor)) }); }
   finishCrop(save: boolean): void { if (this.cropBefore) { if (save) this.commit(this.cropBefore); else { this.items.set(this.cropBefore.items); this.connections.set(this.cropBefore.connections); } } this.cropBefore = null; this.cropId.set(null); }
-  imageTransform(item: CanvasItem): string { return `translate(${item.cropX || 0}px, ${item.cropY || 0}px) scale(${item.cropScale || 1})`; }
+  imageTransform(item: CanvasItem): string { const scale = item.cropScale || 1; return `translate(${item.cropX || 0}px, ${item.cropY || 0}px) scale(${scale * (item.flipX ? -1 : 1)}, ${scale * (item.flipY ? -1 : 1)})`; }
   layer(direction: 'front' | 'back' | 'top' | 'bottom'): void { if (!this.selectedIds().length) return; const values = this.items().map(item => item.zIndex || 0); const high = Math.max(1, ...values), low = Math.min(0, ...values); this.snapshot(); this.selectedIds().forEach(id => { const item = this.items().find(entry => entry.id === id); if (item) this.update(id, { zIndex: direction === 'top' ? high + 1 : direction === 'bottom' ? low - 1 : (item.zIndex || 1) + (direction === 'front' ? 1 : -1) }); }); }
   flip(id: string, axis: 'x' | 'y'): void { const item = this.items().find(entry => entry.id === id); if (item) this.setStyle(id, axis === 'x' ? { flipX: !item.flipX } : { flipY: !item.flipY }); }
   align(axis: 'x' | 'y'): void { const targets = this.items().filter(item => this.selectedIds().includes(item.id)); if (targets.length < 2) return; const value = Math.min(...targets.map(item => item[axis])); this.snapshot(); targets.forEach(item => this.update(item.id, { [axis]: value })); }
@@ -291,7 +291,13 @@ export class CanvasPage implements AfterViewInit {
     this.items.update(items => items.filter(item => {
       if (item.sketchAsset) return !(point.x >= item.x - radius && point.x <= item.x + item.width + radius && point.y >= item.y - radius && point.y <= item.y + item.height + radius);
       if (item.type !== 'sketch') return true;
-      return !(item.strokes || []).some(stroke => stroke.some(p => Math.hypot(point.x - item.x - p.x, point.y - item.y - p.y) <= radius));
+      const angle = -(item.rotation || 0) * Math.PI / 180, cos = Math.cos(angle), sin = Math.sin(angle);
+      const dx = point.x - item.x - item.width / 2, dy = point.y - item.y - item.height / 2;
+      const localX = dx * cos - dy * sin + item.width / 2, localY = dx * sin + dy * cos + item.height / 2;
+      const sourceX = localX * (item.sourceWidth || item.width) / item.width;
+      const sourceY = localY * (item.sourceHeight || item.height) / item.height;
+      const sourceRadius = radius * Math.max((item.sourceWidth || item.width) / item.width, (item.sourceHeight || item.height) / item.height);
+      return !(item.strokes || []).some(stroke => stroke.some(p => Math.hypot(sourceX - p.x, sourceY - p.y) <= sourceRadius));
     }));
   }
   private finishSketch(): void {
@@ -300,7 +306,7 @@ export class CanvasPage implements AfterViewInit {
     const minX = Math.min(...points.map(point => point.x)) - padding, minY = Math.min(...points.map(point => point.y)) - padding;
     const maxX = Math.max(...points.map(point => point.x)) + padding, maxY = Math.max(...points.map(point => point.y)) + padding;
     const pressure = points.reduce((sum, p) => sum + (p.pressure ?? .5), 0) / points.length;
-    const item: CanvasItem = { id: crypto.randomUUID(), type: 'sketch', parentId: null, x: minX, y: minY, width: Math.max(12, maxX - minX), height: Math.max(12, maxY - minY), title: 'Sketch', strokes: [points.map(point => ({ x: point.x - minX, y: point.y - minY, pressure: point.pressure }))], accent: this.sketchColor(), brush: this.brush(), strokeWidth: this.brushSize() * (.8 + Math.min(1, pressure) * .4), strokeOpacity: this.brushOpacity(), zIndex: Math.max(1, ...this.items().map(entry => entry.zIndex || 1)) + 1, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
+    const item: CanvasItem = { id: crypto.randomUUID(), type: 'sketch', parentId: null, x: minX, y: minY, width: Math.max(12, maxX - minX), height: Math.max(12, maxY - minY), sourceWidth: Math.max(12, maxX - minX), sourceHeight: Math.max(12, maxY - minY), title: 'Sketch', strokes: [points.map(point => ({ x: point.x - minX, y: point.y - minY, pressure: point.pressure }))], accent: this.sketchColor(), brush: this.brush(), strokeWidth: this.brushSize() * (.8 + Math.min(1, pressure) * .4), strokeOpacity: this.brushOpacity(), zIndex: Math.max(1, ...this.items().map(entry => entry.zIndex || 1)) + 1, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
     this.snapshot(); this.items.update(items => [...items, item]); this.selectedIds.set([item.id]);
   }
   tableColumns(item: CanvasItem): string[] { return item.tableColumns?.length ? item.tableColumns : ['Column 1', 'Column 2']; }

@@ -418,7 +418,7 @@
           } @else if (item.type === 'sketch') {
             <svg
               class="sketch-object"
-              [attr.viewBox]="'0 0 ' + item.width + ' ' + item.height"
+              [attr.viewBox]="'0 0 ' + (item.sourceWidth || item.width) + ' ' + (item.sourceHeight || item.height)"
               preserveAspectRatio="none"
               aria-label="Sketch stroke"
             >

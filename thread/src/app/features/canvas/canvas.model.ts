@@ -61,6 +61,8 @@ export interface CanvasItem {
   brush?: 'pen' | 'marker' | 'highlighter';
   strokeWidth?: number;
   strokeOpacity?: number;
+  sourceWidth?: number;
+  sourceHeight?: number;
   zoneType?: ZoneType;
   portalTargetId?: string;
   locked?: boolean;
