@@ -16,6 +16,9 @@ export type ItemType =
   | 'voice'
   | 'budget';
 export type ZoneType = 'standard' | 'nested' | 'portal';
+export type SketchBrush = 'pen' | 'marker' | 'highlighter' | 'neon';
+export interface SketchPoint { x: number; y: number; pressure: number }
+export interface SketchStroke { id: string; brush: SketchBrush; points: SketchPoint[]; color: string; size: number; opacity: number }
 
 export interface CanvasItem {
   id: string;
@@ -54,6 +57,7 @@ export interface CanvasItem {
   tableColumns?: string[];
   tableRows?: string[][];
   strokes?: { x: number; y: number; pressure?: number }[][];
+  sketchStrokes?: SketchStroke[];
   sketchAsset?: 'sticker' | 'gif';
   assetId?: string;
   flipX?: boolean;

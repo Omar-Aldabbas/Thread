@@ -66,7 +66,7 @@ button { cursor:pointer; border:0; background:none; color:inherit; }
 
 .canvas-item.note-item { background:var(--color-note); border-color:#e8dcb8; box-shadow:0 3px 11px rgba(84,65,18,.06); }
 .canvas-item:not(.zone):not(.text-item):not(.image-item):not(.sketch-item).note-item { background:var(--color-note); }
-.canvas-item.sketch-item { border:0; background:transparent; }
+.canvas-item.sketch-item { border:0!important; background:transparent!important; box-shadow:none!important; padding:0; }
 .sketch-object { display:block; width:100%; height:100%; overflow:visible; }
 .sketch-preview { position:absolute; left:0; top:0; overflow:visible; pointer-events:none; }
 .canvas-viewport.sketch-cursor { cursor:crosshair; }
@@ -96,6 +96,11 @@ button { cursor:pointer; border:0; background:none; color:inherit; }
 .create-palette,.inspector { animation:panel-in 180ms ease-out both; }
 .selection-toolbar { animation:toolbar-in 140ms ease-out both; }
 .canvas-item.selected { transition:outline-color 140ms ease,outline-offset 140ms ease; }
+.canvas-item.selected { outline:0; }
+.alignment-guide { position:absolute; z-index:19; pointer-events:none; background:var(--color-primary); opacity:.72; }
+.alignment-guide.vertical { top:-10000px; width:1px; height:20000px; }
+.alignment-guide.horizontal { left:-10000px; width:20000px; height:1px; }
+.transform-guide { position:absolute; z-index:26; padding:5px 8px; transform:translateX(-50%); border:1px solid var(--color-border); border-radius:5px; background:var(--color-surface); box-shadow:var(--shadow-sm); color:var(--color-text-primary); white-space:nowrap; font-size:11px; font-weight:750; pointer-events:none; }
 .canvas-item.connection-source { outline:3px solid var(--color-primary); outline-offset:4px; box-shadow:0 0 0 7px rgba(212,17,28,.12); }
 .tool-rail { left:20px; gap:3px; padding:6px; border-radius:12px; }
 .tool-rail button { width:44px; height:44px; border-radius:8px; }
@@ -167,3 +172,32 @@ button { cursor:pointer; border:0; background:none; color:inherit; }
   .sketch-tools select { min-height:42px; font-size:16px; }
 }
 @media (min-width:701px) and (max-width:1024px) { .tool-rail { left:12px; } .create-palette { left:70px; } .inspector { width:270px; } .sketch-tools { left:72px; } }
+.canvas-action-bar { border:1px solid var(--color-border); border-radius:10px; background:var(--color-surface); box-shadow:var(--shadow-sm); }
+.canvas-action-bar button { display:inline-flex; align-items:center; justify-content:center; flex:none; min-width:36px; height:36px; padding:0 9px; border-radius:6px; color:var(--color-text-secondary); line-height:1; }
+.canvas-action-bar button:hover { background:var(--color-primary-subtle); color:var(--color-primary); }
+.canvas-action-bar button.active { background:var(--color-primary); color:white; }
+.canvas-action-bar button:disabled { opacity:.4; cursor:default; }
+.canvas-action-bar svg { display:block; width:19px; height:19px; flex:none; fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; }
+.tool-rail.canvas-action-bar button { display:flex; align-items:center; justify-content:center; gap:3px; padding:0; }
+.tool-rail.canvas-action-bar button svg { width:20px; height:20px; }
+.tool-rail.canvas-action-bar button small { margin:0; }
+.sketch-tools.canvas-action-bar { gap:5px; padding:6px; }
+.sketch-tools.canvas-action-bar > button { width:36px; min-width:36px; height:36px; font-size:14px; }
+.sketch-tools.canvas-action-bar .action-done { width:auto; padding:0 13px; background:var(--color-primary); color:white; font-size:12px; font-weight:750; }
+.sketch-tools.canvas-action-bar .action-done:hover { filter:brightness(.93); }
+.sketch-tools.canvas-action-bar > select { height:36px; min-width:102px; padding:0 9px; border-radius:6px; }
+.brush-gauge { display:flex!important; flex-direction:row!important; align-items:center; gap:7px!important; min-width:142px; height:36px; padding:0 8px; border:1px solid var(--color-border-light); border-radius:6px; }
+.brush-gauge-dot { display:block; flex:none; max-width:26px; max-height:26px; border-radius:50%; background:var(--color-text-primary); }
+.brush-gauge input[type=range] { width:85px!important; height:24px!important; padding:0!important; border:0!important; accent-color:var(--color-primary); cursor:pointer; }
+.brush-gauge output { min-width:18px; color:var(--color-text-secondary); text-align:right; font-size:11px; font-variant-numeric:tabular-nums; }
+.sketch-colors { padding:0 7px; border-left:1px solid var(--color-border-light); border-right:1px solid var(--color-border-light); }
+.sketch-colors button { width:21px!important; min-width:21px!important; height:21px!important; padding:0!important; border-radius:50%!important; }
+.selection-toolbar.canvas-action-bar { min-height:46px; gap:3px; padding:5px; }
+.selection-toolbar.canvas-action-bar button { height:34px; min-height:34px; }
+.selection-toolbar.canvas-action-bar select { height:34px; border-radius:5px; }
+.zoom-controls.canvas-action-bar { padding:5px; }
+.zoom-controls.canvas-action-bar button { height:32px; min-width:32px; }
+.resize-handle { width:13px; height:13px; z-index:6; padding:0; touch-action:none; border-radius:2px; }
+.rotate-handle { z-index:6; touch-action:none; }
+@media (pointer:coarse) { .resize-handle { width:22px; height:22px; } .rotate-handle { width:24px; height:24px; top:-36px; left:calc(50% - 12px); } }
+@media (max-width:700px) { .tool-rail.canvas-action-bar { border-radius:0; } .tool-rail.canvas-action-bar button { height:53px; } .tool-rail.canvas-action-bar button svg { width:21px; height:21px; } .sketch-tools.canvas-action-bar { gap:6px; padding:7px; } .sketch-tools.canvas-action-bar .brush-gauge { min-width:160px; } }

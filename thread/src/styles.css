@@ -151,3 +151,10 @@ a {
 :root[data-theme='dark'] .mock-picture {
   background: linear-gradient(160deg, #33485a, #456573);
 }
+.thread-moveable.moveable-control-box { z-index:24!important; }
+.thread-moveable { pointer-events:none!important; }
+.thread-moveable .moveable-line { background:#d4111c!important; }
+.thread-moveable .moveable-control { width:9px!important; height:9px!important; margin-top:-4.5px!important; margin-left:-4.5px!important; border:1.5px solid #d4111c!important; background:#fff!important; }
+.thread-moveable .moveable-rotation .moveable-control { border-radius:50%!important; background:#d4111c!important; }
+.thread-moveable .moveable-guideline { background:#d4111c!important; }
+@media (pointer:coarse) { .thread-moveable .moveable-control { width:13px!important; height:13px!important; margin-top:-6.5px!important; margin-left:-6.5px!important; } .thread-moveable .moveable-direction { padding:12px!important; } }

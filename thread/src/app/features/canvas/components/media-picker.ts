@@ -1,5 +1,6 @@
-import { Component, EventEmitter, Input, OnInit, Output, computed, signal } from '@angular/core';
-import { GifResult, StickerAsset, curatedGifProvider, stickers } from '../media-catalog';
+import { Component, EventEmitter, Input, OnDestroy, OnInit, Output, computed, inject, signal } from '@angular/core';
+import { GifResult, StickerAsset, stickers } from '../media-catalog';
+import { GiphyService } from '../giphy.service';
 
 export interface PickedMedia {
   kind: 'gif' | 'sticker';
@@ -49,20 +50,20 @@ export interface PickedMedia {
             [attr.aria-label]="'Place ' + entry.name"
           >
             <img
-              [src]="kind === 'gif' ? $any(entry).previewUrl : $any(entry).src"
+              [src]="kind === 'gif' || category() === 'GIPHY' ? $any(entry).previewUrl : $any(entry).src"
               [alt]="entry.name"
               loading="lazy"
             /><span>{{ entry.name }}</span>
           </button>
         }
-        @if (loading()) { <p class="media-empty">Loading GIFs...</p> }
+        @if (loading()) { <p class="media-empty">Loading media...</p> }
+        @else if (error()) { <p class="media-empty">{{ error() }}</p> }
         @else if (!visible().length) {
-          <p class="media-empty">No matches in this collection.</p>
+          <p class="media-empty">{{ category() === 'Wevi' ? 'Wevi stickers need the approved mascot artwork.' : 'No matches found.' }}</p>
         }
       </div>
-      @if (kind === 'gif') {
-        <p class="media-caption">Curated GIFs · more results can be added with a media provider</p>
-      }
+      @if (more() && !loading()) { <button class="media-more" type="button" (click)="loadMore()">Load more</button> }
+      @if (kind === 'gif' || category() === 'GIPHY') { <p class="media-caption">Powered by GIPHY</p> }
     </aside>
   `,
   styles: [
@@ -208,6 +209,7 @@ export interface PickedMedia {
         color: var(--color-text-muted);
         font-size: 10px;
       }
+      .media-more { margin:8px 15px; min-height:36px; border:1px solid var(--color-border); border-radius:7px; background:var(--color-surface); color:var(--color-text-primary); cursor:pointer; }
       @media (max-width: 700px) {
         .media-search { height: 46px; font-size: 16px; }
         .media-picker {
@@ -230,7 +232,8 @@ export interface PickedMedia {
     `,
   ],
 })
-export class MediaPicker implements OnInit {
+export class MediaPicker implements OnInit, OnDestroy {
+  private readonly giphy = inject(GiphyService);
   @Input({ required: true }) kind!: 'gif' | 'sticker';
   @Output() closed = new EventEmitter<void>();
   @Output() picked = new EventEmitter<PickedMedia>();
@@ -238,24 +241,29 @@ export class MediaPicker implements OnInit {
   readonly category = signal('Featured');
   readonly gifs = signal<GifResult[]>([]);
   readonly loading = signal(false);
+  readonly error = signal('');
+  readonly more = signal(false);
+  private offset = 0;
+  private request?: AbortController;
+  private debounce?: ReturnType<typeof setTimeout>;
   readonly recent = signal<string[]>([]);
   readonly categories = computed(() =>
     this.kind === 'gif'
       ? ['Trending', 'Recent']
-      : ['Featured', 'Recent', 'Thread', 'Doodles', 'Arrows', 'Shapes', 'Tape', 'Labels', 'Nature'],
+      : ['Featured', 'Recent', 'Thread', 'Doodles', 'Arrows', 'Shapes', 'Tape', 'Labels', 'Nature', 'GIPHY', 'Wevi'],
   );
   readonly visible = computed(() => {
     const query = this.query().trim().toLowerCase();
-    const data: (GifResult | StickerAsset)[] = this.kind === 'gif' ? this.gifs() : stickers;
+    const data: (GifResult | StickerAsset)[] = this.kind === 'gif' || this.category() === 'GIPHY' ? this.gifs() : this.category() === 'Wevi' ? [] : stickers;
     return data.filter((entry) => {
       if (this.category() === 'Recent' && !this.recent().includes(entry.id)) return false;
       if (
         this.kind === 'sticker' &&
-        !['Featured', 'Recent'].includes(this.category()) &&
+        !['Featured', 'Recent', 'GIPHY'].includes(this.category()) &&
         (entry as StickerAsset).category !== this.category()
       )
         return false;
-      return !query || `${entry.name} ${entry.keywords.join(' ')}`.toLowerCase().includes(query);
+      return this.kind === 'gif' || this.category() === 'GIPHY' || !query || `${entry.name} ${entry.keywords.join(' ')}`.toLowerCase().includes(query);
     });
   });
   ngOnInit(): void {
@@ -265,15 +273,32 @@ export class MediaPicker implements OnInit {
     } catch {
       this.recent.set([]);
     }
-    if (this.kind === 'gif') { this.loading.set(true); void curatedGifProvider.search('').then(value => this.gifs.set(value)).finally(() => this.loading.set(false)); }
+    if (this.kind === 'gif') this.load();
   }
+  ngOnDestroy(): void { clearTimeout(this.debounce); this.request?.abort(); }
   search(event: Event): void {
     const value = (event.target as HTMLInputElement).value;
     this.query.set(value);
-    if (this.kind === 'gif') { this.loading.set(true); void curatedGifProvider.search(value).then(results => { if (this.query() === value) this.gifs.set(results); }).finally(() => this.loading.set(false)); }
+    if (this.kind === 'gif' || this.category() === 'GIPHY') { clearTimeout(this.debounce); this.debounce = setTimeout(() => this.load(), 300); }
   }
   setCategory(value: string): void {
     this.category.set(value);
+    if (this.kind === 'sticker' && value === 'GIPHY') this.load();
+    else { this.request?.abort(); this.error.set(''); this.more.set(false); }
+  }
+  loadMore(): void { this.load(true); }
+  private load(append = false): void {
+    this.request?.abort();
+    const request = new AbortController(); this.request = request;
+    const offset = append ? this.offset : 0;
+    this.loading.set(true); this.error.set('');
+    void this.giphy.fetch(this.kind, this.query(), offset, request.signal).then(page => {
+      if (request.signal.aborted) return;
+      this.gifs.set(append ? [...this.gifs(), ...page.results] : page.results);
+      this.offset = offset + page.results.length;
+      this.more.set(page.more);
+    }).catch(error => { if (!request.signal.aborted) this.error.set(error instanceof Error ? error.message : 'Media could not load.'); })
+      .finally(() => { if (!request.signal.aborted) this.loading.set(false); });
   }
   choose(entry: GifResult | StickerAsset): void {
     const recent = [entry.id, ...this.recent().filter((id) => id !== entry.id)].slice(0, 12);
@@ -287,7 +312,7 @@ export class MediaPicker implements OnInit {
       kind: this.kind,
       id: entry.id,
       name: entry.name,
-      src: this.kind === 'gif' ? (entry as GifResult).sourceUrl : (entry as StickerAsset).src,
+      src: this.kind === 'gif' || this.category() === 'GIPHY' ? (entry as GifResult).sourceUrl : (entry as StickerAsset).src,
       width: entry.width,
       height: entry.height,
     });

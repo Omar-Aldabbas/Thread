@@ -1,17 +1,20 @@
-﻿import { CommonModule, isPlatformBrowser } from '@angular/common';
-import { AfterViewInit, Component, ElementRef, HostListener, PLATFORM_ID, computed, effect, inject, signal, viewChild } from '@angular/core';
+import { CommonModule, isPlatformBrowser } from '@angular/common';
+import { AfterViewInit, Component, ElementRef, HostListener, OnDestroy, PLATFORM_ID, computed, effect, inject, signal, viewChild } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
-import { CanvasConnection, CanvasItem, ItemType, demoConnections, demoItems } from '../../canvas.model';
+import { CanvasConnection, CanvasItem, ItemType, SketchBrush, SketchStroke, demoConnections, demoItems } from '../../canvas.model';
 import { RichTextEditor } from '../../components/rich-text-editor';
 import { PreferencesService } from '../../../../shared/preferences.service';
 import { MediaPicker, PickedMedia } from '../../components/media-picker';
+import { CanvasTransformOverlay } from '../../transform/canvas-transform-overlay';
+import { SketchRenderer } from '../../sketch/sketch-renderer';
+import { brushDiameter, distanceToStroke, strokeBounds, strokeOutlinePath } from '../../sketch/sketch-geometry';
 
 type Tool = 'select' | 'hand' | 'text' | 'add' | 'connect' | 'sketch';
 type Session = { kind: 'pan' | 'move' | 'resize' | 'rotate' | 'marquee' | 'place' | 'crop' | 'connect' | 'sketch' | 'erase'; pointerId: number; clientX: number; clientY: number; x: number; y: number; itemId?: string; corner?: 'nw' | 'ne' | 'sw' | 'se'; before?: State; origins?: Map<string, { x: number; y: number }>; moved?: boolean };
 type State = { items: CanvasItem[]; connections: CanvasConnection[] };
 
-@Component({ selector: 'app-canvas-page', standalone: true, imports: [CommonModule, RichTextEditor, MediaPicker], templateUrl: './canvas-page.html', styleUrl: './canvas-page.css' })
-export class CanvasPage implements AfterViewInit {
+@Component({ selector: 'app-canvas-page', standalone: true, imports: [CommonModule, RichTextEditor, MediaPicker, SketchRenderer], templateUrl: './canvas-page.html', styleUrl: './canvas-page.css' })
+export class CanvasPage implements AfterViewInit, OnDestroy {
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   readonly preferences = inject(PreferencesService);
@@ -38,8 +41,11 @@ export class CanvasPage implements AfterViewInit {
   readonly sketchPoints = signal<{ x: number; y: number; pressure?: number }[]>([]);
   readonly sketchColor = signal('#d4111c');
   readonly sketchEraser = signal(false);
-  readonly brush = signal<'pen' | 'marker' | 'highlighter'>('pen');
+  readonly brush = signal<SketchBrush>('pen');
   readonly brushWidth = signal(3);
+  readonly activeSketchStrokes = signal<SketchStroke[]>([]);
+  readonly undoneSketchStrokes = signal<SketchStroke[]>([]);
+  readonly editingSketchId = signal<string | null>(null);
   readonly mediaPicker = signal<'gif' | 'sticker' | null>(null);
   readonly pendingAsset = signal<PickedMedia | null>(null);
   readonly assetPreview = signal<{ x: number; y: number } | null>(null);
@@ -61,6 +67,12 @@ export class CanvasPage implements AfterViewInit {
   private session: Session | null = null;
   private history: State[] = [];
   private future: State[] = [];
+  private transformOverlay: CanvasTransformOverlay | null = null;
+  private transformBefore: State | null = null;
+  private transformStart: CanvasItem | null = null;
+  private transformFrame = 0;
+  readonly transformGuide = signal<{ label: string; x: number; y: number } | null>(null);
+  readonly snapGuide = signal<{ x?: number; y?: number } | null>(null);
 
   readonly spaceName = computed(() => {
     if (!this.browser) return 'Thread development';
@@ -78,8 +90,42 @@ export class CanvasPage implements AfterViewInit {
   readonly zoomLabel = computed(() => `${Math.round(this.zoom() * 100)}%`);
   childCount(id: string): number { return this.items().filter((item) => item.parentId === id).length; }
 
-  constructor() { effect(() => { if (this.browser) { try { localStorage.setItem(this.storageKey, JSON.stringify({ version: 2, items: this.items(), connections: this.connections() })); } catch { /* Large files can exceed local storage. */ } } }); }
-  ngAfterViewInit(): void { setTimeout(() => this.fitView()); }
+  constructor() {
+    effect(() => { if (this.browser) { try { localStorage.setItem(this.storageKey, JSON.stringify({ version: 2, items: this.items(), connections: this.connections() })); } catch { /* Large files can exceed local storage. */ } } });
+    effect(() => { this.selectedIds(); this.zoom(); this.panX(); this.panY(); if (this.browser) this.queueTransformSync(); });
+  }
+  ngAfterViewInit(): void {
+    if (this.browser && this.viewport()) {
+      this.transformOverlay = new CanvasTransformOverlay(this.viewport()!.nativeElement, {
+        start: () => this.beginTransform(),
+        resize: (width, height, direction) => this.resizeTransform(width, height, direction),
+        rotate: degrees => this.rotateTransform(degrees),
+        end: () => this.endTransform(),
+      });
+    }
+    setTimeout(() => { this.fitView(); this.queueTransformSync(); });
+  }
+  ngOnDestroy(): void { if (this.transformFrame) cancelAnimationFrame(this.transformFrame); this.transformOverlay?.destroy(); }
+  private queueTransformSync(): void { if (!this.browser || this.transformFrame) return; this.transformFrame = requestAnimationFrame(() => { this.transformFrame = 0; const viewport = this.viewport()?.nativeElement; if (!viewport || !this.transformOverlay) return; const ids = this.selectedIds(); const targets = ids.map(id => viewport.querySelector<HTMLElement>(`[data-node-id="${id}"]`)).filter((value): value is HTMLElement => !!value); const others = [...viewport.querySelectorAll<HTMLElement>('[data-node-id]')].filter(element => !ids.includes(element.dataset['nodeId'] || '')); const item = this.selected(); this.transformOverlay.update(targets, others, !!item && ['image', 'gif', 'sticker', 'sketch'].includes(item.type)); }); }
+  private beginTransform(): void { this.transformStart = this.selected(); this.transformBefore = this.state(); }
+  private resizeTransform(width: number, height: number, direction: number[]): void {
+    const item = this.transformStart; if (!item) return;
+    const nextWidth = Math.max(40, width), nextHeight = Math.max(40, height);
+    const sx = direction[0] || 1, sy = direction[1] || 1;
+    const angle = (item.rotation || 0) * Math.PI / 180, cos = Math.cos(angle), sin = Math.sin(angle);
+    const oldOppX = -sx * item.width / 2, oldOppY = -sy * item.height / 2;
+    const newOppX = -sx * nextWidth / 2, newOppY = -sy * nextHeight / 2;
+    const anchorX = item.x + item.width / 2 + oldOppX * cos - oldOppY * sin;
+    const anchorY = item.y + item.height / 2 + oldOppX * sin + oldOppY * cos;
+    const centerX = anchorX - newOppX * cos + newOppY * sin;
+    const centerY = anchorY - newOppX * sin - newOppY * cos;
+    this.update(item.id, { x: centerX - nextWidth / 2, y: centerY - nextHeight / 2, width: nextWidth, height: nextHeight, textAutoSize: false });
+    this.setTransformGuide(`${Math.round(nextWidth)} × ${Math.round(nextHeight)}`);
+    this.queueTransformSync();
+  }
+  private rotateTransform(degrees: number): void { const item = this.transformStart; if (!item) return; const rotation = Math.round(degrees); this.update(item.id, { rotation }); this.setTransformGuide(`${rotation}°`); this.queueTransformSync(); }
+  private setTransformGuide(label: string): void { const item = this.selected(), viewport = this.viewport()?.nativeElement; if (!item || !viewport) return; const x = this.panX() + (item.x + item.width / 2) * this.zoom(); const top = this.panY() + item.y * this.zoom(); const bottom = this.panY() + (item.y + item.height) * this.zoom(); this.transformGuide.set({ label, x, y: top >= 44 ? top - 35 : bottom + 16 }); }
+  private endTransform(): void { if (this.transformBefore) this.commit(this.transformBefore); this.transformBefore = null; this.transformStart = null; this.transformGuide.set(null); this.queueTransformSync(); }
 
   private read(): State {
     if (!this.browser) return { items: demoItems, connections: demoConnections };
@@ -97,7 +143,7 @@ export class CanvasPage implements AfterViewInit {
   private snapshot(): void { this.history.push(this.state()); this.history = this.history.slice(-60); this.future = []; }
   undo(): void { const state = this.history.pop(); if (!state) return; this.future.push({ items: structuredClone(this.items()), connections: structuredClone(this.connections()) }); this.items.set(state.items); this.connections.set(state.connections); }
   redo(): void { const state = this.future.pop(); if (!state) return; this.history.push({ items: structuredClone(this.items()), connections: structuredClone(this.connections()) }); this.items.set(state.items); this.connections.set(state.connections); }
-  setTool(tool: Tool): void { this.finishEditing(); this.tool.set(tool); this.paletteOpen.set(tool === 'add'); if (tool !== 'add') this.pendingType.set(null); if (tool !== 'sketch') this.sketchEraser.set(false); this.pendingAsset.set(null); this.mediaPicker.set(null); this.connectionSourceId.set(null); }
+  setTool(tool: Tool): void { if (this.tool() === 'sketch' && tool !== 'sketch') this.completeSketch(); this.finishEditing(); this.tool.set(tool); this.paletteOpen.set(tool === 'add'); if (tool !== 'add') this.pendingType.set(null); if (tool !== 'sketch') this.sketchEraser.set(false); else this.selectedIds.set([]); this.pendingAsset.set(null); this.mediaPicker.set(null); this.connectionSourceId.set(null); }
   chooseType(type: ItemType): void { if (type === 'gif' || type === 'sticker') { this.openMedia(type); return; } this.pendingType.set(type); this.paletteOpen.set(false); this.tool.set('select'); }
   openMedia(kind: 'gif' | 'sticker'): void { this.paletteOpen.set(false); this.mediaPicker.set(kind); this.pendingAsset.set(null); }
   pickMedia(asset: PickedMedia): void { this.mediaPicker.set(null); this.pendingAsset.set(asset); this.assetPreview.set(this.centerPoint()); this.selectedIds.set([]); this.sketchEraser.set(false); this.tool.set('select'); }
@@ -107,8 +153,11 @@ export class CanvasPage implements AfterViewInit {
     const item: CanvasItem = { id: crypto.randomUUID(), type: asset.kind, parentId: null, x: point.x - width / 2, y: point.y - height / 2, width, height, title: asset.name, image: asset.src, assetId: asset.id, rotation: 0, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
     this.snapshot(); this.items.update(items => [...items, item]); this.selectedIds.set([item.id]); this.pendingAsset.set(null); this.assetPreview.set(null); this.tool.set('select');
   }
-  brushSize(): number { return this.brush() === 'pen' ? this.brushWidth() : this.brush() === 'marker' ? this.brushWidth() * 2 : this.brushWidth() * 4; }
-  brushOpacity(): number { return this.brush() === 'highlighter' ? .32 : 1; }
+  brushSize(): number { return brushDiameter(this.brush(), this.brushWidth()); }
+  brushOpacity(): number { return this.brush() === 'highlighter' ? .34 : this.brush() === 'marker' ? .9 : 1; }
+  readonly currentStroke = computed<SketchStroke | null>(() => this.sketchPoints().length ? { id: 'current', brush: this.brush(), points: this.sketchPoints().map(point => ({ x: point.x, y: point.y, pressure: point.pressure ?? .5 })), color: this.sketchColor(), size: this.brushWidth(), opacity: this.brushOpacity() } : null);
+  readonly activeRendered = computed(() => this.activeSketchStrokes().map(stroke => ({ stroke, path: strokeOutlinePath(stroke) })));
+  strokeOutlinePath(stroke: SketchStroke): string { return strokeOutlinePath(stroke, false); }
 
   @HostListener('window:keydown', ['$event'])
   keyDown(event: KeyboardEvent): void {
@@ -119,7 +168,8 @@ export class CanvasPage implements AfterViewInit {
     if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'c') { event.preventDefault(); this.copy(); return; }
     if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'x') { event.preventDefault(); this.copy(); this.removeSelected(); return; }
     if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'v' && this.clipboard.length) { event.preventDefault(); this.paste(); return; }
-    if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'z') { event.preventDefault(); event.shiftKey ? this.redo() : this.undo(); return; }
+    if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'z') { event.preventDefault(); if (this.tool() === 'sketch') event.shiftKey ? this.redoSketchStroke() : this.undoSketchStroke(); else event.shiftKey ? this.redo() : this.undo(); return; }
+    if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'y' && this.tool() === 'sketch') { event.preventDefault(); this.redoSketchStroke(); return; }
     if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'd') { event.preventDefault(); this.duplicate(); return; }
     if (event.key === 'Delete' || event.key === 'Backspace') { this.removeSelected(); return; }
     if (event.key === 'Escape') { if (this.cropId()) this.finishCrop(false); else if (this.editingId()) this.finishEditing(); else if (this.pendingAsset()) this.pendingAsset.set(null); else if (this.mediaPicker()) this.mediaPicker.set(null); else if (this.pendingType()) this.pendingType.set(null); else if (this.paletteOpen()) this.paletteOpen.set(false); else this.selectedIds.set([]); this.connectionSourceId.set(null); return; }
@@ -164,8 +214,27 @@ export class CanvasPage implements AfterViewInit {
     const dx = event.clientX - session.clientX; const dy = event.clientY - session.clientY;
     if (Math.abs(dx) + Math.abs(dy) > 3) session.moved = true;
     if (session.kind === 'pan') { this.panX.set(session.x + dx); this.panY.set(session.y + dy); }
-    if (session.kind === 'move' && session.origins) this.items.update(items => items.map(item => { const origin = session.origins!.get(item.id); return origin ? { ...item, x: origin.x + dx / this.zoom(), y: origin.y + dy / this.zoom() } : item; }));
-    if (session.kind === 'resize') this.items.update((items) => items.map((item) => {
+    if (session.kind === 'move' && session.origins) {
+      let offsetX = dx / this.zoom(), offsetY = dy / this.zoom();
+      const moving = this.items().find(item => item.id === session.itemId);
+      const origin = moving && session.origins.get(moving.id);
+      let guideX: number | undefined, guideY: number | undefined;
+      if (moving && origin) {
+        const ownX = [origin.x + offsetX, origin.x + offsetX + moving.width / 2, origin.x + offsetX + moving.width];
+        const ownY = [origin.y + offsetY, origin.y + offsetY + moving.height / 2, origin.y + offsetY + moving.height];
+        let bestX = 6 / this.zoom(), bestY = 6 / this.zoom(), snapX = 0, snapY = 0;
+        for (const other of this.items()) {
+          if (session.origins.has(other.id)) continue;
+          for (const target of [other.x, other.x + other.width / 2, other.x + other.width]) for (const value of ownX) { const distance = Math.abs(target - value); if (distance < bestX) { bestX = distance; guideX = target; snapX = target - value; } }
+          for (const target of [other.y, other.y + other.height / 2, other.y + other.height]) for (const value of ownY) { const distance = Math.abs(target - value); if (distance < bestY) { bestY = distance; guideY = target; snapY = target - value; } }
+        }
+        offsetX += snapX; offsetY += snapY;
+      }
+      this.snapGuide.set(guideX !== undefined || guideY !== undefined ? { x: guideX, y: guideY } : null);
+      this.items.update(items => items.map(item => { const start = session.origins!.get(item.id); return start ? { ...item, x: start.x + offsetX, y: start.y + offsetY } : item; }));
+      this.queueTransformSync();
+    }
+    if (session.kind === 'resize') { this.items.update((items) => items.map((item) => {
       if (item.id !== session.itemId) return item;
       const original = session.before!.items.find(entry => entry.id === item.id)!;
       const corner = session.corner || 'se', sx = corner.endsWith('e') ? 1 : -1, sy = corner.startsWith('s') ? 1 : -1;
@@ -173,7 +242,7 @@ export class CanvasPage implements AfterViewInit {
       const localX = (dx * cos + dy * sin) / this.zoom(), localY = (-dx * sin + dy * cos) / this.zoom();
       let width = Math.max(item.type === 'text' ? 50 : 40, original.width + sx * localX);
       let height = Math.max(item.type === 'text' ? 34 : 40, original.height + sy * localY);
-      if (['image', 'gif', 'sticker'].includes(item.type) && !event.shiftKey) {
+      if (['image', 'gif', 'sticker', 'sketch'].includes(item.type) && !event.shiftKey) {
         const ratio = original.width / original.height;
         if (Math.abs(localX / original.width) >= Math.abs(localY / original.height)) height = width / ratio;
         else width = height * ratio;
@@ -185,8 +254,8 @@ export class CanvasPage implements AfterViewInit {
       const centerX = anchorX - newOppX * cos + newOppY * sin;
       const centerY = anchorY - newOppX * sin - newOppY * cos;
       return { ...item, x: centerX - width / 2, y: centerY - height / 2, width, height };
-    }));
-    if (session.kind === 'rotate' && session.itemId) { const item = this.items().find(entry => entry.id === session.itemId); if (item) { const point = this.point(event.clientX, event.clientY); const angle = Math.atan2(point.y - item.y - item.height / 2, point.x - item.x - item.width / 2); let rotation = session.y + (angle - session.x) * 180 / Math.PI; if (event.shiftKey) rotation = Math.round(rotation / 15) * 15; this.update(item.id, { rotation }); } }
+    })); const item = this.items().find(entry => entry.id === session.itemId); if (item) this.setTransformGuide(`${Math.round(item.width)} × ${Math.round(item.height)}`); this.queueTransformSync(); }
+    if (session.kind === 'rotate' && session.itemId) { const item = this.items().find(entry => entry.id === session.itemId); if (item) { const point = this.point(event.clientX, event.clientY); const angle = Math.atan2(point.y - item.y - item.height / 2, point.x - item.x - item.width / 2); let rotation = session.y + (angle - session.x) * 180 / Math.PI; if (event.shiftKey) rotation = Math.round(rotation / 15) * 15; this.update(item.id, { rotation }); this.setTransformGuide(`${Math.round(rotation)}°`); this.queueTransformSync(); } }
     if (session.kind === 'marquee') { const point = this.point(event.clientX, event.clientY); this.marquee.set({ x: Math.min(session.x, point.x), y: Math.min(session.y, point.y), width: Math.abs(point.x - session.x), height: Math.abs(point.y - session.y) }); }
     if (session.kind === 'place' && this.pendingType() === 'zone') { const point = this.point(event.clientX, event.clientY); this.placement.set({ x: Math.min(session.x, point.x), y: Math.min(session.y, point.y), width: Math.abs(point.x - session.x), height: Math.abs(point.y - session.y) }); }
     if (session.kind === 'crop' && session.itemId) this.update(session.itemId, { cropX: session.x + dx / this.zoom(), cropY: session.y + dy / this.zoom() });
@@ -194,7 +263,7 @@ export class CanvasPage implements AfterViewInit {
     if (session.kind === 'sketch') { const point = this.point(event.clientX, event.clientY); const last = this.sketchPoints().at(-1); if (!last || Math.hypot(point.x - last.x, point.y - last.y) > 1.5) this.sketchPoints.update(points => [...points, { ...point, pressure: event.pressure || .5 }]); }
     if (session.kind === 'erase') this.eraseSketchAt(this.point(event.clientX, event.clientY));
   }
-  pointerUp(event: PointerEvent): void { this.pointers.delete(event.pointerId); if (this.pointers.size < 2) this.pinch = null; const session = this.session; if (session?.kind === 'marquee' && this.marquee()) { const rect = this.marquee()!; if (rect.width > 4 || rect.height > 4) this.selectedIds.set(this.visibleItems().filter((item) => item.x < rect.x + rect.width && item.x + item.width > rect.x && item.y < rect.y + rect.height && item.y + item.height > rect.y).map((item) => item.id)); } if (session?.kind === 'place' && this.pendingType()) { const box = this.placement(); this.createAt(this.pendingType()!, { x: box?.width && box.width > 10 ? box.x : session.x, y: box?.height && box.height > 10 ? box.y : session.y }, box?.width && box.width > 10 ? box : undefined); this.pendingType.set(null); } if (session?.kind === 'connect' && session.itemId) { const point = this.point(event.clientX, event.clientY); const target = [...this.items()].reverse().find(item => item.id !== session.itemId && point.x >= item.x && point.x <= item.x + item.width && point.y >= item.y && point.y <= item.y + item.height); if (target) { this.snapshot(); this.connections.update(connections => [...connections, { id: crypto.randomUUID(), sourceId: session.itemId!, targetId: target.id, direction: 'forward' }]); } } if ((session?.kind === 'move' || session?.kind === 'resize' || session?.kind === 'rotate') && session.before) { if (session.kind === 'resize' && session.itemId && this.items().find(entry => entry.id === session.itemId)?.type === 'text') this.update(session.itemId, { textAutoSize: false }); if (session.kind === 'move' && session.moved && session.itemId) this.reparent(session.itemId); this.commit(session.before); } if (session?.kind === 'sketch') this.finishSketch(); this.session = null; this.sketchPoints.set([]); this.marquee.set(null); this.placement.set(null); this.connectionPreview.set(null); this.isPanning.set(false); const target = event.currentTarget as HTMLElement; if (target.hasPointerCapture(event.pointerId)) target.releasePointerCapture(event.pointerId); }
+  pointerUp(event: PointerEvent): void { this.pointers.delete(event.pointerId); if (this.pointers.size < 2) this.pinch = null; const session = this.session; this.transformGuide.set(null); if (session?.kind === 'marquee' && this.marquee()) { const rect = this.marquee()!; if (rect.width > 4 || rect.height > 4) this.selectedIds.set(this.visibleItems().filter((item) => item.x < rect.x + rect.width && item.x + item.width > rect.x && item.y < rect.y + rect.height && item.y + item.height > rect.y).map((item) => item.id)); } if (session?.kind === 'place' && this.pendingType()) { const box = this.placement(); this.createAt(this.pendingType()!, { x: box?.width && box.width > 10 ? box.x : session.x, y: box?.height && box.height > 10 ? box.y : session.y }, box?.width && box.width > 10 ? box : undefined); this.pendingType.set(null); } if (session?.kind === 'connect' && session.itemId) { const point = this.point(event.clientX, event.clientY); const target = [...this.items()].reverse().find(item => item.id !== session.itemId && point.x >= item.x && point.x <= item.x + item.width && point.y >= item.y && point.y <= item.y + item.height); if (target) { this.snapshot(); this.connections.update(connections => [...connections, { id: crypto.randomUUID(), sourceId: session.itemId!, targetId: target.id, direction: 'forward' }]); } } if ((session?.kind === 'move' || session?.kind === 'resize' || session?.kind === 'rotate') && session.before) { if (session.kind === 'resize' && session.itemId && this.items().find(entry => entry.id === session.itemId)?.type === 'text') this.update(session.itemId, { textAutoSize: false }); if (session.kind === 'move' && session.moved && session.itemId) this.reparent(session.itemId); this.commit(session.before); } if (session?.kind === 'sketch') this.finishSketch(); this.session = null; this.sketchPoints.set([]); this.marquee.set(null); this.snapGuide.set(null); this.placement.set(null); this.connectionPreview.set(null); this.isPanning.set(false); const target = event.currentTarget as HTMLElement; if (target.hasPointerCapture(event.pointerId)) target.releasePointerCapture(event.pointerId); }
   wheel(event: WheelEvent): void { event.preventDefault(); if (event.ctrlKey || event.metaKey) this.zoomAt(event.clientX, event.clientY, this.zoom() * (event.deltaY > 0 ? .9 : 1.1)); else { this.panX.update((x) => x - event.deltaX); this.panY.update((y) => y - event.deltaY); } }
   zoomAt(clientX: number, clientY: number, value: number): void { const rect = this.viewport()?.nativeElement.getBoundingClientRect(); if (!rect) return; const point = this.point(clientX, clientY); const zoom = Math.min(3, Math.max(.25, value)); this.zoom.set(zoom); this.panX.set(clientX - rect.left - point.x * zoom); this.panY.set(clientY - rect.top - point.y * zoom); }
   zoomBy(factor: number): void { const rect = this.viewport()?.nativeElement.getBoundingClientRect(); if (rect) this.zoomAt(rect.left + rect.width / 2, rect.top + rect.height / 2, this.zoom() * factor); }
@@ -291,35 +360,44 @@ export class CanvasPage implements AfterViewInit {
   }
   flip(id: string, axis: 'x' | 'y'): void { const item = this.items().find(entry => entry.id === id); if (item) this.setStyle(id, axis === 'x' ? { flipX: !item.flipX } : { flipY: !item.flipY }); }
   align(axis: 'x' | 'y'): void { const targets = this.items().filter(item => this.selectedIds().includes(item.id)); if (targets.length < 2) return; const value = Math.min(...targets.map(item => item[axis])); this.snapshot(); targets.forEach(item => this.update(item.id, { [axis]: value })); }
-  sketchPath(points: { x: number; y: number }[]): string {
-    if (!points.length) return '';
-    if (points.length < 3) return points.map((point, index) => `${index ? 'L' : 'M'} ${point.x} ${point.y}`).join(' ');
-    let path = `M ${points[0].x} ${points[0].y}`;
-    for (let i = 1; i < points.length - 1; i++) path += ` Q ${points[i].x} ${points[i].y} ${(points[i].x + points[i + 1].x) / 2} ${(points[i].y + points[i + 1].y) / 2}`;
-    return `${path} L ${points.at(-1)!.x} ${points.at(-1)!.y}`;
-  }
   private eraseSketchAt(point: { x: number; y: number }): void {
     const radius = 18 / this.zoom();
-    this.items.update(items => items.filter(item => {
-      if (item.sketchAsset) return !(point.x >= item.x - radius && point.x <= item.x + item.width + radius && point.y >= item.y - radius && point.y <= item.y + item.height + radius);
-      if (item.type !== 'sketch') return true;
+    this.activeSketchStrokes.update(strokes => strokes.filter(stroke => distanceToStroke(point, stroke) > radius + brushDiameter(stroke.brush, stroke.size) / 2));
+    this.items.update(items => items.flatMap(item => {
+      if (item.type !== 'sketch' || item.id === this.editingSketchId()) return [item];
       const angle = -(item.rotation || 0) * Math.PI / 180, cos = Math.cos(angle), sin = Math.sin(angle);
       const dx = point.x - item.x - item.width / 2, dy = point.y - item.y - item.height / 2;
       const localX = dx * cos - dy * sin + item.width / 2, localY = dx * sin + dy * cos + item.height / 2;
-      const sourceX = localX * (item.sourceWidth || item.width) / item.width;
-      const sourceY = localY * (item.sourceHeight || item.height) / item.height;
-      const sourceRadius = radius * Math.max((item.sourceWidth || item.width) / item.width, (item.sourceHeight || item.height) / item.height);
-      return !(item.strokes || []).some(stroke => stroke.some(p => Math.hypot(sourceX - p.x, sourceY - p.y) <= sourceRadius));
+      const sourceX = localX * (item.sourceWidth || item.width) / item.width, sourceY = localY * (item.sourceHeight || item.height) / item.height;
+      const scale = Math.max((item.sourceWidth || item.width) / item.width, (item.sourceHeight || item.height) / item.height);
+      const existing = item.sketchStrokes || (item.strokes || []).map((points, index): SketchStroke => ({ id: `${item.id}-${index}`, brush: 'pen', points: points.map(p => ({ x: p.x, y: p.y, pressure: p.pressure ?? .5 })), color: item.accent || '#d4111c', size: item.strokeWidth || 3, opacity: item.strokeOpacity || 1 }));
+      const remaining = existing.filter(stroke => distanceToStroke({ x: sourceX, y: sourceY }, stroke) > radius * scale + brushDiameter(stroke.brush, stroke.size) / 2);
+      return remaining.length ? [{ ...item, sketchStrokes: remaining, strokes: undefined }] : [];
     }));
   }
   private finishSketch(): void {
-    const points = this.sketchPoints(); if (points.length < 2) return;
-    const padding = this.brushSize() / 2 + 4;
-    const minX = Math.min(...points.map(point => point.x)) - padding, minY = Math.min(...points.map(point => point.y)) - padding;
-    const maxX = Math.max(...points.map(point => point.x)) + padding, maxY = Math.max(...points.map(point => point.y)) + padding;
-    const pressure = points.reduce((sum, p) => sum + (p.pressure ?? .5), 0) / points.length;
-    const item: CanvasItem = { id: crypto.randomUUID(), type: 'sketch', parentId: null, x: minX, y: minY, width: Math.max(12, maxX - minX), height: Math.max(12, maxY - minY), sourceWidth: Math.max(12, maxX - minX), sourceHeight: Math.max(12, maxY - minY), title: 'Sketch', strokes: [points.map(point => ({ x: point.x - minX, y: point.y - minY, pressure: point.pressure }))], accent: this.sketchColor(), brush: this.brush(), strokeWidth: this.brushSize() * (.8 + Math.min(1, pressure) * .4), strokeOpacity: this.brushOpacity(), zIndex: Math.max(1, ...this.items().map(entry => entry.zIndex || 1)) + 1, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
-    this.snapshot(); this.items.update(items => [...items, item]); this.selectedIds.set([item.id]);
+    if (this.sketchPoints().length < 2) return;
+    const stroke: SketchStroke = { id: crypto.randomUUID(), brush: this.brush(), points: this.sketchPoints().map(point => ({ x: point.x, y: point.y, pressure: point.pressure ?? .5 })), color: this.sketchColor(), size: this.brushWidth(), opacity: this.brushOpacity() };
+    this.activeSketchStrokes.update(strokes => [...strokes, stroke]); this.undoneSketchStrokes.set([]);
+  }
+  undoSketchStroke(): void { const strokes = this.activeSketchStrokes(); if (!strokes.length) return; this.undoneSketchStrokes.update(undone => [...undone, strokes.at(-1)!]); this.activeSketchStrokes.set(strokes.slice(0, -1)); }
+  redoSketchStroke(): void { const undone = this.undoneSketchStrokes(); if (!undone.length) return; this.activeSketchStrokes.update(strokes => [...strokes, undone.at(-1)!]); this.undoneSketchStrokes.set(undone.slice(0, -1)); }
+  editSketch(id: string): void {
+    const item = this.items().find(entry => entry.id === id); if (!item || item.type !== 'sketch') return;
+    this.setTool('sketch'); this.editingSketchId.set(id);
+    const angle = (item.rotation || 0) * Math.PI / 180, cos = Math.cos(angle), sin = Math.sin(angle);
+    const strokes = item.sketchStrokes || (item.strokes || []).map((points, index): SketchStroke => ({ id: `${id}-${index}`, brush: 'pen', points: points.map(point => ({ x: point.x, y: point.y, pressure: point.pressure ?? .5 })), color: item.accent || '#d4111c', size: item.strokeWidth || 3, opacity: item.strokeOpacity || 1 }));
+    this.activeSketchStrokes.set(strokes.map(stroke => ({ ...stroke, points: stroke.points.map(point => { const x = point.x * item.width / (item.sourceWidth || item.width) - item.width / 2, y = point.y * item.height / (item.sourceHeight || item.height) - item.height / 2; return { ...point, x: item.x + item.width / 2 + x * cos - y * sin, y: item.y + item.height / 2 + x * sin + y * cos }; }) })));
+  }
+  private completeSketch(): void {
+    const strokes = this.activeSketchStrokes(), editingId = this.editingSketchId();
+    if (!strokes.length) { if (editingId) { this.snapshot(); this.items.update(items => items.filter(item => item.id !== editingId)); } this.activeSketchStrokes.set([]); this.undoneSketchStrokes.set([]); this.editingSketchId.set(null); return; }
+    const bounds = strokeBounds(strokes);
+    const normalized = strokes.map(stroke => ({ ...stroke, points: stroke.points.map(point => ({ ...point, x: point.x - bounds.x, y: point.y - bounds.y })) }));
+    this.snapshot();
+    if (editingId) { this.update(editingId, { x: bounds.x, y: bounds.y, width: bounds.width, height: bounds.height, sourceWidth: bounds.width, sourceHeight: bounds.height, rotation: 0, sketchStrokes: normalized, strokes: undefined }); this.selectedIds.set([editingId]); }
+    else { const item: CanvasItem = { id: crypto.randomUUID(), type: 'sketch', parentId: null, x: bounds.x, y: bounds.y, width: bounds.width, height: bounds.height, sourceWidth: bounds.width, sourceHeight: bounds.height, title: 'Sketch', sketchStrokes: normalized, rotation: 0, zIndex: Math.max(1, ...this.items().map(entry => entry.zIndex || 1)) + 1, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() }; this.items.update(items => [...items, item]); this.selectedIds.set([item.id]); }
+    this.activeSketchStrokes.set([]); this.undoneSketchStrokes.set([]); this.editingSketchId.set(null);
   }
   tableColumns(item: CanvasItem): string[] { return item.tableColumns?.length ? item.tableColumns : ['Column 1', 'Column 2']; }
   tableRows(item: CanvasItem): string[][] { if (item.tableRows?.length) return item.tableRows; if (item.body) return item.body.split('\n').filter(Boolean).map(row => row.split('|')); return [['', '']]; }
@@ -330,11 +408,3 @@ export class CanvasPage implements AfterViewInit {
   removeTableRow(id: string, row: number): void { const item = this.items().find(entry => entry.id === id); if (!item || this.tableRows(item).length <= 1) return; this.setStyle(id, { tableRows: this.tableRows(item).filter((_, index) => index !== row), tableColumns: this.tableColumns(item) }); }
   removeTableColumn(id: string, column: number): void { const item = this.items().find(entry => entry.id === id); if (!item || this.tableColumns(item).length <= 1) return; this.setStyle(id, { tableColumns: this.tableColumns(item).filter((_, index) => index !== column), tableRows: this.tableRows(item).map(row => row.filter((_, index) => index !== column)) }); }
 }
-
-
-
-
-
-
-
-
