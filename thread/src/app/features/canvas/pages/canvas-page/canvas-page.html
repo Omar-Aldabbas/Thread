@@ -1,260 +1,38 @@
-<section class="canvas-page">
+<section class="thread-app flex h-full w-full overflow-hidden bg-[var(--color-background)] text-[var(--color-text-primary)]">
+  <div class="flex min-w-0 flex-1 flex-col">
+    <header data-ui class="thread-header flex h-[56px] shrink-0 items-center gap-3 border-b border-[var(--color-border-light)] bg-[var(--color-surface)] px-4">
+      <button class="brand-button" (click)="goToSpaces()" aria-label="All spaces">THREAD<span>.</span></button><span class="header-divider"></span>
+      <nav class="flex min-w-0 items-center gap-2 overflow-hidden whitespace-nowrap text-[12px] text-stone-400" aria-label="Breadcrumbs"><button (click)="navigate(null)" class="truncate hover:text-[var(--color-primary)]">{{ spaceName() }}</button>@for (crumb of breadcrumbs(); track crumb.id) { <span>/</span><button class="truncate font-medium text-[var(--color-text-primary)] hover:text-[var(--color-primary)]" (click)="navigate(crumb.id)">{{ crumb.title }}</button> }</nav>
+      <div class="ml-auto flex items-center gap-3"><label class="search-box hidden items-center gap-2 rounded-lg border border-[var(--color-border)] bg-white px-3 py-2 text-stone-400 md:flex"><span>⌕</span><input class="w-32 border-none bg-transparent text-xs text-[var(--color-text-primary)] outline-none" placeholder="Search canvas" [value]="search()" (input)="search.set($any($event.target).value)" /></label><button class="top-action" (click)="undo()" aria-label="Undo">↶</button><button class="top-action" (click)="redo()" aria-label="Redo">↷</button><span class="hidden h-6 w-px bg-stone-200 sm:block"></span><button class="rounded-lg bg-[var(--color-primary)] px-3 py-2 text-[12px] font-semibold text-white hover:bg-[var(--color-primary-hover)]" (click)="setTool('add')">+ Add to canvas</button></div>
+    </header>
 
-  <!-- TOPBAR -->
-  <header class="canvas-topbar surface-bar">
-
-    <div class="canvas-navigation">
-      <span class="brand-word">
-        THREAD
-      </span>
-
-      <span class="topbar-divider"></span>
-
-      <button
-        type="button"
-        class="breadcrumb-button"
-      >
-        All spaces
-      </button>
-
-      <span class="breadcrumb-separator">
-        /
-      </span>
-
-      <span class="breadcrumb-current">
-        {{ spaceName() }}
-      </span>
-    </div>
-
-
-    <div class="canvas-topbar-actions">
-
-      <div class="canvas-search">
-        <span>
-          ⌕
-        </span>
-
-        <input
-          type="text"
-          placeholder="Search this space..."
-        />
-      </div>
-
-
-      <button
-        type="button"
-        class="avatar-btn"
-      >
-        O
-      </button>
-
-    </div>
-
-  </header>
-
-
-  <!-- VIEWPORT -->
-  <div
-    class="canvas-viewport board-grid"
-    [class.is-panning]="isPanning()"
-    (pointerdown)="startPan($event)"
-    (pointermove)="pan($event)"
-    (pointerup)="stopPan()"
-    (pointercancel)="stopPan()"
-    (wheel)="handleWheel($event)"
-  >
-
-    <!-- WORLD -->
-    <div
-      class="canvas-world"
-      [style.transform]="worldTransform()"
-    >
-
-      <!-- SPACE TITLE -->
-      <div class="space-heading">
-
-        <div class="space-heading-accent"></div>
-
-        <h1>
-          {{ spaceName() }}
-        </h1>
-
-        <p>
-          {{ items().length }} items
-        </p>
-
-      </div>
-
-
-      <!-- ITEMS -->
-      @for (item of items(); track item.id) {
-
-        <article
-          class="board-item card-base"
-          [style.left.px]="item.x"
-          [style.top.px]="item.y"
-        >
-
-          <!-- CARD HEADER -->
-          <header class="board-item-header">
-
-            <div class="board-item-heading">
-
-              <div class="board-item-accent"></div>
-
-              <h2>
-                {{ item.title }}
-              </h2>
-
-            </div>
-
-            <button
-              type="button"
-              class="item-menu"
-            >
-              •••
-            </button>
-
-          </header>
-
-
-          <!-- NOTE -->
-          @if (item.type === 'note') {
-
-            <div class="note-content">
-
-              @for (
-                line of item.content?.split('\n');
-                track $index
-              ) {
-
-                <p>
-                  {{ line }}
-                </p>
-
-              }
-
-            </div>
-
+    <div class="relative min-h-0 flex-1 overflow-hidden">
+      <main #viewport class="canvas-viewport absolute inset-0" [class.is-panning]="isPanning()" [class.hand-cursor]="tool() === 'hand' || spaceHeld()" [class.edit-cursor]="tool() === 'edit'" [class.connect-cursor]="tool() === 'connect'" [style.background-size]="gridSize()" [style.background-position]="gridPosition()" (pointerdown)="pointerDown($event)" (pointermove)="pointerMove($event)" (pointerup)="pointerUp($event)" (pointercancel)="pointerUp($event)" (wheel)="wheel($event)">
+        <div class="world" [style.transform]="worldTransform()">
+          <svg class="connections" width="10000" height="10000" viewBox="0 0 10000 10000" aria-hidden="true"><defs><marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="var(--color-border)" /></marker></defs>@for (connection of visibleConnections(); track connection.id) { <path [attr.d]="connectionPath(connection)" fill="none" stroke="var(--color-border)" stroke-width="2" [attr.stroke-dasharray]="connection.style === 'dashed' ? '7 6' : null" [attr.marker-end]="connection.direction === 'forward' || connection.direction === 'both' ? 'url(#arrow)' : null" />@if (connection.label) { <text [attr.x]="connectionLabelX(connection)" [attr.y]="connectionLabelY(connection)" text-anchor="middle" fill="var(--color-text-secondary)" font-size="12" font-weight="600">{{ connection.label }}</text> } }</svg>
+          @if (!contextId()) { <div class="canvas-heading"><span class="eyebrow">YOUR CANVAS / 01</span><h1>{{ spaceName() }}</h1><p>Everything starts somewhere. Follow the thread.</p></div> }
+          @if (contextId()) { <div class="canvas-heading"><span class="eyebrow">INSIDE A {{ context()?.type | uppercase }}</span><h1>{{ context()?.title }}</h1><p>{{ context()?.body || 'A space for ideas to take shape.' }}</p></div> }
+          @for (item of visibleItems(); track item.id) {
+            <article data-item class="canvas-item" [class.selected]="selectedIds().includes(item.id)" [class.connect-source]="connectionSourceId() === item.id" [class.frame]="item.type === 'workspace'" [class.zone]="item.type === 'zone'" [style.left.px]="item.x" [style.top.px]="item.y" [style.width.px]="item.width" [style.height.px]="item.height" (pointerdown)="itemPointerDown($event, item)" (pointermove)="pointerMove($event)" (pointerup)="pointerUp($event)" (pointercancel)="pointerUp($event)" (dblclick)="enter(item)" tabindex="0">
+              @if (item.type === 'workspace') { <div class="frame-head"><span class="frame-icon" [style.color]="item.accent">✳</span><div><div class="frame-kicker">WORKSPACE</div><h2>{{ item.title }}</h2><p>{{ item.body }}</p></div><button class="frame-enter" (click)="enter(item)" (pointerdown)="$event.stopPropagation()" aria-label="Enter {{ item.title }}">↗</button></div><div class="frame-bottom"><span>{{ item.width | number:'1.0-0' }} × {{ item.height | number:'1.0-0' }}</span><span>Double click to enter ↗</span></div> }
+              @else if (item.type === 'zone') { <div class="zone-icon" [style.background]="item.accent + '22'" [style.color]="item.accent">◇</div><div class="zone-kicker">{{ item.zoneType || 'standard' }} zone</div><h2>{{ item.title }}</h2><p>{{ item.body }}</p><div class="zone-foot"><span>{{ childCount(item.id) }} items inside</span><button (click)="enter(item)" (pointerdown)="$event.stopPropagation()">Enter ↗</button></div> }
+              @else { <app-canvas-card [item]="item" (toggleTask)="toggleTask(item.id)" (toggleChecklist)="toggleChecklist(item.id, $event)" /> }
+              @if (selectedIds().includes(item.id) && tool() === 'select') { <button class="resize-handle" aria-label="Resize {{ item.title }}" (pointerdown)="resizeDown($event, item)" (pointermove)="pointerMove($event)" (pointerup)="pointerUp($event)"></button> }
+            </article>
           }
+          @if (marquee(); as box) { <div class="marquee" [style.left.px]="box.x" [style.top.px]="box.y" [style.width.px]="box.width" [style.height.px]="box.height"></div> }
+        </div>
+        @if (!visibleItems().length && !search()) { <div data-ui class="empty-canvas"><div class="text-3xl text-[var(--color-primary)]">✳</div><h2>A little room for your ideas</h2><p>Add a workspace, zone, or note to begin.</p><button (click)="setTool('add')">+ Add your first item</button></div> }
+        @if (search() && !visibleItems().length) { <div data-ui class="empty-canvas"><h2>No matching items</h2><p>Try a different search.</p></div> }
+      </main>
 
+      <nav data-ui class="tool-rail" aria-label="Canvas tools"><button [class.active]="tool() === 'select'" (click)="setTool('select')" title="Select (V)" aria-label="Select">↖</button><button [class.active]="tool() === 'hand'" (click)="setTool('hand')" title="Hand (H)" aria-label="Hand">✋</button><button [class.active]="tool() === 'edit'" (click)="setTool('edit')" title="Edit (E)" aria-label="Edit">✎</button><span></span><button [class.active]="tool() === 'add'" (click)="setTool('add')" title="Add (N)" aria-label="Add">＋</button><button [class.active]="tool() === 'connect'" (click)="setTool('connect')" title="Connect (C)" aria-label="Connect">⌁</button></nav>
+      @if (paletteOpen()) { <div data-ui class="create-palette"><div class="palette-title">Add to canvas <button (click)="setTool('select')" aria-label="Close">×</button></div><div class="palette-grid">@for (entry of [{ type: 'workspace', icon: '▣' }, { type: 'zone', icon: '◇' }, { type: 'note', icon: '▤' }, { type: 'task', icon: '✓' }, { type: 'checklist', icon: '☷' }, { type: 'image', icon: '▧' }, { type: 'file', icon: '▢' }, { type: 'link', icon: '↗' }, { type: 'table', icon: '▦' }, { type: 'voice', icon: '◖' }, { type: 'budget', icon: '$' }]; track entry.type) { <button (click)="create($any(entry.type))"><span>{{ entry.icon }}</span>{{ entry.type }}</button> }</div></div> }
+      @if (tool() === 'connect') { <div data-ui class="hint-pill">{{ connectionSourceId() ? 'Now choose an item to connect to' : 'Choose an item to start a connection' }}</div> }
+      <div data-ui class="zoom-controls"><button (click)="zoomBy(.85)" aria-label="Zoom out">−</button><button class="zoom-value" (click)="fitView()" title="Fit view">{{ zoomLabel() }}</button><button (click)="zoomBy(1.15)" aria-label="Zoom in">+</button><span></span><button (click)="fitView()" aria-label="Fit view">⛶</button></div>
+      <div data-ui class="bottom-hint">{{ visibleItems().length }} items <span>·</span> {{ tool() === 'hand' ? 'Drag to pan' : 'Space + drag to pan' }} <span>·</span> Ctrl + scroll to zoom</div>
 
-          <!-- CHECKLIST -->
-          @if (item.type === 'checklist') {
-
-            <div class="checklist">
-
-              @for (task of item.tasks; track task.label) {
-
-                <label
-                  class="checklist-item"
-                  [class.completed]="task.completed"
-                >
-
-                  <input
-                    type="checkbox"
-                    [checked]="task.completed"
-                  />
-
-                  <span>
-                    {{ task.label }}
-                  </span>
-
-                </label>
-
-              }
-
-            </div>
-
-          }
-
-
-          <!-- FILE -->
-          @if (item.type === 'file') {
-
-            <div class="file-preview">
-
-              <div class="file-icon">
-                PDF
-              </div>
-
-              <div>
-                <strong>
-                  {{ item.content }}
-                </strong>
-
-                <p>
-                  PDF document
-                </p>
-              </div>
-
-            </div>
-
-          }
-
-
-          <!-- IMAGE -->
-          @if (item.type === 'image') {
-
-            <div class="image-preview">
-
-              <div class="image-placeholder">
-                <span>
-                  IMAGE
-                </span>
-              </div>
-
-            </div>
-
-          }
-
-        </article>
-
-      }
-
+      @if (selected() && inspectorOpen()) { <aside data-ui class="inspector"><div class="inspector-head"><div><span class="eyebrow">{{ selected()?.type }} properties</span><h2>Edit item</h2></div><button (click)="inspectorOpen.set(false)" aria-label="Close editor">×</button></div><div class="inspector-body">@if (selected(); as item) {<label>Title<input [value]="item.title" (input)="field($event, 'title')" /></label><label>Plain text<textarea [value]="item.body || ''" (input)="field($event, 'body')" rows="3"></textarea></label>@if (item.type === 'note' || item.type === 'task') { <div class="field-title">Styled text</div><div class="format-toolbar"><button type="button" (mousedown)="$event.preventDefault()" (click)="formatText('bold')" aria-label="Bold"><b>B</b></button><button type="button" (mousedown)="$event.preventDefault()" (click)="formatText('italic')" aria-label="Italic"><i>I</i></button><button type="button" (mousedown)="$event.preventDefault()" (click)="formatText('underline')" aria-label="Underline"><u>U</u></button><button type="button" (mousedown)="$event.preventDefault()" (click)="formatText('insertUnorderedList')" aria-label="Bulleted list">• ≡</button></div><div class="rich-editor" contenteditable="true" role="textbox" aria-label="Styled text" [innerHTML]="item.bodyHtml || item.body || ''" (input)="richInput($event)"></div> }@if (item.type === 'zone') { <label>Zone type<select [value]="item.zoneType || 'standard'" (change)="field($event, 'zoneType')"><option value="standard">Standard</option><option value="nested">Nested</option><option value="portal">Portal</option></select></label>@if (item.zoneType === 'portal') { <label>Target zone<select [value]="item.portalTargetId || ''" (change)="field($event, 'portalTargetId')"><option value="">Choose a zone</option>@for (zone of items(); track zone.id) { @if (zone.type === 'zone' && zone.id !== item.id) { <option [value]="zone.id">{{ zone.title }}</option> } }</select></label> } }@if (item.type === 'task') { <label>Due date<input [value]="item.due || ''" (input)="field($event, 'due')" /></label><label>Priority<select [value]="item.priority || 'Medium'" (change)="field($event, 'priority')"><option>Low</option><option>Medium</option><option>High</option></select></label> }@if (item.type === 'image') { <label>Image URL<input [value]="item.image || ''" (input)="field($event, 'image')" placeholder="https://..." /></label> }@if (item.type === 'file') { <label>File name<input [value]="item.filename || ''" (input)="field($event, 'filename')" /></label> }@if (item.type === 'link') { <label>URL<input [value]="item.url || ''" (input)="field($event, 'url')" /></label> }@if (item.type === 'checklist') { <div class="field-title">Checklist</div>@for (row of item.checklist || []; track $index) { <input class="row-input" [value]="row.label" (input)="editChecklistRow($index, $event)" /> }<button class="add-row" (click)="addChecklistRow()">+ Add step</button> }@if (item.type === 'budget') { <div class="field-title">Budget rows</div>@for (row of item.rows || []; track $index) { <div class="row-fields"><input [value]="row.label" (input)="editBudgetRow($index, 'label', $event)" /><input type="number" [value]="row.value" (input)="editBudgetRow($index, 'value', $event)" /></div> }<button class="add-row" (click)="addBudgetRow()">+ Add row</button> }<label>Accent<input type="color" [value]="item.accent || 'var(--color-primary)'" (input)="field($event, 'accent')" /></label><div class="inspector-actions"><button (click)="duplicate()">Duplicate</button><button class="danger" (click)="removeSelected()">Delete</button></div>}</div></aside> }
     </div>
-
-
-    <!-- CREATE -->
-    <button
-      type="button"
-      class="canvas-add-button"
-      (click)="addNote()"
-    >
-      +
-    </button>
-
-
-    <!-- ZOOM CONTROLS -->
-    <div class="canvas-controls card-base">
-
-      <button
-        type="button"
-        (click)="zoomIn()"
-      >
-        +
-      </button>
-
-      <div class="zoom-value">
-        {{ (zoom() * 100).toFixed(0) }}%
-      </div>
-
-      <button
-        type="button"
-        (click)="zoomOut()"
-      >
-        −
-      </button>
-
-      <button
-        type="button"
-        (click)="resetView()"
-      >
-        ⌾
-      </button>
-
-    </div>
-
   </div>
-
 </section>

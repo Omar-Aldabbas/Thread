@@ -995,7 +995,7 @@ export class SpacesPage {
       {
         id: 'wevra',
 
-        title: 'Wevra HR',
+        title: 'Work projects',
 
         itemCount: 23,
 
@@ -1013,7 +1013,7 @@ export class SpacesPage {
       {
         id: 'angular',
 
-        title: 'Angular Learning',
+        title: 'Learning',
 
         itemCount: 12,
 
@@ -1049,7 +1049,7 @@ export class SpacesPage {
       {
         id: 'thread',
 
-        title: 'Thread App',
+        title: 'Thread development',
 
         itemCount: 14,
 
