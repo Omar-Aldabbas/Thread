@@ -1,4 +1,4 @@
-import {
+﻿import {
   Component,
   computed,
   effect,
@@ -11,6 +11,7 @@ import {
 } from '@angular/core';
 import { isPlatformBrowser } from '@angular/common';
 import { Router } from '@angular/router';
+import { PreferencesService } from '../../../../shared/preferences.service';
 
 type Tool = 'select' | 'hand' | 'edit' | 'add';
 
@@ -67,6 +68,7 @@ interface DragSession {
 })
 export class SpacesPage {
   private readonly router = inject(Router);
+  readonly preferences = inject(PreferencesService);
 
   private readonly isBrowser = isPlatformBrowser(inject(PLATFORM_ID));
 
@@ -466,6 +468,10 @@ export class SpacesPage {
     if (this.panSession) {
       this.stopPan(event);
     }
+  }
+
+  openSettings(): void {
+    this.router.navigate(['/settings']);
   }
 
   openSpace(space: SpaceCard): void {

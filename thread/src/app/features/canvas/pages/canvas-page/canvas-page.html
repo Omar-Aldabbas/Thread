@@ -1,38 +1,928 @@
-<section class="thread-app flex h-full w-full overflow-hidden bg-[var(--color-background)] text-[var(--color-text-primary)]">
-  <div class="flex min-w-0 flex-1 flex-col">
-    <header data-ui class="thread-header flex h-[56px] shrink-0 items-center gap-3 border-b border-[var(--color-border-light)] bg-[var(--color-surface)] px-4">
-      <button class="brand-button" (click)="goToSpaces()" aria-label="All spaces">THREAD<span>.</span></button><span class="header-divider"></span>
-      <nav class="flex min-w-0 items-center gap-2 overflow-hidden whitespace-nowrap text-[12px] text-stone-400" aria-label="Breadcrumbs"><button (click)="navigate(null)" class="truncate hover:text-[var(--color-primary)]">{{ spaceName() }}</button>@for (crumb of breadcrumbs(); track crumb.id) { <span>/</span><button class="truncate font-medium text-[var(--color-text-primary)] hover:text-[var(--color-primary)]" (click)="navigate(crumb.id)">{{ crumb.title }}</button> }</nav>
-      <div class="ml-auto flex items-center gap-3"><label class="search-box hidden items-center gap-2 rounded-lg border border-[var(--color-border)] bg-white px-3 py-2 text-stone-400 md:flex"><span>⌕</span><input class="w-32 border-none bg-transparent text-xs text-[var(--color-text-primary)] outline-none" placeholder="Search canvas" [value]="search()" (input)="search.set($any($event.target).value)" /></label><button class="top-action" (click)="undo()" aria-label="Undo">↶</button><button class="top-action" (click)="redo()" aria-label="Redo">↷</button><span class="hidden h-6 w-px bg-stone-200 sm:block"></span><button class="rounded-lg bg-[var(--color-primary)] px-3 py-2 text-[12px] font-semibold text-white hover:bg-[var(--color-primary-hover)]" (click)="setTool('add')">+ Add to canvas</button></div>
-    </header>
-
-    <div class="relative min-h-0 flex-1 overflow-hidden">
-      <main #viewport class="canvas-viewport absolute inset-0" [class.is-panning]="isPanning()" [class.hand-cursor]="tool() === 'hand' || spaceHeld()" [class.edit-cursor]="tool() === 'edit'" [class.connect-cursor]="tool() === 'connect'" [style.background-size]="gridSize()" [style.background-position]="gridPosition()" (pointerdown)="pointerDown($event)" (pointermove)="pointerMove($event)" (pointerup)="pointerUp($event)" (pointercancel)="pointerUp($event)" (wheel)="wheel($event)">
-        <div class="world" [style.transform]="worldTransform()">
-          <svg class="connections" width="10000" height="10000" viewBox="0 0 10000 10000" aria-hidden="true"><defs><marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="var(--color-border)" /></marker></defs>@for (connection of visibleConnections(); track connection.id) { <path [attr.d]="connectionPath(connection)" fill="none" stroke="var(--color-border)" stroke-width="2" [attr.stroke-dasharray]="connection.style === 'dashed' ? '7 6' : null" [attr.marker-end]="connection.direction === 'forward' || connection.direction === 'both' ? 'url(#arrow)' : null" />@if (connection.label) { <text [attr.x]="connectionLabelX(connection)" [attr.y]="connectionLabelY(connection)" text-anchor="middle" fill="var(--color-text-secondary)" font-size="12" font-weight="600">{{ connection.label }}</text> } }</svg>
-          @if (!contextId()) { <div class="canvas-heading"><span class="eyebrow">YOUR CANVAS / 01</span><h1>{{ spaceName() }}</h1><p>Everything starts somewhere. Follow the thread.</p></div> }
-          @if (contextId()) { <div class="canvas-heading"><span class="eyebrow">INSIDE A {{ context()?.type | uppercase }}</span><h1>{{ context()?.title }}</h1><p>{{ context()?.body || 'A space for ideas to take shape.' }}</p></div> }
-          @for (item of visibleItems(); track item.id) {
-            <article data-item class="canvas-item" [class.selected]="selectedIds().includes(item.id)" [class.connect-source]="connectionSourceId() === item.id" [class.frame]="item.type === 'workspace'" [class.zone]="item.type === 'zone'" [style.left.px]="item.x" [style.top.px]="item.y" [style.width.px]="item.width" [style.height.px]="item.height" (pointerdown)="itemPointerDown($event, item)" (pointermove)="pointerMove($event)" (pointerup)="pointerUp($event)" (pointercancel)="pointerUp($event)" (dblclick)="enter(item)" tabindex="0">
-              @if (item.type === 'workspace') { <div class="frame-head"><span class="frame-icon" [style.color]="item.accent">✳</span><div><div class="frame-kicker">WORKSPACE</div><h2>{{ item.title }}</h2><p>{{ item.body }}</p></div><button class="frame-enter" (click)="enter(item)" (pointerdown)="$event.stopPropagation()" aria-label="Enter {{ item.title }}">↗</button></div><div class="frame-bottom"><span>{{ item.width | number:'1.0-0' }} × {{ item.height | number:'1.0-0' }}</span><span>Double click to enter ↗</span></div> }
-              @else if (item.type === 'zone') { <div class="zone-icon" [style.background]="item.accent + '22'" [style.color]="item.accent">◇</div><div class="zone-kicker">{{ item.zoneType || 'standard' }} zone</div><h2>{{ item.title }}</h2><p>{{ item.body }}</p><div class="zone-foot"><span>{{ childCount(item.id) }} items inside</span><button (click)="enter(item)" (pointerdown)="$event.stopPropagation()">Enter ↗</button></div> }
-              @else { <app-canvas-card [item]="item" (toggleTask)="toggleTask(item.id)" (toggleChecklist)="toggleChecklist(item.id, $event)" /> }
-              @if (selectedIds().includes(item.id) && tool() === 'select') { <button class="resize-handle" aria-label="Resize {{ item.title }}" (pointerdown)="resizeDown($event, item)" (pointermove)="pointerMove($event)" (pointerup)="pointerUp($event)"></button> }
-            </article>
-          }
-          @if (marquee(); as box) { <div class="marquee" [style.left.px]="box.x" [style.top.px]="box.y" [style.width.px]="box.width" [style.height.px]="box.height"></div> }
-        </div>
-        @if (!visibleItems().length && !search()) { <div data-ui class="empty-canvas"><div class="text-3xl text-[var(--color-primary)]">✳</div><h2>A little room for your ideas</h2><p>Add a workspace, zone, or note to begin.</p><button (click)="setTool('add')">+ Add your first item</button></div> }
-        @if (search() && !visibleItems().length) { <div data-ui class="empty-canvas"><h2>No matching items</h2><p>Try a different search.</p></div> }
-      </main>
-
-      <nav data-ui class="tool-rail" aria-label="Canvas tools"><button [class.active]="tool() === 'select'" (click)="setTool('select')" title="Select (V)" aria-label="Select">↖</button><button [class.active]="tool() === 'hand'" (click)="setTool('hand')" title="Hand (H)" aria-label="Hand">✋</button><button [class.active]="tool() === 'edit'" (click)="setTool('edit')" title="Edit (E)" aria-label="Edit">✎</button><span></span><button [class.active]="tool() === 'add'" (click)="setTool('add')" title="Add (N)" aria-label="Add">＋</button><button [class.active]="tool() === 'connect'" (click)="setTool('connect')" title="Connect (C)" aria-label="Connect">⌁</button></nav>
-      @if (paletteOpen()) { <div data-ui class="create-palette"><div class="palette-title">Add to canvas <button (click)="setTool('select')" aria-label="Close">×</button></div><div class="palette-grid">@for (entry of [{ type: 'workspace', icon: '▣' }, { type: 'zone', icon: '◇' }, { type: 'note', icon: '▤' }, { type: 'task', icon: '✓' }, { type: 'checklist', icon: '☷' }, { type: 'image', icon: '▧' }, { type: 'file', icon: '▢' }, { type: 'link', icon: '↗' }, { type: 'table', icon: '▦' }, { type: 'voice', icon: '◖' }, { type: 'budget', icon: '$' }]; track entry.type) { <button (click)="create($any(entry.type))"><span>{{ entry.icon }}</span>{{ entry.type }}</button> }</div></div> }
-      @if (tool() === 'connect') { <div data-ui class="hint-pill">{{ connectionSourceId() ? 'Now choose an item to connect to' : 'Choose an item to start a connection' }}</div> }
-      <div data-ui class="zoom-controls"><button (click)="zoomBy(.85)" aria-label="Zoom out">−</button><button class="zoom-value" (click)="fitView()" title="Fit view">{{ zoomLabel() }}</button><button (click)="zoomBy(1.15)" aria-label="Zoom in">+</button><span></span><button (click)="fitView()" aria-label="Fit view">⛶</button></div>
-      <div data-ui class="bottom-hint">{{ visibleItems().length }} items <span>·</span> {{ tool() === 'hand' ? 'Drag to pan' : 'Space + drag to pan' }} <span>·</span> Ctrl + scroll to zoom</div>
-
-      @if (selected() && inspectorOpen()) { <aside data-ui class="inspector"><div class="inspector-head"><div><span class="eyebrow">{{ selected()?.type }} properties</span><h2>Edit item</h2></div><button (click)="inspectorOpen.set(false)" aria-label="Close editor">×</button></div><div class="inspector-body">@if (selected(); as item) {<label>Title<input [value]="item.title" (input)="field($event, 'title')" /></label><label>Plain text<textarea [value]="item.body || ''" (input)="field($event, 'body')" rows="3"></textarea></label>@if (item.type === 'note' || item.type === 'task') { <div class="field-title">Styled text</div><div class="format-toolbar"><button type="button" (mousedown)="$event.preventDefault()" (click)="formatText('bold')" aria-label="Bold"><b>B</b></button><button type="button" (mousedown)="$event.preventDefault()" (click)="formatText('italic')" aria-label="Italic"><i>I</i></button><button type="button" (mousedown)="$event.preventDefault()" (click)="formatText('underline')" aria-label="Underline"><u>U</u></button><button type="button" (mousedown)="$event.preventDefault()" (click)="formatText('insertUnorderedList')" aria-label="Bulleted list">• ≡</button></div><div class="rich-editor" contenteditable="true" role="textbox" aria-label="Styled text" [innerHTML]="item.bodyHtml || item.body || ''" (input)="richInput($event)"></div> }@if (item.type === 'zone') { <label>Zone type<select [value]="item.zoneType || 'standard'" (change)="field($event, 'zoneType')"><option value="standard">Standard</option><option value="nested">Nested</option><option value="portal">Portal</option></select></label>@if (item.zoneType === 'portal') { <label>Target zone<select [value]="item.portalTargetId || ''" (change)="field($event, 'portalTargetId')"><option value="">Choose a zone</option>@for (zone of items(); track zone.id) { @if (zone.type === 'zone' && zone.id !== item.id) { <option [value]="zone.id">{{ zone.title }}</option> } }</select></label> } }@if (item.type === 'task') { <label>Due date<input [value]="item.due || ''" (input)="field($event, 'due')" /></label><label>Priority<select [value]="item.priority || 'Medium'" (change)="field($event, 'priority')"><option>Low</option><option>Medium</option><option>High</option></select></label> }@if (item.type === 'image') { <label>Image URL<input [value]="item.image || ''" (input)="field($event, 'image')" placeholder="https://..." /></label> }@if (item.type === 'file') { <label>File name<input [value]="item.filename || ''" (input)="field($event, 'filename')" /></label> }@if (item.type === 'link') { <label>URL<input [value]="item.url || ''" (input)="field($event, 'url')" /></label> }@if (item.type === 'checklist') { <div class="field-title">Checklist</div>@for (row of item.checklist || []; track $index) { <input class="row-input" [value]="row.label" (input)="editChecklistRow($index, $event)" /> }<button class="add-row" (click)="addChecklistRow()">+ Add step</button> }@if (item.type === 'budget') { <div class="field-title">Budget rows</div>@for (row of item.rows || []; track $index) { <div class="row-fields"><input [value]="row.label" (input)="editBudgetRow($index, 'label', $event)" /><input type="number" [value]="row.value" (input)="editBudgetRow($index, 'value', $event)" /></div> }<button class="add-row" (click)="addBudgetRow()">+ Add row</button> }<label>Accent<input type="color" [value]="item.accent || 'var(--color-primary)'" (input)="field($event, 'accent')" /></label><div class="inspector-actions"><button (click)="duplicate()">Duplicate</button><button class="danger" (click)="removeSelected()">Delete</button></div>}</div></aside> }
+﻿<section class="thread-app">
+  <header class="thread-header" data-ui>
+    <button class="brand-button" (click)="goToSpaces()" aria-label="All spaces">
+      THREAD<span>.</span>
+    </button>
+    <span class="header-divider"></span><span class="space-name">{{ spaceName() }}</span>
+    <div class="header-actions">
+      <label class="search-box"
+        ><span>⌕</span
+        ><input
+          aria-label="Search canvas"
+          placeholder="Search"
+          [value]="search()"
+          (input)="search.set($any($event.target).value)" /></label
+      ><button class="icon-button" (click)="undo()" aria-label="Undo">↶</button
+      ><button class="icon-button" (click)="redo()" aria-label="Redo">↷</button
+      ><button
+        class="quick-task"
+        (click)="chooseType('task')"
+        title="Add a task, then tap the canvas"
+      >
+        + Task</button
+      ><button class="add-top" (click)="setTool('add')">+ <span>Add</span></button
+      ><button
+        class="profile-button"
+        (click)="goToSettings()"
+        [attr.aria-label]="'Profile and settings for ' + preferences.profileName()"
+        title="Profile and settings"
+      >
+        {{ preferences.initials() }}
+      </button>
     </div>
+  </header>
+  <main
+    #viewport
+    class="canvas-viewport"
+    [class.is-panning]="isPanning()"
+    [class.hand-cursor]="tool() === 'hand' || spaceHeld()"
+    [class.placement-cursor]="pendingType() || tool() === 'text'"
+    [class.connect-cursor]="tool() === 'connect'"
+    [class.sketch-cursor]="tool() === 'sketch'"
+    [style.background-size]="gridSize()"
+    [style.background-position]="gridPosition()"
+    (pointerdown)="pointerDown($event)"
+    (pointermove)="pointerMove($event)"
+    (pointerup)="pointerUp($event)"
+    (pointercancel)="pointerUp($event)"
+    (dblclick)="canvasDoubleClick($event)"
+    (wheel)="wheel($event)"
+    (dragover)="dragOver($event)"
+    (dragleave)="dragLeave()"
+    (drop)="drop($event)"
+  >
+    <div class="world" [style.transform]="worldTransform()">
+      <svg
+        class="connections"
+        width="10000"
+        height="10000"
+        viewBox="0 0 10000 10000"
+        aria-hidden="true"
+      >
+        <defs>
+          <marker
+            id="arrow"
+            viewBox="0 0 10 10"
+            refX="8"
+            refY="5"
+            markerWidth="6"
+            markerHeight="6"
+            orient="auto"
+          >
+            <path
+              d="M0 0 L10 5 L0 10"
+              fill="none"
+              stroke="var(--color-primary)"
+              stroke-width="1.6"
+            />
+          </marker>
+        </defs>
+        @for (connection of visibleConnections(); track connection.id) {
+          <path
+            [attr.d]="connectionPath(connection)"
+            fill="none"
+            stroke="var(--color-primary)"
+            stroke-opacity=".65"
+            stroke-width="1.5"
+            [attr.stroke-dasharray]="connection.style === 'dashed' ? '7 6' : null"
+            [attr.marker-end]="
+              connection.direction === 'forward' || connection.direction === 'both'
+                ? 'url(#arrow)'
+                : null
+            "
+          />
+        }
+        @if (connectionPreview(); as preview) {
+          <path
+            [attr.d]="'M ' + preview.x1 + ' ' + preview.y1 + ' L ' + preview.x2 + ' ' + preview.y2"
+            fill="none"
+            stroke="var(--color-primary)"
+            stroke-width="1.5"
+            stroke-dasharray="5 4"
+          />
+        }
+      </svg>
+      @for (item of visibleItems(); track item.id) {
+        <article
+          data-item
+          [attr.data-node-id]="item.id"
+          class="canvas-item"
+          [class.selected]="selectedIds().includes(item.id)"
+          [class.connection-source]="tool() === 'connect' && connectionSourceId() === item.id"
+          [class.zone]="item.type === 'zone' || item.type === 'workspace'"
+          [class.note-item]="item.type === 'note'"
+          [class.task-item]="item.type === 'task'"
+          [class.task-done]="item.type === 'task' && item.completed"
+          [class.text-item]="item.type === 'text'"
+          [class.image-item]="item.type === 'image'"
+          [class.visual-asset]="item.type === 'gif' || item.type === 'sticker' || !!item.sketchAsset"
+          [class.sketch-item]="item.type === 'sketch'"
+          [style.left.px]="item.x"
+          [style.top.px]="item.y"
+          [style.width.px]="item.width"
+          [style.height.px]="item.height"
+          [style.transform]="item.rotation ? 'rotate(' + item.rotation + 'deg)' : null"
+          [style.z-index]="
+            item.zIndex || (item.type === 'zone' || item.type === 'workspace' ? 0 : 1)
+          "
+          [style.background]="item.type === 'note' ? item.background || null : null"
+          (pointerdown)="itemPointerDown($event, item)"
+          (pointermove)="pointerMove($event)"
+          (pointerup)="pointerUp($event)"
+          (pointercancel)="pointerUp($event)"
+          (dblclick)="$event.stopPropagation(); startEditing(item.id, $event.target)"
+          tabindex="0"
+          [attr.aria-label]="item.type + ': ' + item.title"
+        >
+          @if (item.type === 'zone' || item.type === 'workspace') {
+            <div class="zone-label">
+              <span>{{ item.type }}</span
+              ><strong
+                [attr.contenteditable]="editingId() === item.id"
+                [attr.data-edit-id]="editingId() === item.id ? item.id : null"
+                (keydown)="inlineKey($event)"
+                (blur)="inlineBlur($event, item.id, 'title')"
+                [textContent]="item.title || (editingId() === item.id ? '' : 'Untitled zone')"
+              ></strong>
+            </div>
+          } @else if (item.type === 'image') {
+            @if (item.image) {
+              <div class="image-frame">
+                <img
+                  [src]="item.image"
+                  [alt]="item.title"
+                  [style.transform]="imageTransform(item)"
+                  draggable="false"
+                />
+              </div>
+            } @else {
+              <div class="image-empty">
+                <span>▧</span><strong>Image frame</strong
+                ><button
+                  (pointerdown)="$event.stopPropagation()"
+                  (click)="selectImageForBlock(item.id)"
+                >
+                  + Add image</button
+                ><small>or drop an image here</small>
+              </div>
+            }
+          } @else if (item.type === 'gif' || item.type === 'sticker' || item.sketchAsset) {
+            <div class="visual-asset-content">@if (item.image) { <img [src]="item.image" [alt]="item.title" [style.transform]="'scale(' + (item.flipX ? -1 : 1) + ',' + (item.flipY ? -1 : 1) + ')'" draggable="false" /> } @else { <span>{{ item.title }}</span> }</div>
+          } @else if (item.type === 'text') {
+            <div
+              class="text-content"
+              [style.font-size.px]="item.fontSize || 21"
+              [style.font-weight]="item.fontWeight || 600"
+              [style.font-family]="item.fontFamily === 'mono' ? 'ui-monospace, monospace' : null"
+              [style.text-align]="item.textAlign || 'left'"
+              [style.color]="item.textColor || 'var(--color-text-primary)'"
+              dir="auto"
+            >
+              @if (editingId() === item.id) {
+                <app-rich-text-editor
+                  [html]="richContent(item.id)"
+                  [focusOnInit]="true"
+                  (contentChanged)="richChanged(item.id, $event)"
+                  (finished)="finishEditing()"
+                />
+              } @else {
+                @if (item.bodyHtml) {
+                  <div class="rich-display" [innerHTML]="item.bodyHtml"></div>
+                } @else {
+                  <div class="rich-display" [textContent]="item.title || 'Text'"></div>
+                }
+              }
+            </div>
+          } @else if (item.type === 'note') {
+            <div
+              class="note-content"
+              [style.color]="item.textColor || 'var(--color-text-primary)'"
+              [style.font-family]="item.fontFamily === 'mono' ? 'ui-monospace, monospace' : null"
+            >
+              <div
+                class="note-title"
+                [style.font-size.px]="item.fontSize || 17"
+                [style.font-weight]="item.fontWeight || 650"
+                [style.text-align]="item.textAlign || 'left'"
+                dir="auto"
+                [attr.contenteditable]="editingId() === item.id"
+                [attr.data-edit-id]="editingId() === item.id ? item.id : null"
+                (keydown)="inlineKey($event)"
+                (blur)="inlineBlur($event, item.id, 'title')"
+                [textContent]="item.title || (editingId() === item.id ? '' : 'Note')"
+              ></div>
+              <div class="note-body" dir="auto">
+                @if (editingId() === item.id) {
+                  <app-rich-text-editor
+                    [html]="richContent(item.id)"
+                    [focusOnInit]="richFocusId() === item.id"
+                    (contentChanged)="richChanged(item.id, $event)"
+                    (finished)="finishEditing()"
+                  />
+                } @else {
+                  @if (item.bodyHtml) {
+                    <div class="rich-display" [innerHTML]="item.bodyHtml"></div>
+                  } @else {
+                    <div class="rich-display" [textContent]="item.body || ''"></div>
+                  }
+                }
+              </div>
+            </div>
+          } @else if (item.type === 'task') {
+            <div class="task-content">
+              <input
+                type="checkbox"
+                [checked]="item.completed"
+                (change)="toggleTask(item.id)"
+                (pointerdown)="$event.stopPropagation()"
+                aria-label="Complete task"
+              />
+              <div class="task-main">
+                @if (editingId() === item.id) {
+                  <input
+                    class="task-title-input"
+                    [attr.data-edit-id]="item.id"
+                    [value]="item.title"
+                    placeholder="What needs doing?"
+                    (pointerdown)="$event.stopPropagation()"
+                    (keydown)="taskTitleKey($event, item.id)"
+                    (blur)="taskTitleBlur($event, item.id)"
+                  />
+                } @else {
+                  <div class="task-title" dir="auto" [textContent]="item.title || 'New task'"></div>
+                }
+                @if (item.body) {
+                  <p>{{ item.body }}</p>
+                }
+                @if (item.due || item.priority) {
+                  <small>{{ item.due }} {{ item.priority }}</small>
+                }
+                @if (item.checklist?.length) {
+                  <div class="checklist">
+                    @for (entry of item.checklist || []; track $index) {
+                      <label
+                        ><input
+                          type="checkbox"
+                          [checked]="entry.completed"
+                          (change)="toggleChecklist(item.id, $index)"
+                          (pointerdown)="$event.stopPropagation()"
+                        />{{ entry.label }}</label
+                      >
+                    }
+                  </div>
+                }
+              </div>
+            </div>
+          } @else if (item.type === 'list' || item.type === 'checklist') {
+            <div class="list-content">
+              <div
+                class="list-title"
+                dir="auto"
+                [attr.contenteditable]="editingId() === item.id"
+                (keydown)="inlineKey($event)"
+                (blur)="inlineBlur($event, item.id, 'title')"
+                [textContent]="item.title || (editingId() === item.id ? '' : 'Untitled list')"
+              ></div>
+              <div class="list-rows">
+                @for (entry of item.checklist || []; track $index) {
+                  <div class="list-row">
+                    <span>{{ item.ordered ? $index + 1 + '.' : '•' }}</span
+                    ><input
+                      [attr.data-edit-id]="editingId() === item.id && $index === 0 ? item.id : null"
+                      [value]="entry.label"
+                      placeholder="List item"
+                      (pointerdown)="$event.stopPropagation()"
+                      (change)="setListRow(item.id, $index, $event)"
+                      (keydown)="listKey($event, item.id, $index)"
+                    />
+                  </div>
+                }
+              </div>
+              <button
+                class="inline-add"
+                (click)="addListRow(item.id)"
+                (pointerdown)="$event.stopPropagation()"
+              >
+                + Item
+              </button>
+            </div>
+          } @else if (item.type === 'budget') {
+            <div class="budget-content">
+              <div
+                class="list-title"
+                [attr.contenteditable]="editingId() === item.id"
+                [attr.data-edit-id]="editingId() === item.id ? item.id : null"
+                (keydown)="inlineKey($event)"
+                (blur)="inlineBlur($event, item.id, 'title')"
+                [textContent]="item.title || (editingId() === item.id ? '' : 'Budget')"
+              ></div>
+              @for (row of item.rows || []; track $index) {
+                <div class="budget-row">
+                  <input
+                    [value]="row.label"
+                    placeholder="Item"
+                    (pointerdown)="$event.stopPropagation()"
+                    (change)="setBudgetRow(item.id, $index, 'label', $event)"
+                  /><input
+                    type="number"
+                    [value]="row.value"
+                    (pointerdown)="$event.stopPropagation()"
+                    (change)="setBudgetRow(item.id, $index, 'value', $event)"
+                  />
+                </div>
+              }
+              <div class="budget-total">
+                Total <strong>{{ budgetTotal(item) }}</strong>
+              </div>
+              <button
+                class="inline-add"
+                (click)="addBudgetEntry(item.id)"
+                (pointerdown)="$event.stopPropagation()"
+              >
+                + Entry
+              </button>
+            </div>
+          } @else if (item.type === 'table') {
+            <div class="table-content">
+              <div
+                class="table-title"
+                [attr.contenteditable]="editingId() === item.id"
+                [attr.data-edit-id]="editingId() === item.id ? item.id : null"
+                (keydown)="inlineKey($event)"
+                (blur)="inlineBlur($event, item.id, 'title')"
+                [textContent]="item.title || (editingId() === item.id ? '' : 'Table')"
+              ></div>
+              <div class="table-scroll">
+                <table>
+                  <thead>
+                    <tr>
+                      @for (column of tableColumns(item); track $index; let columnIndex = $index) {
+                        <th>
+                          <input
+                            [value]="column"
+                            [attr.aria-label]="'Column ' + (columnIndex + 1) + ' name'"
+                            (pointerdown)="$event.stopPropagation()"
+                            (change)="setTableHeader(item.id, columnIndex, $event)"
+                          /><button
+                            (pointerdown)="$event.stopPropagation()"
+                            (click)="removeTableColumn(item.id, columnIndex)"
+                            [attr.aria-label]="'Remove column ' + (columnIndex + 1)"
+                          >
+                            ×
+                          </button>
+                        </th>
+                      }
+                    </tr>
+                  </thead>
+                  <tbody>
+                    @for (row of tableRows(item); track $index; let rowIndex = $index) {
+                      <tr>
+                        @for (
+                          column of tableColumns(item);
+                          track $index;
+                          let columnIndex = $index
+                        ) {
+                          <td>
+                            <input
+                              [value]="row[columnIndex] || ''"
+                              [attr.aria-label]="
+                                'Row ' + (rowIndex + 1) + ', column ' + (columnIndex + 1)
+                              "
+                              (pointerdown)="$event.stopPropagation()"
+                              (change)="setTableCell(item.id, rowIndex, columnIndex, $event)"
+                            />
+                          </td>
+                        }
+                        <td class="row-action">
+                          <button
+                            (pointerdown)="$event.stopPropagation()"
+                            (click)="removeTableRow(item.id, rowIndex)"
+                            [attr.aria-label]="'Remove row ' + (rowIndex + 1)"
+                          >
+                            ×
+                          </button>
+                        </td>
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
+              <div class="table-actions">
+                <button (pointerdown)="$event.stopPropagation()" (click)="addTableRow(item.id)">
+                  + Row</button
+                ><button (pointerdown)="$event.stopPropagation()" (click)="addTableColumn(item.id)">
+                  + Column
+                </button>
+              </div>
+            </div>
+          } @else if (item.type === 'sketch') {
+            <svg
+              class="sketch-object"
+              [attr.viewBox]="'0 0 ' + item.width + ' ' + item.height"
+              preserveAspectRatio="none"
+              aria-label="Sketch stroke"
+            >
+              @for (stroke of item.strokes || []; track $index) {
+                <path
+                  [attr.d]="sketchPath(stroke)"
+                  fill="none"
+                  [attr.stroke]="item.accent || '#d4111c'"
+                  [attr.stroke-width]="item.strokeWidth || 3"
+                  [attr.stroke-opacity]="item.strokeOpacity || 1"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                />
+              }
+            </svg>
+          } @else if (item.type === 'link') {
+            <div class="link-content">
+              <span class="link-icon">↗</span>
+              <div
+                class="card-title"
+                [attr.contenteditable]="editingId() === item.id"
+                (keydown)="inlineKey($event)"
+                (blur)="inlineBlur($event, item.id, 'title')"
+                [textContent]="item.title || (editingId() === item.id ? '' : 'New link')"
+              ></div>
+              @if (editingId() === item.id) {
+                <input
+                  [attr.data-edit-id]="item.id"
+                  type="url"
+                  [value]="item.url || ''"
+                  placeholder="Paste a URL"
+                  (pointerdown)="$event.stopPropagation()"
+                  (change)="setLinkUrl(item.id, $event)"
+                />
+              } @else if (item.url) {
+                <a
+                  [href]="item.url"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  (pointerdown)="$event.stopPropagation()"
+                  >{{ item.url }}</a
+                >
+              }
+            </div>
+          } @else {
+            <div class="card-content">
+              <div class="card-top">
+                <span class="card-type">{{ item.type }}</span>
+              </div>
+              <div
+                class="card-title"
+                [attr.contenteditable]="editingId() === item.id"
+                [attr.data-edit-id]="editingId() === item.id ? item.id : null"
+                (keydown)="inlineKey($event)"
+                (blur)="inlineBlur($event, item.id, 'title')"
+                [textContent]="
+                  item.title || (editingId() === item.id ? '' : 'Untitled ' + item.type)
+                "
+              ></div>
+              <div
+                class="card-body"
+                [attr.contenteditable]="editingId() === item.id"
+                (keydown)="inlineKey($event)"
+                (blur)="inlineBlur($event, item.id, 'body')"
+                [textContent]="item.body"
+              ></div>
+              @if (item.type === 'voice' && item.url) {
+                <audio controls [src]="item.url" (pointerdown)="$event.stopPropagation()"></audio>
+              }
+              @if (item.type === 'file' && item.url) {
+                <a
+                  [href]="item.url"
+                  [download]="item.filename || item.title"
+                  (pointerdown)="$event.stopPropagation()"
+                  >Download file ↓</a
+                >
+              }
+            </div>
+          }
+          @if (tool() === 'connect') {
+            <button
+              class="connect-handle"
+              (pointerdown)="connectDown($event, item)"
+              (pointermove)="pointerMove($event)"
+              (pointerup)="pointerUp($event)"
+              aria-label="Connect {{ item.title }}"
+            ></button>
+          }
+          @if (selectedIds().includes(item.id) && tool() === 'select') {
+            @if (item.type === 'image' || item.type === 'gif' || item.type === 'sticker' || item.type === 'sketch') {
+              <button class="resize-handle corner-nw" [attr.aria-label]="'Resize ' + item.title" (pointerdown)="resizeDown($event, item, 'nw')" (pointermove)="pointerMove($event)" (pointerup)="pointerUp($event)"></button>
+              <button class="resize-handle corner-ne" [attr.aria-label]="'Resize ' + item.title" (pointerdown)="resizeDown($event, item, 'ne')" (pointermove)="pointerMove($event)" (pointerup)="pointerUp($event)"></button>
+              <button class="resize-handle corner-sw" [attr.aria-label]="'Resize ' + item.title" (pointerdown)="resizeDown($event, item, 'sw')" (pointermove)="pointerMove($event)" (pointerup)="pointerUp($event)"></button>
+              <button class="rotate-handle" [attr.aria-label]="'Rotate ' + item.title" (pointerdown)="rotateDown($event, item)" (pointermove)="pointerMove($event)" (pointerup)="pointerUp($event)"></button>
+            }
+            <button
+              class="resize-handle"
+              aria-label="Resize {{ item.title }}"
+              (pointerdown)="resizeDown($event, item)"
+              (pointermove)="pointerMove($event)"
+              (pointerup)="pointerUp($event)"
+            ></button>
+          }
+        </article>
+      }
+      @if (marquee(); as box) {
+        <div
+          class="marquee"
+          [style.left.px]="box.x"
+          [style.top.px]="box.y"
+          [style.width.px]="box.width"
+          [style.height.px]="box.height"
+        ></div>
+      }
+      @if (placement(); as box) {
+        <div
+          class="placement-box"
+          [style.left.px]="box.x"
+          [style.top.px]="box.y"
+          [style.width.px]="box.width"
+          [style.height.px]="box.height"
+        ></div>
+      }
+    </div>
+    <div
+      class="sketch-layer"
+      [class.active]="tool() === 'sketch' || !!pendingAsset()"
+      [class.erasing]="sketchEraser()"
+      (pointerdown)="$event.stopPropagation(); pointerDown($event)"
+      (pointermove)="$event.stopPropagation(); pointerMove($event)"
+      (pointerup)="$event.stopPropagation(); pointerUp($event)"
+      (pointercancel)="$event.stopPropagation(); pointerUp($event)"
+    >
+      <svg
+        class="sketch-layer-world"
+        width="10000"
+        height="10000"
+        [style.transform]="worldTransform()"
+        aria-hidden="true"
+      >
+        @if (sketchPoints().length > 1) {
+          <path
+            [attr.d]="sketchPath(sketchPoints())"
+            fill="none"
+            [attr.stroke]="sketchColor()"
+            [attr.stroke-width]="brushSize()"
+            [attr.stroke-opacity]="brushOpacity()"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          />
+        }
+        @if (pendingAsset(); as asset) { @if (assetPreview(); as point) { <image [attr.href]="asset.src" [attr.x]="point.x - 80" [attr.y]="point.y - 60" width="160" height="120" opacity=".6" /> } }
+      </svg>
+    </div>
+    @if (!visibleItems().length && !search()) {
+      <div class="empty-hint" data-ui>
+        Start creating <span class="desktop-hint">Double-click for a note or press N to add</span
+        ><span class="mobile-hint">Tap Task or Add below</span>
+      </div>
+    }
+    @if (dropActive()) {
+      <div class="drop-indicator" data-ui>Drop files to place them here</div>
+    }
+  </main>
+  <nav class="tool-rail" data-ui aria-label="Canvas tools">
+    <button
+      [class.active]="tool() === 'select' && !pendingType()"
+      (click)="setTool('select')"
+      aria-label="Select"
+    >
+      <span>↖</span><small>Select</small></button
+    ><button [class.active]="tool() === 'hand'" (click)="setTool('hand')" aria-label="Pan">
+      <span>✋</span><small>Move</small></button
+    ><button
+      class="mobile-task"
+      [class.active]="pendingType() === 'task'"
+      (click)="chooseType('task')"
+      aria-label="Add task"
+    >
+      <span>✓</span><small>Task</small></button
+    ><button
+      [class.active]="paletteOpen() || !!pendingType()"
+      (click)="setTool('add')"
+      aria-label="Add content"
+    >
+      <span>+</span><small>Add</small></button
+    ><button [class.active]="tool() === 'sketch'" (click)="setTool('sketch')" aria-label="Sketch">
+      <span>✎</span><small>Sketch</small></button
+    ><button
+      class="desktop-extra"
+      [class.active]="tool() === 'text'"
+      (click)="setTool('text')"
+      aria-label="Text"
+    >
+      <span>T</span><small>Text</small></button
+    ><button
+      class="connect-tool"
+      [class.active]="tool() === 'connect'"
+      (click)="setTool('connect')"
+      aria-label="Connect"
+    >
+      <span>⌁</span><small>Connect</small>
+    </button>
+  </nav>
+  @if (paletteOpen()) {
+    <div class="create-palette" data-ui>
+      <div class="palette-title">
+        ADD <button (click)="setTool('select')" aria-label="Close">×</button>
+      </div>
+      <div class="palette-section">Quick</div>
+      <div class="palette-grid">
+        @for (
+          entry of [
+            { type: 'note', icon: '▤' },
+            { type: 'text', icon: 'T' },
+            { type: 'task', icon: '✓' },
+            { type: 'list', icon: '☷' },
+          ];
+          track entry.type
+        ) {
+          <button (click)="chooseType($any(entry.type))">
+            <span>{{ entry.icon }}</span
+            >{{ entry.type }}
+          </button>
+        }
+      </div>
+      <div class="palette-section">Media</div>
+      <div class="palette-grid">
+        @for (
+          entry of [
+            { type: 'image', icon: '▧' },
+            { type: 'gif', icon: '▣' },
+            { type: 'sticker', icon: '✳' },
+            { type: 'file', icon: '▣' },
+            { type: 'link', icon: '↗' },
+            { type: 'voice', icon: '◖' },
+          ];
+          track entry.type
+        ) {
+          <button (click)="chooseType($any(entry.type))">
+            <span>{{ entry.icon }}</span
+            >{{ entry.type === 'voice' ? 'audio' : entry.type }}
+          </button>
+        }
+      </div>
+      <div class="palette-section">Organize</div>
+      <div class="palette-grid">
+        @for (
+          entry of [
+            { type: 'zone', icon: '□' },
+            { type: 'budget', icon: '$' },
+            { type: 'table', icon: '▦' },
+          ];
+          track entry.type
+        ) {
+          <button (click)="chooseType($any(entry.type))">
+            <span>{{ entry.icon }}</span
+            >{{ entry.type }}
+          </button>
+        }
+      </div>
+      <button class="palette-sketch" (click)="setTool('sketch')">
+        <span>✎</span> Sketch directly on canvas
+      </button>
+    </div>
+  }
+  @if (mediaPicker(); as kind) { <app-media-picker [kind]="kind" (closed)="mediaPicker.set(null)" (picked)="pickMedia($event)" /> }
+  @if (pendingAsset()) { <div class="hint-pill" data-ui>Tap the canvas to place {{ pendingAsset()?.name }} · Esc to cancel</div> }
+  @if (pendingType()) {
+    <div class="hint-pill" data-ui>Tap the canvas to place {{ pendingType() }} · Esc to cancel</div>
+  }
+  @if (tool() === 'sketch') {
+    <div class="sketch-tools" data-ui>
+      <span>Sketch</span>
+      <button [class.active]="!sketchEraser()" (click)="sketchEraser.set(false)" aria-label="Draw">✎</button>
+      <button
+        [class.active]="sketchEraser()"
+        (click)="sketchEraser.set(true)"
+        aria-label="Erase sketch marks"
+      >⌫</button>
+      <select aria-label="Brush" [value]="brush()" (change)="brush.set($any($event.target).value)"><option value="pen">Pen</option><option value="marker">Marker</option><option value="highlighter">Highlighter</option></select>
+      <select aria-label="Stroke width" [value]="brushWidth()" (change)="brushWidth.set(+$any($event.target).value)"><option value="2">S</option><option value="3">M</option><option value="6">L</option></select>
+      <div class="sketch-colors">@for (color of ['#111111','#d4111c','#ffffff','#e2b72d','#315b89','#35735b']; track color) { <button [style.background]="color" [class.active]="sketchColor() === color" (click)="sketchColor.set(color)" [attr.aria-label]="'Draw with ' + color"></button> }</div>
+      <button (click)="undo()" aria-label="Undo stroke">↶</button>
+    </div>
+  }
+  @if (tool() === 'connect') {
+    <div class="hint-pill" data-ui>
+      {{ connectionSourceId() ? 'Choose the second object' : 'Choose two objects to connect' }}
+    </div>
+  }
+  <div class="zoom-controls" data-ui>
+    <button (click)="zoomBy(0.8)" aria-label="Zoom out">−</button
+    ><button class="zoom-value" (click)="fitView()" title="Fit view">{{ zoomLabel() }}</button
+    ><button (click)="zoomBy(1.25)" aria-label="Zoom in">+</button
+    ><button (click)="fitView()" aria-label="Fit all">⛶</button>
   </div>
+  @if (selectedIds().length && !editingId()) {
+    <div class="selection-toolbar" data-ui>
+      <span>{{ selectedIds().length }} selected</span>
+      @if (selected(); as item) {
+        @if (selectedIds().length === 1 && (item.type === 'text' || item.type === 'note')) {
+          <select
+            aria-label="Font family"
+            [value]="item.fontFamily || 'sans'"
+            (change)="setFontFamily(item.id, $event)"
+          >
+            <option value="sans">Sans</option>
+            <option value="mono">Mono</option></select
+          ><select
+            aria-label="Text preset"
+            [value]="item.fontSize || (item.type === 'text' ? 21 : 16)"
+            (change)="setTextSize(item.id, $event)"
+          >
+            <option value="12">Label</option>
+            <option value="14">Small</option>
+            <option value="16">Body</option>
+            <option value="18">Large</option>
+            <option value="20">Lead</option>
+            <option value="24">Heading</option>
+            <option value="32">Section</option>
+            <option value="40">Title</option>
+            <option value="48">Hero</option>
+            <option value="64">Display</option></select
+          ><button
+            (click)="toggleBold(item.id)"
+            [class.active]="(item.fontWeight || 600) >= 700"
+            aria-label="Bold"
+          >
+            <b>B</b></button
+          ><select
+            aria-label="Text alignment"
+            [value]="item.textAlign || 'left'"
+            (change)="setAlignment(item.id, $event)"
+          >
+            <option value="left">Left</option>
+            <option value="center">Center</option>
+            <option value="right">Right</option>
+          </select>
+          <div class="swatches" aria-label="Text color">
+            @for (
+              color of [
+                '#111111',
+                '#62615e',
+                '#d4111c',
+                '#ffffff',
+                '#d9a20b',
+                '#315b89',
+                '#35735b',
+              ];
+              track color
+            ) {
+              <button
+                [style.background]="color"
+                [class.active]="item.textColor === color"
+                (click)="setStyle(item.id, { textColor: color })"
+                [attr.aria-label]="'Text color ' + color"
+              ></button>
+            }
+          </div>
+          @if (item.type === 'note') {
+            <div class="swatches" aria-label="Note background">
+              @for (color of ['#ffffff', '#fff5d9', '#fcecee', '#eaf2ed', '#eaf0f8']; track color) {
+                <button
+                  [style.background]="color"
+                  [class.active]="item.background === color"
+                  (click)="setStyle(item.id, { background: color })"
+                  [attr.aria-label]="'Note background ' + color"
+                ></button>
+              }
+            </div>
+          }
+        }
+      }
+      <button (click)="duplicate()">Duplicate</button
+      ><button (click)="inspectorOpen.set(!inspectorOpen())">Details</button
+      ><button (click)="removeSelected()">Delete</button>
+    </div>
+  }
+  @if (selected() && inspectorOpen()) {
+    <aside class="inspector" data-ui>
+      <div class="inspector-head">
+        <div>
+          <small>OBJECT DETAILS</small>
+          <h2>
+            {{ selectedIds().length > 1 ? selectedIds().length + ' selected' : selected()?.type }}
+          </h2>
+        </div>
+        <button (click)="inspectorOpen.set(false)" aria-label="Close">×</button>
+      </div>
+      <div class="inspector-body">
+        @if (selectedIds().length === 1 && selected(); as item) {
+          <div class="inspector-grid">
+            <label
+              >X<input
+                type="number"
+                [value]="item.x"
+                (change)="setProperty(item.id, 'x', $event)" /></label
+            ><label
+              >Y<input
+                type="number"
+                [value]="item.y"
+                (change)="setProperty(item.id, 'y', $event)" /></label
+            ><label
+              >W<input
+                type="number"
+                [value]="item.width"
+                (change)="setProperty(item.id, 'width', $event)" /></label
+            ><label
+              >H<input
+                type="number"
+                [value]="item.height"
+                (change)="setProperty(item.id, 'height', $event)"
+            /></label>
+          </div>
+          @if (item.type === 'task') {
+            <label
+              >Status<select
+                [value]="item.completed ? 'done' : 'open'"
+                (change)="setTaskStatus(item.id, $event)"
+              >
+                <option value="open">Open</option>
+                <option value="done">Done</option>
+              </select></label
+            ><label
+              >Due date<input
+                type="date"
+                [value]="item.due || ''"
+                (change)="setString(item.id, 'due', $event)" /></label
+            ><label
+              >Priority<select
+                [value]="item.priority || ''"
+                (change)="setString(item.id, 'priority', $event)"
+              >
+                <option value="">None</option>
+                <option>Low</option>
+                <option>Medium</option>
+                <option>High</option>
+              </select></label
+            ><label
+              >Notes<textarea
+                [value]="item.body || ''"
+                (change)="setString(item.id, 'body', $event)"
+              ></textarea>
+            </label>
+            @for (subtask of item.checklist || []; track $index) {
+              <label
+                >Subtask {{ $index + 1
+                }}<input [value]="subtask.label" (change)="setListRow(item.id, $index, $event)"
+              /></label>
+            }
+            <button class="inspector-action" (click)="addSubtask(item.id)">+ Subtask</button>
+          }
+          @if (item.type === 'list') {
+            <label
+              ><input
+                type="checkbox"
+                [checked]="item.ordered || false"
+                (change)="setOrdered(item.id, $event)"
+              />
+              Ordered list</label
+            >
+          }
+          @if (item.type === 'image') {
+            <button class="inspector-action" (click)="startCrop()">Crop image</button
+            ><button class="inspector-action" (click)="replaceImage()">Replace image</button>
+          }
+          @if (item.type === 'image' || item.type === 'gif' || item.type === 'sticker') { <div class="inspector-grid"><button class="inspector-action" (click)="flip(item.id, 'x')">Flip horizontal</button><button class="inspector-action" (click)="flip(item.id, 'y')">Flip vertical</button></div> }
+          @if (item.type === 'sketch') { <label class="accent-control">Stroke color<input type="color" [value]="item.accent || '#d4111c'" (change)="setStyle(item.id, {accent: $any($event.target).value})" /></label> }
+          @if (item.type === 'link') {
+            <label
+              >URL<input type="url" [value]="item.url || ''" (change)="setLinkUrl(item.id, $event)"
+            /></label>
+          }
+        }
+        @if (selectedIds().length > 1) {
+          <div class="inspector-grid">
+            <button class="inspector-action" (click)="align('x')">Align left</button
+            ><button class="inspector-action" (click)="align('y')">Align top</button>
+          </div>
+        }
+        <div class="inspector-grid">
+          <button class="inspector-action" (click)="layer('front')">Bring forward</button
+          ><button class="inspector-action" (click)="layer('back')">Send backward</button>
+        </div>
+        <div class="inspector-grid"><button class="inspector-action" (click)="layer('top')">Bring to front</button><button class="inspector-action" (click)="layer('bottom')">Send to back</button></div>
+        <button class="inspector-action" (click)="duplicate()">Duplicate</button
+        ><button class="inspector-action danger" (click)="removeSelected()">Delete</button>
+      </div>
+    </aside>
+  }
+  @if (cropId()) {
+    <div class="crop-toolbar" data-ui>
+      <span>Drag image to crop</span><button (click)="cropZoom(0.9)">−</button
+      ><button (click)="cropZoom(1.1)">+</button><button (click)="finishCrop(false)">Cancel</button
+      ><button class="crop-done" (click)="finishCrop(true)">Done</button>
+    </div>
+  }
+  <input
+    #fileInput
+    type="file"
+    multiple
+    accept="image/*,audio/*,.pdf,.txt,.doc,.docx"
+    hidden
+    (change)="fileSelected($event)"
+  />
 </section>

@@ -19,6 +19,12 @@ export const routes: Routes = [
   },
 
   {
+    path: 'settings',
+    loadComponent: () =>
+      import('../app/features/settings/settings-page').then((m) => m.SettingsPage),
+  },
+
+  {
     path: 'space/:id',
     loadComponent: () =>
       import('../app/layouts/canvas-layout/canvas-layout').then((m) => m.CanvasLayout),

@@ -1,11 +1,11 @@
-<section class="spaces-page">
+﻿<section class="spaces-page">
   <!-- TOP BAR -->
   <header class="topbar">
     <span class="brand"> THREAD </span>
 
     <div class="topbar-actions">
       <div class="search">
-        <span class="search-symbol"> ⌕ </span>
+        <span class="search-symbol"> âŒ• </span>
 
         <input
           type="text"
@@ -15,11 +15,19 @@
         />
 
         @if (searchQuery()) {
-          <button type="button" (click)="clearSearch()">×</button>
+          <button type="button" (click)="clearSearch()">أ—</button>
         }
       </div>
 
-      <button type="button" class="avatar">O</button>
+      <button
+        type="button"
+        class="avatar"
+        (click)="openSettings()"
+        [attr.aria-label]="'Profile and settings for ' + preferences.profileName()"
+        title="Profile and settings"
+      >
+        {{ preferences.initials() }}
+      </button>
     </div>
   </header>
 
@@ -265,7 +273,7 @@
             <strong> Edit Space </strong>
           </div>
 
-          <button type="button" (click)="selectedSpaceId.set(null)">×</button>
+          <button type="button" (click)="selectedSpaceId.set(null)">أ—</button>
         </div>
 
         <div class="editor-section">
@@ -351,7 +359,7 @@
 
     <!-- ZOOM -->
     <div class="zoom-controls" (pointerdown)="$event.stopPropagation()">
-      <button type="button" (click)="zoomOut()">−</button>
+      <button type="button" (click)="zoomOut()">âˆ’</button>
 
       <button type="button" class="zoom-percentage" (click)="resetView()">
         {{ zoomPercent() }}%
@@ -359,7 +367,7 @@
 
       <button type="button" (click)="zoomIn()">+</button>
 
-      <button type="button" title="Fit all Spaces" (click)="fitSpaces()">⛶</button>
+      <button type="button" title="Fit all Spaces" (click)="fitSpaces()">â›¶</button>
     </div>
 
     <!-- CURRENT MODE -->
