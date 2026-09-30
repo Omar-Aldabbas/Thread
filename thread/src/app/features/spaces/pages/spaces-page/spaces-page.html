@@ -258,6 +258,23 @@
 
         <span class="tool-key"> N </span>
       </button>
+      <div class="tool-divider"></div>
+      <button type="button" title="Add task in selected space" (click)="openToolInSpace('task')" aria-label="Add task in space">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="m8 12 3 3 5-6"/></svg>
+        <span class="tool-key">Task</span>
+      </button>
+      <button type="button" title="Add text in selected space" (click)="openToolInSpace('text')" aria-label="Add text in space">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M12 6v13M8 19h8"/></svg>
+        <span class="tool-key">T</span>
+      </button>
+      <button type="button" title="Sketch in selected space" (click)="openToolInSpace('sketch')" aria-label="Sketch in space">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m4 20 4.5-1 11-11a2 2 0 0 0-3-3l-11 11L4 20ZM14 7l3 3"/></svg>
+        <span class="tool-key">P</span>
+      </button>
+      <button type="button" title="Connect objects in selected space" (click)="openToolInSpace('connect')" aria-label="Connect objects in space">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="7" r="2"/><circle cx="19" cy="17" r="2"/><path d="M7 7h4c4 0 2 10 6 10"/></svg>
+        <span class="tool-key">C</span>
+      </button>
     </nav>
 
     <!-- =====================

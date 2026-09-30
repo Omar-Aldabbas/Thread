@@ -103,7 +103,7 @@ export class CanvasPage implements AfterViewInit, OnDestroy {
         end: () => this.endTransform(),
       });
     }
-    setTimeout(() => { this.fitView(); this.queueTransformSync(); });
+    setTimeout(() => { this.fitView(); this.queueTransformSync(); const entryTool = this.route.snapshot.queryParamMap.get('tool'); if (entryTool === 'task') this.chooseType('task'); else if (entryTool === 'text' || entryTool === 'sketch' || entryTool === 'connect') this.setTool(entryTool); });
   }
   ngOnDestroy(): void { if (this.transformFrame) cancelAnimationFrame(this.transformFrame); this.transformOverlay?.destroy(); }
   private queueTransformSync(): void { if (!this.browser || this.transformFrame) return; this.transformFrame = requestAnimationFrame(() => { this.transformFrame = 0; const viewport = this.viewport()?.nativeElement; if (!viewport || !this.transformOverlay) return; const ids = this.selectedIds(); const targets = ids.map(id => viewport.querySelector<HTMLElement>(`[data-node-id="${id}"]`)).filter((value): value is HTMLElement => !!value); const others = [...viewport.querySelectorAll<HTMLElement>('[data-node-id]')].filter(element => !ids.includes(element.dataset['nodeId'] || '')); const item = this.selected(); this.transformOverlay.update(targets, others, !!item && ['image', 'gif', 'sticker', 'sketch'].includes(item.type)); }); }
@@ -324,6 +324,7 @@ export class CanvasPage implements AfterViewInit, OnDestroy {
   setTaskStatus(id: string, event: Event): void { this.setStyle(id, { completed: (event.target as HTMLSelectElement).value === 'done' }); }
   setOrdered(id: string, event: Event): void { this.setStyle(id, { ordered: (event.target as HTMLInputElement).checked }); }
   addSubtask(id: string): void { const item = this.items().find(entry => entry.id === id); if (!item) return; this.setStyle(id, { checklist: [...(item.checklist || []), { label: 'New subtask', completed: false }], height: Math.max(item.height, 155) }); }
+  addTaskNear(id: string): void { const item = this.items().find(entry => entry.id === id); if (!item) return; this.finishEditing(); this.createAt('task', { x: item.x, y: item.y + item.height + 18 }); }
   setListRow(id: string, index: number, event: Event): void { const item = this.items().find(entry => entry.id === id); if (!item) return; const value = (event.target as HTMLInputElement).value; if (item.checklist?.[index]?.label === value) return; this.setStyle(id, { checklist: item.checklist?.map((row, i) => i === index ? { ...row, label: value } : row) }); }
   addListRow(id: string): void { const item = this.items().find(entry => entry.id === id); if (!item) return; const index = item.checklist?.length || 0; this.setStyle(id, { checklist: [...(item.checklist || []), { label: '', completed: false }], height: Math.max(item.height, 95 + (index + 1) * 32) }); setTimeout(() => document.querySelector<HTMLInputElement>(`[data-node-id="${id}"] .list-row:nth-child(${index + 1}) input`)?.focus()); }
   listKey(event: KeyboardEvent, id: string, index: number): void { if (event.key === 'Enter') { event.preventDefault(); this.setListRow(id, index, event); this.addListRow(id); } else if (event.key === 'Escape') (event.target as HTMLInputElement).blur(); }

@@ -100,6 +100,7 @@ a {
   --color-secondary-dark: #ffffff;
   --color-secondary-light: #d5d2ca;
   --color-background: #191b1b;
+  --canvas-dot: rgba(241, 240, 235, 0.34);
   --color-surface: #252727;
   --color-surface-muted: #303232;
   --color-border: #464848;
@@ -121,7 +122,7 @@ a {
   background-color: var(--color-surface);
 }
 :root[data-theme='dark'] .canvas-viewport {
-  background-image: radial-gradient(circle, rgba(255, 255, 255, 0.1) 0.8px, transparent 0.8px);
+  background-image: radial-gradient(circle, var(--canvas-dot) 1px, transparent 1.2px);
 }
 :root[data-theme='dark'] {
   --color-note: #393426;

@@ -477,6 +477,10 @@ export class SpacesPage {
   openSpace(space: SpaceCard): void {
     this.router.navigate(['/space', space.id]);
   }
+  openToolInSpace(tool: 'task' | 'text' | 'sketch' | 'connect'): void {
+    const space = this.selectedSpace() || this.spaces()[0];
+    if (space) this.router.navigate(['/space', space.id], { queryParams: { tool } });
+  }
 
   selectSpace(space: SpaceCard): void {
     this.selectedSpaceId.set(space.id);

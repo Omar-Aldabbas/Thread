@@ -12,7 +12,7 @@ button { cursor:pointer; border:0; background:none; color:inherit; }
 .icon-button { width:30px; height:30px; color:var(--color-text-secondary); font-size:20px; }
 .icon-button:hover { color:var(--color-primary); }
 .add-top { height:32px; margin-left:6px; padding:0 13px; background:var(--color-primary); color:white; font-size:12px; font-weight:700; }
-.canvas-viewport { position:relative; flex:1; min-height:0; overflow:hidden; touch-action:none; user-select:none; background-color:var(--color-background); background-image:radial-gradient(circle,rgba(17,17,17,.105) .8px,transparent .8px); cursor:default; }
+.canvas-viewport { position:relative; flex:1; min-height:0; overflow:hidden; touch-action:none; user-select:none; background-color:var(--color-background); background-image:radial-gradient(circle,var(--canvas-dot, rgba(17,17,17,.18)) 1px,transparent 1.2px); cursor:default; }
 .canvas-viewport.hand-cursor { cursor:grab; }.canvas-viewport.is-panning { cursor:grabbing; }.canvas-viewport.placement-cursor,.canvas-viewport.connect-cursor { cursor:crosshair; }
 .world { position:absolute; left:0; top:0; width:0; height:0; transform-origin:0 0; }
 .connections { position:absolute; left:0; top:0; overflow:visible; pointer-events:none; }
@@ -97,7 +97,7 @@ button { cursor:pointer; border:0; background:none; color:inherit; }
 .selection-toolbar { animation:toolbar-in 140ms ease-out both; }
 .canvas-item.selected { transition:outline-color 140ms ease,outline-offset 140ms ease; }
 .canvas-item.selected { outline:0; }
-.alignment-guide { position:absolute; z-index:19; pointer-events:none; background:var(--color-primary); opacity:.72; }
+.alignment-guide { position:absolute; z-index:19; pointer-events:none; opacity:.82; }
 .alignment-guide.vertical { top:-10000px; width:1px; height:20000px; }
 .alignment-guide.horizontal { left:-10000px; width:20000px; height:1px; }
 .transform-guide { position:absolute; z-index:26; padding:5px 8px; transform:translateX(-50%); border:1px solid var(--color-border); border-radius:5px; background:var(--color-surface); box-shadow:var(--shadow-sm); color:var(--color-text-primary); white-space:nowrap; font-size:11px; font-weight:750; pointer-events:none; }
@@ -201,3 +201,15 @@ button { cursor:pointer; border:0; background:none; color:inherit; }
 .rotate-handle { z-index:6; touch-action:none; }
 @media (pointer:coarse) { .resize-handle { width:22px; height:22px; } .rotate-handle { width:24px; height:24px; top:-36px; left:calc(50% - 12px); } }
 @media (max-width:700px) { .tool-rail.canvas-action-bar { border-radius:0; } .tool-rail.canvas-action-bar button { height:53px; } .tool-rail.canvas-action-bar button svg { width:21px; height:21px; } .sketch-tools.canvas-action-bar { gap:6px; padding:7px; } .sketch-tools.canvas-action-bar .brush-gauge { min-width:160px; } }
+.alignment-guide.vertical { background:repeating-linear-gradient(to bottom,var(--color-primary) 0 6px,transparent 6px 12px); }
+.alignment-guide.horizontal { background:repeating-linear-gradient(to right,var(--color-primary) 0 6px,transparent 6px 12px); }
+.text-content app-rich-text-editor { min-width:0; }
+.canvas-item.text-item:not(.selected) .text-content { overflow-wrap:anywhere; }
+.selection-toolbar.editing-text { bottom:72px; }
+@media (max-width:700px) { .selection-toolbar.editing-text { bottom:calc(125px + env(safe-area-inset-bottom)); } }
+.tool-rail.canvas-action-bar { left:1.25rem; gap:.25rem; padding:.35rem; border-radius:var(--radius-md); box-shadow:var(--shadow-md); }
+.tool-rail.canvas-action-bar button { position:relative; width:3rem; height:3rem; border-radius:var(--radius-sm); color:var(--color-text-primary); }
+.tool-rail.canvas-action-bar button.active { color:var(--color-text-inverse); }
+.tool-rail.canvas-action-bar button::after { position:absolute; right:.16rem; bottom:.1rem; content:attr(data-shortcut); font-size:.5rem; font-weight:500; opacity:.55; }
+.tool-rail.canvas-action-bar .tool-divider { width:70%; height:1px; margin:.15rem auto; background:var(--color-border-light); }
+@media (max-width:700px) { .tool-rail.canvas-action-bar { top:auto; right:0; bottom:0; left:0; display:grid; grid-template-columns:repeat(6,1fr); gap:0; width:100%; padding:5px 8px calc(5px + env(safe-area-inset-bottom)); transform:none; border:0; border-top:1px solid var(--color-border); border-radius:0; } .tool-rail.canvas-action-bar button { width:100%; height:53px; } .tool-rail.canvas-action-bar button::after { display:none; } .tool-rail.canvas-action-bar .tool-divider { display:none; } }

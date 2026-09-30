@@ -157,9 +157,9 @@
   background-color: var(--color-background);
 
   background-image: radial-gradient(
-    rgba(98, 97, 94, 0.17) 0.75px,
+    var(--canvas-dot, rgba(98, 97, 94, 0.22)) 1px,
 
-    transparent 0.75px
+    transparent 1.2px
   );
 
   background-repeat: repeat;
@@ -1119,6 +1119,9 @@
     transform: translateX(-50%);
 
     flex-direction: row;
+    max-width: calc(100vw - 1rem);
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
   }
 
   .editor-panel {
