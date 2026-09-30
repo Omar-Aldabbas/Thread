@@ -100,7 +100,7 @@ export class CanvasPage implements AfterViewInit {
   setTool(tool: Tool): void { this.finishEditing(); this.tool.set(tool); this.paletteOpen.set(tool === 'add'); if (tool !== 'add') this.pendingType.set(null); if (tool !== 'sketch') this.sketchEraser.set(false); this.pendingAsset.set(null); this.mediaPicker.set(null); this.connectionSourceId.set(null); }
   chooseType(type: ItemType): void { if (type === 'gif' || type === 'sticker') { this.openMedia(type); return; } this.pendingType.set(type); this.paletteOpen.set(false); this.tool.set('select'); }
   openMedia(kind: 'gif' | 'sticker'): void { this.paletteOpen.set(false); this.mediaPicker.set(kind); this.pendingAsset.set(null); }
-  pickMedia(asset: PickedMedia): void { this.mediaPicker.set(null); this.pendingAsset.set(asset); this.assetPreview.set(this.centerPoint()); this.sketchEraser.set(false); this.tool.set('select'); }
+  pickMedia(asset: PickedMedia): void { this.mediaPicker.set(null); this.pendingAsset.set(asset); this.assetPreview.set(this.centerPoint()); this.selectedIds.set([]); this.sketchEraser.set(false); this.tool.set('select'); }
   placeMedia(asset: PickedMedia, point: { x: number; y: number }): void {
     const scale = Math.min(1, 280 / asset.width, 220 / asset.height);
     const width = Math.round(asset.width * scale), height = Math.round(asset.height * scale);
@@ -276,7 +276,19 @@ export class CanvasPage implements AfterViewInit {
   cropZoom(factor: number): void { const item = this.selected(); if (item?.type === 'image') this.update(item.id, { cropScale: Math.max(1, Math.min(5, (item.cropScale || 1) * factor)) }); }
   finishCrop(save: boolean): void { if (this.cropBefore) { if (save) this.commit(this.cropBefore); else { this.items.set(this.cropBefore.items); this.connections.set(this.cropBefore.connections); } } this.cropBefore = null; this.cropId.set(null); }
   imageTransform(item: CanvasItem): string { const scale = item.cropScale || 1; return `translate(${item.cropX || 0}px, ${item.cropY || 0}px) scale(${scale * (item.flipX ? -1 : 1)}, ${scale * (item.flipY ? -1 : 1)})`; }
-  layer(direction: 'front' | 'back' | 'top' | 'bottom'): void { if (!this.selectedIds().length) return; const values = this.items().map(item => item.zIndex || 0); const high = Math.max(1, ...values), low = Math.min(0, ...values); this.snapshot(); this.selectedIds().forEach(id => { const item = this.items().find(entry => entry.id === id); if (item) this.update(id, { zIndex: direction === 'top' ? high + 1 : direction === 'bottom' ? low - 1 : (item.zIndex || 1) + (direction === 'front' ? 1 : -1) }); }); }
+  layer(direction: 'front' | 'back' | 'top' | 'bottom'): void {
+    const selected = new Set(this.selectedIds()); if (!selected.size) return;
+    const ordered = [...this.items()].sort((a, b) => (a.zIndex ?? (a.type === 'zone' || a.type === 'workspace' ? 0 : 1)) - (b.zIndex ?? (b.type === 'zone' || b.type === 'workspace' ? 0 : 1)));
+    if (direction === 'top' || direction === 'bottom') {
+      const chosen = ordered.filter(item => selected.has(item.id)), rest = ordered.filter(item => !selected.has(item.id));
+      ordered.splice(0, ordered.length, ...(direction === 'top' ? [...rest, ...chosen] : [...chosen, ...rest]));
+    } else {
+      const indexes = direction === 'front' ? [...ordered.keys()].reverse() : [...ordered.keys()];
+      for (const index of indexes) { const next = index + (direction === 'front' ? 1 : -1); if (next < 0 || next >= ordered.length || !selected.has(ordered[index].id) || selected.has(ordered[next].id)) continue; [ordered[index], ordered[next]] = [ordered[next], ordered[index]]; }
+    }
+    const levels = new Map(ordered.map((item, index) => [item.id, index + 1]));
+    this.snapshot(); this.items.update(items => items.map(item => ({ ...item, zIndex: levels.get(item.id) })));
+  }
   flip(id: string, axis: 'x' | 'y'): void { const item = this.items().find(entry => entry.id === id); if (item) this.setStyle(id, axis === 'x' ? { flipX: !item.flipX } : { flipY: !item.flipY }); }
   align(axis: 'x' | 'y'): void { const targets = this.items().filter(item => this.selectedIds().includes(item.id)); if (targets.length < 2) return; const value = Math.min(...targets.map(item => item[axis])); this.snapshot(); targets.forEach(item => this.update(item.id, { [axis]: value })); }
   sketchPath(points: { x: number; y: number }[]): string {

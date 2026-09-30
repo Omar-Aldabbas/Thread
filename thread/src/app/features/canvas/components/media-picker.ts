@@ -55,7 +55,8 @@ export interface PickedMedia {
             /><span>{{ entry.name }}</span>
           </button>
         }
-        @if (!visible().length) {
+        @if (loading()) { <p class="media-empty">Loading GIFs...</p> }
+        @else if (!visible().length) {
           <p class="media-empty">No matches in this collection.</p>
         }
       </div>
@@ -208,6 +209,7 @@ export interface PickedMedia {
         font-size: 10px;
       }
       @media (max-width: 700px) {
+        .media-search { height: 46px; font-size: 16px; }
         .media-picker {
           top: auto;
           right: 0;
@@ -235,6 +237,7 @@ export class MediaPicker implements OnInit {
   readonly query = signal('');
   readonly category = signal('Featured');
   readonly gifs = signal<GifResult[]>([]);
+  readonly loading = signal(false);
   readonly recent = signal<string[]>([]);
   readonly categories = computed(() =>
     this.kind === 'gif'
@@ -262,13 +265,12 @@ export class MediaPicker implements OnInit {
     } catch {
       this.recent.set([]);
     }
-    if (this.kind === 'gif')
-      void curatedGifProvider.search('').then((value) => this.gifs.set(value));
+    if (this.kind === 'gif') { this.loading.set(true); void curatedGifProvider.search('').then(value => this.gifs.set(value)).finally(() => this.loading.set(false)); }
   }
   search(event: Event): void {
     const value = (event.target as HTMLInputElement).value;
     this.query.set(value);
-    if (this.kind === 'gif') void curatedGifProvider.search(value).then(results => { if (this.query() === value) this.gifs.set(results); });
+    if (this.kind === 'gif') { this.loading.set(true); void curatedGifProvider.search(value).then(results => { if (this.query() === value) this.gifs.set(results); }).finally(() => this.loading.set(false)); }
   }
   setCategory(value: string): void {
     this.category.set(value);

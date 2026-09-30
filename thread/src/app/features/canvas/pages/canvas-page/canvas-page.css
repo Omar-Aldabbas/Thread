@@ -164,5 +164,6 @@ button { cursor:pointer; border:0; background:none; color:inherit; }
   .sketch-tools { top:auto; right:8px; bottom:calc(72px + env(safe-area-inset-bottom)); left:8px; max-width:none; overflow-x:auto; }
   .sketch-tools > span { display:none; }
   .sketch-tools label input { width:150px; }
+  .sketch-tools select { min-height:42px; font-size:16px; }
 }
 @media (min-width:701px) and (max-width:1024px) { .tool-rail { left:12px; } .create-palette { left:70px; } .inspector { width:270px; } .sketch-tools { left:72px; } }
