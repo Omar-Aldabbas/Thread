@@ -1,17 +1,17 @@
 ﻿import { Component, inject } from '@angular/core';
 import { Router } from '@angular/router';
 import { PreferencesService, ThemeChoice } from '../../shared/preferences.service';
+import { ThreadHeader } from '../../shared/thread-header';
+import { ScrollDirective } from '../../shared/scroll.directive';
 
 @Component({
   selector: 'app-settings-page',
   standalone: true,
+  imports: [ThreadHeader, ScrollDirective],
   template: `
     <main class="settings-page">
-      <header class="settings-header">
-        <button (click)="back()" aria-label="Back to spaces">←</button
-        ><strong>THREAD<span>.</span></strong
-        ><span>Settings</span>
-      </header>
+      <app-thread-header title="Settings" />
+      <div class="settings-scroll" appScroll="y" scrollbar="auto">
       <div class="settings-shell">
         <div class="settings-intro">
           <span>YOUR SPACE</span>
@@ -70,20 +70,26 @@ import { PreferencesService, ThemeChoice } from '../../shared/preferences.servic
           <p>Canvas content and preferences are saved locally in this browser.</p>
         </section>
       </div>
+      </div>
     </main>
   `,
   styles: [
     `
       :host {
         display: block;
-        min-height: 100vh;
+        height: 100dvh;
+        overflow: hidden;
         background: var(--color-background);
         color: var(--color-text-primary);
       }
       .settings-page {
-        min-height: 100vh;
+        display:flex;
+        flex-direction:column;
+        height:100%;
+        min-height:0;
         font-family: Inter, ui-sans-serif, system-ui, sans-serif;
       }
+      .settings-scroll { flex:1; min-height:0; }
       .settings-header {
         display: flex;
         align-items: center;

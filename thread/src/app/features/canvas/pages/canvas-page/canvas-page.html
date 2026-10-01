@@ -1,36 +1,22 @@
 ﻿<section class="thread-app">
-  <header class="thread-header" data-ui>
-    <button class="brand-button" (click)="goToSpaces()" aria-label="All spaces">
-      THREAD<span>.</span>
-    </button>
-    <span class="header-divider"></span><span class="space-name">{{ spaceName() }}</span>
-    <div class="header-actions">
+  <app-thread-header [title]="spaceName()">
       <label class="search-box"
         ><span>⌕</span
         ><input
           aria-label="Search canvas"
           placeholder="Search"
           [value]="search()"
-          (input)="search.set($any($event.target).value)" /></label
-      ><button class="icon-button" (click)="undo()" aria-label="Undo">↶</button
-      ><button class="icon-button" (click)="redo()" aria-label="Redo">↷</button
-      ><button
+          (input)="search.set($any($event.target).value)" /></label>
+      <button class="icon-button" (click)="undo()" aria-label="Undo">↶</button>
+      <button class="icon-button" (click)="redo()" aria-label="Redo">↷</button>
+      <button
         class="quick-task"
         (click)="chooseType('task')"
         title="Add a task, then tap the canvas"
       >
-        + Task</button
-      ><button class="add-top" (click)="setTool('add')">+ <span>Add</span></button
-      ><button
-        class="profile-button"
-        (click)="goToSettings()"
-        [attr.aria-label]="'Profile and settings for ' + preferences.profileName()"
-        title="Profile and settings"
-      >
-        {{ preferences.initials() }}
-      </button>
-    </div>
-  </header>
+        + Task</button>
+      <button class="add-top" (click)="setTool('add')">+ <span>Add</span></button>
+  </app-thread-header>
   <main
     #viewport
     class="canvas-viewport"
@@ -72,7 +58,7 @@
             <path
               d="M0 0 L10 5 L0 10"
               fill="none"
-              stroke="var(--color-primary)"
+              stroke="var(--color-text-secondary)"
               stroke-width="1.6"
             />
           </marker>
@@ -81,8 +67,8 @@
           <path
             [attr.d]="connectionPath(connection)"
             fill="none"
-            stroke="var(--color-primary)"
-            stroke-opacity=".65"
+            [attr.stroke]="selectedConnectionId() === connection.id ? 'var(--color-primary)' : 'var(--color-text-secondary)'"
+            stroke-opacity=".85"
             stroke-width="1.5"
             [attr.stroke-dasharray]="connection.style === 'dashed' ? '7 6' : null"
             [attr.marker-end]="
@@ -90,16 +76,29 @@
                 ? 'url(#arrow)'
                 : null
             "
+            (pointerdown)="selectConnection($event, connection)"
           />
+          <path class="connection-hit" [attr.d]="connectionPath(connection)" fill="none" stroke="transparent" [attr.stroke-width]="14 / zoom()" (pointerdown)="selectConnection($event, connection)" />
+          @if (selectedConnectionId() === connection.id) {
+            @for (terminal of ['source','target']; track terminal) {
+              <circle class="connection-endpoint" [attr.cx]="endpoint(connection, $any(terminal)).x" [attr.cy]="endpoint(connection, $any(terminal)).y" [attr.r]="5 / zoom()" [attr.stroke-width]="1.5 / zoom()" (pointerdown)="rebindDown($event, connection, $any(terminal))" (pointermove)="pointerMove($event)" (pointerup)="pointerUp($event)" />
+            }
+            @if (connection.kind === 'elbow') {
+              <circle class="connection-route-handle" [attr.cx]="routeHandle(connection).x" [attr.cy]="routeHandle(connection).y" [attr.r]="4 / zoom()" [attr.stroke-width]="1.5 / zoom()" (pointerdown)="routeDown($event, connection)" (pointermove)="pointerMove($event)" (pointerup)="pointerUp($event)" />
+            }
+          }
         }
         @if (connectionPreview(); as preview) {
           <path
-            [attr.d]="'M ' + preview.x1 + ' ' + preview.y1 + ' L ' + preview.x2 + ' ' + preview.y2"
+            [attr.d]="previewPath(preview)"
             fill="none"
             stroke="var(--color-primary)"
             stroke-width="1.5"
             stroke-dasharray="5 4"
           />
+        }
+        @if (precisePreview(); as anchor) {
+          <circle [attr.cx]="anchor.x" [attr.cy]="anchor.y" [attr.r]="4 / zoom()" fill="var(--color-surface)" stroke="var(--color-primary)" [attr.stroke-width]="1.5 / zoom()" />
         }
       </svg>
       @for (item of visibleItems(); track item.id) {
@@ -110,6 +109,7 @@
           [class.selected]="selectedIds().includes(item.id)"
           [class.connection-source]="tool() === 'connect' && connectionSourceId() === item.id"
           [class.zone]="item.type === 'zone' || item.type === 'workspace'"
+          [class.frame-item]="item.type === 'frame'"
           [class.note-item]="item.type === 'note'"
           [class.task-item]="item.type === 'task'"
           [class.task-done]="item.type === 'task' && item.completed"
@@ -117,6 +117,8 @@
           [class.image-item]="item.type === 'image'"
           [class.visual-asset]="item.type === 'gif' || item.type === 'sticker' || !!item.sketchAsset"
           [class.sketch-item]="item.type === 'sketch'"
+          [class.shape-item]="item.type === 'shape'"
+          [class.connection-target]="connectionTargetId() === item.id"
           [style.visibility]="editingSketchId() === item.id ? 'hidden' : null"
           [style.left.px]="item.x"
           [style.top.px]="item.y"
@@ -124,7 +126,7 @@
           [style.height.px]="item.height"
           [style.transform]="item.rotation ? 'rotate(' + item.rotation + 'deg)' : null"
           [style.z-index]="
-            item.zIndex || (item.type === 'zone' || item.type === 'workspace' ? 0 : 1)
+            item.zIndex || (item.type === 'zone' || item.type === 'workspace' || item.type === 'frame' ? 0 : 1)
           "
           [style.background]="item.type === 'note' ? item.background || null : null"
           (pointerdown)="itemPointerDown($event, item)"
@@ -135,7 +137,7 @@
           tabindex="0"
           [attr.aria-label]="item.type + ': ' + item.title"
         >
-          @if (item.type === 'zone' || item.type === 'workspace') {
+          @if (item.type === 'zone' || item.type === 'workspace' || item.type === 'frame') {
             <div class="zone-label">
               <span>{{ item.type }}</span
               ><strong
@@ -146,6 +148,18 @@
                 [textContent]="item.title || (editingId() === item.id ? '' : 'Untitled zone')"
               ></strong>
             </div>
+          } @else if (item.type === 'shape') {
+            <svg class="shape-geometry" viewBox="0 0 100 100" preserveAspectRatio="none" [attr.fill]="item.shapeFill || '#ffffff'" [attr.stroke]="item.shapeStroke || '#6b7280'" [attr.stroke-width]="item.shapeStrokeWidth || 2" aria-hidden="true">
+              @switch (item.shapeKind) {
+                @case ('rounded') { <rect x="2" y="2" width="96" height="96" rx="15" /> }
+                @case ('circle') { <ellipse cx="50" cy="50" rx="48" ry="48" /> }
+                @case ('diamond') { <polygon points="50,2 98,50 50,98 2,50" /> }
+                @case ('triangle') { <polygon points="50,2 98,98 2,98" /> }
+                @case ('cloud') { <path d="M 25 78 C 10 78 5 62 13 52 C 17 47 22 45 28 45 C 29 25 45 14 60 22 C 67 25 72 31 75 39 C 91 38 99 50 95 63 C 93 72 85 78 75 78 Z" /> }
+                @default { <rect x="2" y="2" width="96" height="96" /> }
+              }
+            </svg>
+            <div class="shape-label" [attr.contenteditable]="editingId() === item.id" [attr.data-edit-id]="editingId() === item.id ? item.id : null" (keydown)="inlineKey($event)" (blur)="inlineBlur($event, item.id, 'title')" [textContent]="item.title"></div>
           } @else if (item.type === 'image') {
             @if (item.image) {
               <div class="image-frame">
@@ -201,7 +215,7 @@
               [style.font-family]="item.fontFamily === 'mono' ? 'ui-monospace, monospace' : null"
             >
               <div
-                class="note-title"
+                class="note-title" appScroll="y" scrollbar="hover"
                 [style.font-size.px]="item.fontSize || 17"
                 [style.font-weight]="item.fontWeight || 650"
                 [style.text-align]="item.textAlign || 'left'"
@@ -212,7 +226,7 @@
                 (blur)="inlineBlur($event, item.id, 'title')"
                 [textContent]="item.title || (editingId() === item.id ? '' : 'Note')"
               ></div>
-              <div class="note-body" dir="auto">
+              <div class="note-body" appScroll="y" scrollbar="hover" dir="auto">
                 @if (editingId() === item.id) {
                   <app-rich-text-editor
                     [html]="richContent(item.id)"
@@ -238,7 +252,7 @@
                 (pointerdown)="$event.stopPropagation()"
                 aria-label="Complete task"
               />
-              <div class="task-main">
+              <div class="task-main" appScroll="y" scrollbar="hover">
                 @if (editingId() === item.id) {
                   <input
                     class="task-title-input"
@@ -275,7 +289,7 @@
               </div>
             </div>
           } @else if (item.type === 'list' || item.type === 'checklist') {
-            <div class="list-content">
+            <div class="list-content" appScroll="y" scrollbar="hover">
               <div
                 class="list-title"
                 dir="auto"
@@ -308,7 +322,7 @@
               </button>
             </div>
           } @else if (item.type === 'budget') {
-            <div class="budget-content">
+            <div class="budget-content" appScroll="y" scrollbar="hover">
               <div
                 class="list-title"
                 [attr.contenteditable]="editingId() === item.id"
@@ -353,7 +367,7 @@
                 (blur)="inlineBlur($event, item.id, 'title')"
                 [textContent]="item.title || (editingId() === item.id ? '' : 'Table')"
               ></div>
-              <div class="table-scroll">
+              <div class="table-scroll" appScroll="both" scrollbar="auto">
                 <table>
                   <thead>
                     <tr>
@@ -419,10 +433,10 @@
           } @else if (item.type === 'sketch') {
             <app-sketch-renderer [item]="item" />
           } @else if (item.type === 'link') {
-            <div class="link-content">
+            <div class="link-content" appScroll="y" scrollbar="hover">
               <span class="link-icon">↗</span>
               <div
-                class="card-title"
+                class="card-title" appScroll="y" scrollbar="hover"
                 [attr.contenteditable]="editingId() === item.id"
                 (keydown)="inlineKey($event)"
                 (blur)="inlineBlur($event, item.id, 'title')"
@@ -453,7 +467,7 @@
                 <span class="card-type">{{ item.type }}</span>
               </div>
               <div
-                class="card-title"
+                class="card-title" appScroll="y" scrollbar="hover"
                 [attr.contenteditable]="editingId() === item.id"
                 [attr.data-edit-id]="editingId() === item.id ? item.id : null"
                 (keydown)="inlineKey($event)"
@@ -463,7 +477,7 @@
                 "
               ></div>
               <div
-                class="card-body"
+                class="card-body" appScroll="y" scrollbar="hover"
                 [attr.contenteditable]="editingId() === item.id"
                 (keydown)="inlineKey($event)"
                 (blur)="inlineBlur($event, item.id, 'body')"
@@ -482,7 +496,11 @@
               }
             </div>
           }
-          @if (tool() === 'connect') {
+          @if (item.type === 'shape' && tool() === 'connect' && !editingId()) {
+            @for (side of ['top','right','bottom','left']; track side) {
+              <button class="shape-port" [class.port-top]="side === 'top'" [class.port-right]="side === 'right'" [class.port-bottom]="side === 'bottom'" [class.port-left]="side === 'left'" [style.transform]="'scale(' + 1 / zoom() + ')'" (pointerdown)="connectDown($event, item, $any(side))" [attr.aria-label]="'Connect from ' + side"></button>
+            }
+          } @else if (tool() === 'connect') {
             <button
               class="connect-handle"
               (pointerdown)="connectDown($event, item)"
@@ -491,13 +509,21 @@
               aria-label="Connect {{ item.title }}"
             ></button>
           }
+          @if (item.type === 'shape' && tool() === 'connect' && connectionSourceId() === item.id) {
+            <button class="shape-quick-add" [style.transform]="'scale(' + 1 / zoom() + ')'" (pointerdown)="$event.stopPropagation()" (click)="quickConnectedShape(item)" aria-label="Add connected shape">+</button>
+          }
           @if (tool() === 'select' && selectedIds().length === 1 && selectedIds()[0] === item.id && !item.locked && (!editingId() || item.type === 'text')) {
             @for (corner of ['nw', 'ne', 'sw', 'se']; track corner) {
-              <button class="resize-handle" [class.corner-nw]="corner === 'nw'" [class.corner-ne]="corner === 'ne'" [class.corner-sw]="corner === 'sw'" [class.corner-se]="corner === 'se'" (pointerdown)="resizeDown($event, item, $any(corner))" [attr.aria-label]="'Resize ' + item.title + ' from ' + corner"></button>
+              <button class="resize-handle" [style.transform]="'scale(' + 1 / zoom() + ')'" [class.corner-nw]="corner === 'nw'" [class.corner-ne]="corner === 'ne'" [class.corner-sw]="corner === 'sw'" [class.corner-se]="corner === 'se'" (pointerdown)="resizeDown($event, item, $any(corner))" [attr.aria-label]="'Resize ' + item.title + ' from ' + corner"></button>
             }
-            <button class="rotate-handle" (pointerdown)="rotateDown($event, item)" [attr.aria-label]="'Rotate ' + item.title"></button>
+            <button class="rotate-handle" [style.top.px]="-32 / zoom()" [style.transform]="'scale(' + 1 / zoom() + ')'" (pointerdown)="rotateDown($event, item)" [attr.aria-label]="'Rotate ' + item.title"></button>
           }
         </article>
+      }
+      @if (tool() === 'select' && groupBounds(); as bounds) {
+        <div class="group-selection" [style.left.px]="bounds.x" [style.top.px]="bounds.y" [style.width.px]="bounds.width" [style.height.px]="bounds.height">
+          <button class="rotate-handle" [style.top.px]="-32 / zoom()" [style.transform]="'scale(' + 1 / zoom() + ')'" (pointerdown)="rotateGroupDown($event)" aria-label="Rotate selected group"></button>
+        </div>
       }
       @if (marquee(); as box) {
         <div
@@ -584,6 +610,8 @@
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v16M4 12h16"/></svg><small>Add</small></button
     ><button [class.active]="tool() === 'sketch'" (click)="setTool('sketch')" aria-label="Sketch" data-shortcut="P">
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m4 20 4.5-1 11-11a2 2 0 0 0-3-3l-11 11L4 20ZM14 7l3 3"/></svg><small>Sketch</small></button
+    ><button [class.active]="tool() === 'shape'" (click)="setTool('shape')" aria-label="Shape" data-shortcut="S">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="2"/></svg><small>Shape</small></button
     ><button
       class="desktop-extra"
       data-shortcut="T"
@@ -603,7 +631,7 @@
     </button>
   </nav>
   @if (paletteOpen()) {
-    <div class="create-palette" data-ui>
+    <div class="create-palette" appScroll="y" scrollbar="auto" data-ui>
       <div class="palette-title">
         ADD <button (click)="setTool('select')" aria-label="Close">×</button>
       </div>
@@ -648,6 +676,7 @@
         @for (
           entry of [
             { type: 'zone', icon: '□' },
+            { type: 'frame', icon: '▧' },
             { type: 'budget', icon: '$' },
             { type: 'table', icon: '▦' },
           ];
@@ -670,7 +699,7 @@
     <div class="hint-pill" data-ui>Tap the canvas to place {{ pendingType() }} · Esc to cancel</div>
   }
   @if (tool() === 'sketch') {
-    <div class="sketch-tools canvas-action-bar" data-ui>
+    <div class="sketch-tools canvas-action-bar" appScroll="x" scrollbar="hover" data-ui>
       <span>Sketch</span>
       <button [class.active]="!sketchEraser()" (click)="sketchEraser.set(false)" aria-label="Draw"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m4 20 4.5-1 11-11a2 2 0 0 0-3-3l-11 11L4 20ZM14 7l3 3"/></svg></button>
       <button
@@ -681,9 +710,23 @@
       <select aria-label="Brush" [value]="brush()" (change)="brush.set($any($event.target).value)"><option value="pen">Pen</option><option value="marker">Marker</option><option value="highlighter">Highlighter</option><option value="neon">Neon</option></select>
       <label class="brush-gauge" [attr.aria-label]="'Brush size ' + brushWidth()"><span class="brush-gauge-dot" [style.width.px]="brushWidth() + 4" [style.height.px]="brushWidth() + 4"></span><input type="range" min="1" max="24" step="1" [value]="brushWidth()" (input)="brushWidth.set(+$any($event.target).value)" aria-label="Brush size" /><output>{{ brushWidth() }}</output></label>
       <div class="sketch-colors">@for (color of ['#111111','#d4111c','#ffffff','#e2b72d','#315b89','#35735b','#9b4dcc','#e27632']; track color) { <button [style.background]="color" [class.active]="sketchColor() === color" (click)="sketchColor.set(color)" [attr.aria-label]="'Draw with ' + color"></button> }</div>
-      <button (click)="undoSketchStroke()" [disabled]="!activeSketchStrokes().length" aria-label="Undo stroke"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 8 4 12l4 4M4 12h10a6 6 0 0 1 0 12"/></svg></button>
-      <button (click)="redoSketchStroke()" [disabled]="!undoneSketchStrokes().length" aria-label="Redo stroke"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m16 8 4 4-4 4m4-4H10a6 6 0 0 0 0 12"/></svg></button>
+      <button (click)="undoSketchStroke()" aria-label="Undo stroke"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 8 4 12l4 4M4 12h10a6 6 0 0 1 0 12"/></svg></button>
+      <button (click)="redoSketchStroke()" aria-label="Redo stroke"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m16 8 4 4-4 4m4-4H10a6 6 0 0 0 0 12"/></svg></button>
       <button class="action-done" (click)="setTool('select')" aria-label="Finish sketch">Done</button>
+    </div>
+  }
+  @if (tool() === 'shape') {
+    <div class="shape-tools canvas-action-bar" data-ui aria-label="Choose shape">
+      @for (kind of ['rectangle','rounded','circle','diamond','triangle','cloud']; track kind) {
+        <button [class.active]="shapeKind() === kind" (click)="shapeKind.set($any(kind))" [attr.aria-label]="kind">{{ shapeIcon($any(kind)) }}</button>
+      }
+    </div>
+  }
+  @if (tool() === 'connect') {
+    <div class="shape-tools canvas-action-bar" data-ui aria-label="Connector style">
+      @for (kind of ['straight','elbow','curved']; track kind) {
+        <button [class.active]="connectorKind() === kind" (click)="connectorKind.set($any(kind))">{{ kind }}</button>
+      }
     </div>
   }
   @if (tool() === 'connect') {
@@ -698,10 +741,11 @@
     ><button (click)="fitView()" aria-label="Fit all">⛶</button>
   </div>
   @if (selectedIds().length && (!editingId() || selected()?.type === 'text')) {
-    <div class="selection-toolbar canvas-action-bar" [class.editing-text]="!!editingId()" data-ui>
+    <div class="selection-toolbar canvas-action-bar" appScroll="x" scrollbar="hover" [class.editing-text]="!!editingId()" data-ui>
       <span>{{ selectedIds().length }} selected</span>
       @if (selected(); as item) {
-        @if (selectedIds().length === 1 && item.type === 'sketch') { <button (click)="editSketch(item.id)">Edit sketch</button> }
+        @if (selectedIds().length > 1) { <button (click)="groupSelected()">Group</button> }
+        @if (item.groupId) { <button (click)="ungroupSelected()">Ungroup</button> }
         @if (selectedIds().length === 1 && item.type === 'task') { <button (click)="addTaskNear(item.id)">+ Task</button><button (click)="addSubtask(item.id)">+ Subtask</button> }
         @if (selectedIds().length === 1 && (item.type === 'text' || item.type === 'note')) {
           <select
@@ -782,7 +826,7 @@
     </div>
   }
   @if (selected() && inspectorOpen()) {
-    <aside class="inspector" data-ui>
+    <aside class="inspector" appScroll="y" scrollbar="auto" data-ui>
       <div class="inspector-head">
         <div>
           <small>OBJECT DETAILS</small>
@@ -871,6 +915,11 @@
           }
           @if (item.type === 'image' || item.type === 'gif' || item.type === 'sticker') { <div class="inspector-grid"><button class="inspector-action" (click)="flip(item.id, 'x')">Flip horizontal</button><button class="inspector-action" (click)="flip(item.id, 'y')">Flip vertical</button></div> }
           @if (item.type === 'sketch') { <label class="accent-control">Stroke color<input type="color" [value]="item.accent || '#d4111c'" (change)="setStyle(item.id, {accent: $any($event.target).value})" /></label> }
+          @if (item.type === 'shape') {
+            <label>Fill<input type="color" [value]="item.shapeFill || '#ffffff'" (change)="setStyle(item.id, {shapeFill: $any($event.target).value})" /></label>
+            <label>Outline<input type="color" [value]="item.shapeStroke || '#6b7280'" (change)="setStyle(item.id, {shapeStroke: $any($event.target).value})" /></label>
+            <label>Outline weight<input type="range" min="1" max="8" [value]="item.shapeStrokeWidth || 2" (change)="setStyle(item.id, {shapeStrokeWidth: +$any($event.target).value})" /></label>
+          }
           @if (item.type === 'link') {
             <label
               >URL<input type="url" [value]="item.url || ''" (change)="setLinkUrl(item.id, $event)"

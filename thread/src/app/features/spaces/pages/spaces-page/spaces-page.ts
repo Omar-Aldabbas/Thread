@@ -1,4 +1,4 @@
-﻿import {
+import {
   Component,
   computed,
   effect,
@@ -12,6 +12,8 @@
 import { isPlatformBrowser } from '@angular/common';
 import { Router } from '@angular/router';
 import { PreferencesService } from '../../../../shared/preferences.service';
+import { ThreadHeader } from '../../../../shared/thread-header';
+import { ScrollDirective } from '../../../../shared/scroll.directive';
 
 type Tool = 'select' | 'hand' | 'edit' | 'add';
 
@@ -62,7 +64,7 @@ interface DragSession {
 
 @Component({
   selector: 'app-spaces-page',
-  imports: [],
+  imports: [ThreadHeader, ScrollDirective],
   templateUrl: './spaces-page.html',
   styleUrl: './spaces-page.css',
 })
@@ -405,6 +407,10 @@ export class SpacesPage {
     }
 
     event.stopPropagation();
+    if (event.pointerType === 'touch' && this.isMobile() && this.activeTool() === 'select') {
+      this.selectSpace(space);
+      return;
+    }
 
     /*
      * Spacebar = hand/pan even
@@ -458,7 +464,7 @@ export class SpacesPage {
     }
   }
 
-  spacePointerUp(event: PointerEvent): void {
+  spacePointerUp(event: PointerEvent, space?: SpaceCard): void {
     if (this.dragSession) {
       this.endSpaceDrag(event);
 
@@ -468,6 +474,7 @@ export class SpacesPage {
     if (this.panSession) {
       this.stopPan(event);
     }
+    if (event.pointerType === 'touch' && space && this.isMobile() && this.activeTool() === 'select') this.openSpace(space);
   }
 
   openSettings(): void {
@@ -477,6 +484,7 @@ export class SpacesPage {
   openSpace(space: SpaceCard): void {
     this.router.navigate(['/space', space.id]);
   }
+  private isMobile(): boolean { return (this.viewport()?.nativeElement.clientWidth ?? Infinity) <= 768; }
   openToolInSpace(tool: 'task' | 'text' | 'sketch' | 'connect'): void {
     const space = this.selectedSpace() || this.spaces()[0];
     if (space) this.router.navigate(['/space', space.id], { queryParams: { tool } });
@@ -547,6 +555,7 @@ export class SpacesPage {
   }
 
   private endSpaceDrag(event: PointerEvent): void {
+    const session = this.dragSession;
     const currentTarget = event.currentTarget as HTMLElement;
 
     if (currentTarget.hasPointerCapture(event.pointerId)) {
@@ -556,6 +565,10 @@ export class SpacesPage {
     this.dragSession = null;
 
     this.draggingSpaceId.set(null);
+    if (this.isMobile() && session && !session.moved && this.activeTool() === 'select') {
+      const space = this.spaces().find(item => item.id === session.spaceId);
+      if (space) this.openSpace(space);
+    }
   }
 
   /*

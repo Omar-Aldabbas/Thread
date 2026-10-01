@@ -1,9 +1,6 @@
 ﻿<section class="spaces-page">
   <!-- TOP BAR -->
-  <header class="topbar">
-    <span class="brand"> THREAD </span>
-
-    <div class="topbar-actions">
+  <app-thread-header title="Spaces">
       <div class="search">
         <span class="search-symbol"> âŒ• </span>
 
@@ -19,22 +16,14 @@
         }
       </div>
 
-      <button
-        type="button"
-        class="avatar"
-        (click)="openSettings()"
-        [attr.aria-label]="'Profile and settings for ' + preferences.profileName()"
-        title="Profile and settings"
-      >
-        {{ preferences.initials() }}
-      </button>
-    </div>
-  </header>
+  </app-thread-header>
 
   <!-- VIEWPORT -->
   <main
     #viewport
     class="viewport"
+    appScroll="y"
+    scrollbar="auto"
     [class]="cursorClass()"
     [class.is-panning]="isPanning()"
     [style.background-size]="gridSize()"
@@ -71,11 +60,13 @@
           tabindex="0"
           (pointerdown)="spacePointerDown($event, space)"
           (pointermove)="spacePointerMove($event)"
-          (pointerup)="spacePointerUp($event)"
+          (pointerup)="spacePointerUp($event, space)"
           (pointercancel)="spacePointerUp($event)"
+          (keydown.enter)="openSpace(space)"
           (dblclick)="openSpace(space)"
         >
           <div class="card-accent"></div>
+          <button class="mobile-open" type="button" (pointerdown)="$event.stopPropagation()" (pointerup)="$event.stopPropagation()" (click)="$event.stopPropagation(); openSpace(space)" [attr.aria-label]="'Open ' + space.title">Open →</button>
 
           <div class="card-heading">
             <h2>
@@ -194,7 +185,7 @@
          FIGMA-STYLE TOOLBAR
     ====================== -->
 
-    <nav class="toolbox" (pointerdown)="$event.stopPropagation()">
+    <nav class="toolbox" appScroll="x" scrollbar="hover" (pointerdown)="$event.stopPropagation()">
       <!-- SELECT -->
       <button
         type="button"

@@ -14,13 +14,15 @@
 import { Editor } from '@tiptap/core';
 import StarterKit from '@tiptap/starter-kit';
 import { TextStyleKit } from '@tiptap/extension-text-style';
+import { ScrollDirective } from '../../../shared/scroll.directive';
 
 @Component({
   selector: 'app-rich-text-editor',
   standalone: true,
+  imports: [ScrollDirective],
   encapsulation: ViewEncapsulation.None,
   template: `
-    <div #toolbar class="rich-toolbar" (pointerdown)="$event.stopPropagation()">
+    <div #toolbar class="rich-toolbar" appScroll="x" scrollbar="hover" (pointerdown)="$event.stopPropagation()">
       <button
         type="button"
         [class.active]="active('bold')"
@@ -86,7 +88,7 @@ import { TextStyleKit } from '@tiptap/extension-text-style';
       </select>
       <input type="color" aria-label="Text color" value="#111111" (change)="color($event)" />
     </div>
-    <div #mount class="rich-mount" (pointerdown)="$event.stopPropagation()"></div>
+    <div #mount class="rich-mount" appScroll="y" scrollbar="hover" (pointerdown)="$event.stopPropagation()"></div>
   `,
   styles: [
     `
@@ -106,7 +108,8 @@ import { TextStyleKit } from '@tiptap/extension-text-style';
         gap: 2px;
         width: max-content;
         max-width: calc(100vw - 24px);
-        overflow: auto;
+        overflow-x: auto;
+        overflow-y: hidden;
         margin: 0;
         padding: 5px;
         transform: translateX(-50%);
@@ -155,7 +158,8 @@ import { TextStyleKit } from '@tiptap/extension-text-style';
         min-width: 0;
         min-height: 32px;
         max-height: 100%;
-        overflow: auto;
+        overflow-x: hidden;
+        overflow-y: auto;
       }
       .rich-mount :focus {
         outline: none;

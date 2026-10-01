@@ -13,10 +13,19 @@ export type ItemType =
   | 'link'
   | 'table'
   | 'sketch'
+  | 'shape'
+  | 'frame'
   | 'voice'
   | 'budget';
 export type ZoneType = 'standard' | 'nested' | 'portal';
 export type SketchBrush = 'pen' | 'marker' | 'highlighter' | 'neon';
+export type ShapeKind = 'rectangle' | 'rounded' | 'circle' | 'diamond' | 'triangle' | 'cloud';
+export type ConnectorKind = 'straight' | 'elbow' | 'curved';
+export type ConnectorSide = 'top' | 'right' | 'bottom' | 'left';
+export interface ConnectorBinding {
+  mode: 'auto' | 'precise';
+  anchor?: { x: number; y: number };
+}
 export interface SketchPoint { x: number; y: number; pressure: number }
 export interface SketchStroke { id: string; brush: SketchBrush; points: SketchPoint[]; color: string; size: number; opacity: number }
 
@@ -58,6 +67,11 @@ export interface CanvasItem {
   tableRows?: string[][];
   strokes?: { x: number; y: number; pressure?: number }[][];
   sketchStrokes?: SketchStroke[];
+  shapeKind?: ShapeKind;
+  shapeFill?: string;
+  shapeStroke?: string;
+  shapeStrokeWidth?: number;
+  groupId?: string;
   sketchAsset?: 'sticker' | 'gif';
   assetId?: string;
   flipX?: boolean;
@@ -81,6 +95,10 @@ export interface CanvasConnection {
   label?: string;
   style?: 'solid' | 'dashed';
   direction?: 'none' | 'forward' | 'both';
+  kind?: ConnectorKind;
+  sourceBinding?: ConnectorBinding;
+  targetBinding?: ConnectorBinding;
+  routeOffset?: number;
 }
 
 const now = '2026-09-29T00:00:00.000Z';

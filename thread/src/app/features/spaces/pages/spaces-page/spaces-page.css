@@ -301,6 +301,7 @@
     border-color var(--transition-fast),
     box-shadow var(--transition-fast);
 }
+.mobile-open { display:none; }
 
 .viewport.tool-select .space-card {
   cursor: grab;
@@ -659,6 +660,7 @@
 
   box-shadow: var(--shadow-md);
 }
+.toolbox.app-scroll-x { overflow:visible; }
 
 .toolbox button {
   position: relative;
@@ -1086,34 +1088,42 @@
 ================================ */
 
 @media (max-width: 768px) {
+  .viewport { overflow-y:auto; touch-action:pan-y; overscroll-behavior-y:contain; padding:24px 16px 110px; }
+  .intro-panel { position:static; width:auto; margin:0 0 28px; }
+  .intro-panel h1 { display:block; font-size:clamp(2rem, 9vw, 2.8rem); line-height:1.04; }
+  .intro-panel h1 span { display:inline; }
+  .intro-panel p { width:auto; margin-top:9px; }
+  .world { position:relative; inset:auto; display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%, 260px),1fr)); gap:12px; width:100%; height:auto; transform:none!important; will-change:auto; }
+  .space-card { position:relative; top:auto!important; left:auto!important; width:100%; max-width:none; height:180px; touch-action:pan-y; cursor:pointer; }
+  .mobile-open { position:absolute; z-index:2; top:12px; right:12px; display:block; min-width:64px; min-height:40px; padding:0 10px; border:1px solid var(--color-border); border-radius:var(--radius-sm); background:var(--color-surface); color:var(--color-primary); font-size:12px; font-weight:700; }
   .topbar {
     padding-inline: 1rem;
   }
 
   .search {
-    width: 11rem;
+    width: min(11rem, 28vw);
+    min-width: 72px;
   }
+  .search input { min-width: 0; width: 100%; }
 
   .intro-panel {
-    top: 2rem;
-    left: 1rem;
-
-    width: 15rem;
+    width:auto;
   }
 
   .intro-panel h1 {
-    font-size: 2.8rem;
+    font-size:clamp(2rem, 9vw, 2.8rem);
   }
 
   .intro-panel p {
-    width: 14rem;
+    width:auto;
 
     font-size: 0.9rem;
   }
 
-  .toolbox {
+  .toolbox.app-scroll-x {
+    position:fixed;
     top: auto;
-    bottom: 1rem;
+    bottom: calc(1rem + env(safe-area-inset-bottom));
     left: 50%;
 
     transform: translateX(-50%);
@@ -1121,7 +1131,9 @@
     flex-direction: row;
     max-width: calc(100vw - 1rem);
     overflow-x: auto;
+    overflow-y: hidden;
     overscroll-behavior-x: contain;
+    touch-action: pan-x;
   }
 
   .editor-panel {

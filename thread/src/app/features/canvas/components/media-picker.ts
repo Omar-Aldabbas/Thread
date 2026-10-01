@@ -1,6 +1,7 @@
 import { Component, EventEmitter, Input, OnDestroy, OnInit, Output, computed, inject, signal } from '@angular/core';
 import { GifResult, StickerAsset, stickers } from '../media-catalog';
 import { GiphyService } from '../giphy.service';
+import { ScrollDirective } from '../../../shared/scroll.directive';
 
 export interface PickedMedia {
   kind: 'gif' | 'sticker';
@@ -14,6 +15,7 @@ export interface PickedMedia {
 @Component({
   selector: 'app-media-picker',
   standalone: true,
+  imports: [ScrollDirective],
   template: `
     <aside
       class="media-picker"
@@ -34,14 +36,14 @@ export interface PickedMedia {
         [value]="query()"
         (input)="search($event)"
       />
-      <nav class="media-categories" aria-label="Categories">
+      <nav class="media-categories" appScroll="x" scrollbar="hover" aria-label="Categories">
         @for (entry of categories(); track entry) {
           <button type="button" [class.active]="category() === entry" (click)="setCategory(entry)">
             {{ entry }}
           </button>
         }
       </nav>
-      <div class="media-results" [class.gif-results]="kind === 'gif'">
+      <div class="media-results" appScroll="y" scrollbar="auto" [class.gif-results]="kind === 'gif'">
         @for (entry of visible(); track entry.id) {
           <button
             type="button"
@@ -128,7 +130,6 @@ export interface PickedMedia {
         flex: none;
         overflow-x: auto;
         padding: 0 15px 10px;
-        scrollbar-width: thin;
       }
       .media-categories button {
         min-height: 30px;
@@ -150,7 +151,8 @@ export interface PickedMedia {
         display: grid;
         grid-template-columns: repeat(3, minmax(0, 1fr));
         gap: 7px;
-        overflow: auto;
+        overflow-x: hidden;
+        overflow-y: auto;
         padding: 4px 15px 15px;
       }
       .media-results.gif-results {

@@ -1,19 +1,22 @@
 import { CommonModule, isPlatformBrowser } from '@angular/common';
 import { AfterViewInit, Component, ElementRef, HostListener, OnDestroy, PLATFORM_ID, computed, effect, inject, signal, viewChild } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
-import { CanvasConnection, CanvasItem, ItemType, SketchBrush, SketchStroke, demoConnections, demoItems } from '../../canvas.model';
+import { CanvasConnection, CanvasItem, ConnectorKind, ConnectorSide, ItemType, ShapeKind, SketchBrush, SketchStroke, demoConnections, demoItems } from '../../canvas.model';
+import { containsShape, nearestPerimeter, perimeterPoint, sidePoint, world } from '../../sketch/connector-geometry';
 import { RichTextEditor } from '../../components/rich-text-editor';
 import { PreferencesService } from '../../../../shared/preferences.service';
 import { MediaPicker, PickedMedia } from '../../components/media-picker';
 import { CanvasTransformOverlay } from '../../transform/canvas-transform-overlay';
 import { SketchRenderer } from '../../sketch/sketch-renderer';
+import { ThreadHeader } from '../../../../shared/thread-header';
+import { ScrollDirective } from '../../../../shared/scroll.directive';
 import { brushDiameter, distanceToStroke, strokeBounds, strokeOutlinePath } from '../../sketch/sketch-geometry';
 
-type Tool = 'select' | 'hand' | 'text' | 'add' | 'connect' | 'sketch';
-type Session = { kind: 'pan' | 'move' | 'resize' | 'rotate' | 'marquee' | 'place' | 'crop' | 'connect' | 'sketch' | 'erase'; pointerId: number; clientX: number; clientY: number; x: number; y: number; itemId?: string; corner?: 'nw' | 'ne' | 'sw' | 'se'; before?: State; origins?: Map<string, { x: number; y: number }>; moved?: boolean };
+type Tool = 'select' | 'hand' | 'text' | 'add' | 'connect' | 'sketch' | 'shape';
+type Session = { kind: 'pan' | 'move' | 'resize' | 'rotate' | 'marquee' | 'place' | 'crop' | 'connect' | 'rebind' | 'route' | 'sketch' | 'erase'; pointerId: number; clientX: number; clientY: number; x: number; y: number; itemId?: string; connectionId?: string; terminal?: 'source' | 'target'; side?: ConnectorSide; corner?: 'nw' | 'ne' | 'sw' | 'se'; before?: State; origins?: Map<string, { x: number; y: number }>; groupCenter?: { x: number; y: number }; groupIds?: string[]; moved?: boolean };
 type State = { items: CanvasItem[]; connections: CanvasConnection[] };
 
-@Component({ selector: 'app-canvas-page', standalone: true, imports: [CommonModule, RichTextEditor, MediaPicker, SketchRenderer], templateUrl: './canvas-page.html', styleUrl: './canvas-page.css' })
+@Component({ selector: 'app-canvas-page', standalone: true, imports: [CommonModule, RichTextEditor, MediaPicker, SketchRenderer, ThreadHeader, ScrollDirective], templateUrl: './canvas-page.html', styleUrl: './canvas-page.css' })
 export class CanvasPage implements AfterViewInit, OnDestroy {
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
@@ -42,6 +45,12 @@ export class CanvasPage implements AfterViewInit, OnDestroy {
   readonly sketchColor = signal('#d4111c');
   readonly sketchEraser = signal(false);
   readonly brush = signal<SketchBrush>('pen');
+  readonly shapeKind = signal<ShapeKind>('rectangle');
+  shapeIcon(kind: ShapeKind): string { return ({ rectangle: '□', rounded: '▢', circle: '○', diamond: '◇', triangle: '△', cloud: '☁' } as Record<ShapeKind, string>)[kind]; }
+  readonly connectorKind = signal<ConnectorKind>('straight');
+  readonly connectionTargetId = signal<string | null>(null);
+  readonly selectedConnectionId = signal<string | null>(null);
+  readonly precisePreview = signal<{ x: number; y: number } | null>(null);
   readonly brushWidth = signal(3);
   readonly activeSketchStrokes = signal<SketchStroke[]>([]);
   readonly undoneSketchStrokes = signal<SketchStroke[]>([]);
@@ -84,6 +93,7 @@ export class CanvasPage implements AfterViewInit, OnDestroy {
   readonly visibleItems = computed(() => this.items().filter((item) => !this.search() || `${item.title} ${item.body || ''}`.toLowerCase().includes(this.search().toLowerCase())));
   readonly visibleConnections = computed(() => this.connections().filter((connection) => this.visibleItems().some((item) => item.id === connection.sourceId) && this.visibleItems().some((item) => item.id === connection.targetId)));
   readonly selected = computed(() => this.items().find((item) => item.id === this.selectedIds()[0]) || null);
+  readonly groupBounds = computed(() => { const selected = this.items().filter(item => this.selectedIds().includes(item.id)); if (selected.length < 2) return null; const corners = selected.flatMap(item => { const cx = item.x + item.width / 2, cy = item.y + item.height / 2, a = (item.rotation || 0) * Math.PI / 180; return [-1, 1].flatMap(sx => [-1, 1].map(sy => ({ x: cx + sx * item.width / 2 * Math.cos(a) - sy * item.height / 2 * Math.sin(a), y: cy + sx * item.width / 2 * Math.sin(a) + sy * item.height / 2 * Math.cos(a) }))); }); const x = Math.min(...corners.map(point => point.x)), y = Math.min(...corners.map(point => point.y)); return { x, y, width: Math.max(...corners.map(point => point.x)) - x, height: Math.max(...corners.map(point => point.y)) - y }; });
   readonly worldTransform = computed(() => `translate(${this.panX()}px, ${this.panY()}px) scale(${this.zoom()})`);
   readonly gridSize = computed(() => `${24 * this.zoom()}px ${24 * this.zoom()}px`);
   readonly gridPosition = computed(() => `${this.panX()}px ${this.panY()}px`);
@@ -95,14 +105,6 @@ export class CanvasPage implements AfterViewInit, OnDestroy {
     effect(() => { this.selectedIds(); this.zoom(); this.panX(); this.panY(); if (this.browser) this.queueTransformSync(); });
   }
   ngAfterViewInit(): void {
-    if (this.browser && this.viewport()) {
-      this.transformOverlay = new CanvasTransformOverlay(this.viewport()!.nativeElement, {
-        start: () => this.beginTransform(),
-        resize: (width, height, direction) => this.resizeTransform(width, height, direction),
-        rotate: degrees => this.rotateTransform(degrees),
-        end: () => this.endTransform(),
-      });
-    }
     setTimeout(() => { this.fitView(); this.queueTransformSync(); const entryTool = this.route.snapshot.queryParamMap.get('tool'); if (entryTool === 'task') this.chooseType('task'); else if (entryTool === 'text' || entryTool === 'sketch' || entryTool === 'connect') this.setTool(entryTool); });
   }
   ngOnDestroy(): void { if (this.transformFrame) cancelAnimationFrame(this.transformFrame); this.transformOverlay?.destroy(); }
@@ -129,7 +131,7 @@ export class CanvasPage implements AfterViewInit, OnDestroy {
 
   private read(): State {
     if (!this.browser) return { items: demoItems, connections: demoConnections };
-    try { const stored = localStorage.getItem(this.storageKey); if (stored) { const state = JSON.parse(stored) as State & { version?: number }; if (state.version !== 2) return this.normalizeLegacy(state); return { items: state.items.map(item => item.sketchAsset === 'sticker' ? { ...item, type: 'sticker' as const, title: 'Rough star', image: '/stickers/rough-star.svg', assetId: 'rough-star', sketchAsset: undefined } : item.sketchAsset === 'gif' ? { ...item, type: 'gif' as const, sketchAsset: undefined } : item), connections: state.connections }; } } catch { }
+    try { const stored = localStorage.getItem(this.storageKey); if (stored) { const state = JSON.parse(stored) as State & { version?: number }; if (state.version !== 2) return this.normalizeLegacy(state); return { items: this.expandSketchItems(state.items.map(item => item.sketchAsset === 'sticker' ? { ...item, type: 'sticker' as const, title: 'Rough star', image: '/stickers/rough-star.svg', assetId: 'rough-star', sketchAsset: undefined } : item.sketchAsset === 'gif' ? { ...item, type: 'gif' as const, sketchAsset: undefined } : item)), connections: state.connections }; } } catch { }
     return this.spaceId === 'thread' ? { items: [
       { ...demoItems.find(item => item.id === 'research')!, parentId: null, x: 170, y: 150, width: 730, height: 450, title: 'Ideas in progress' },
       { ...demoItems.find(item => item.id === 'note-1')!, parentId: 'research', x: 220, y: 250, width: 270, height: 190 },
@@ -137,13 +139,25 @@ export class CanvasPage implements AfterViewInit, OnDestroy {
       { ...demoItems.find(item => item.id === 'image-1')!, parentId: null, x: 1000, y: 210, width: 360, height: 330 },
     ], connections: [] } : { items: [], connections: [] };
   }
-  private normalizeLegacy(state: State): State { const items = structuredClone(state.items); const byId = new Map(items.map(item => [item.id, item])); const positions = new Map<string, { x: number; y: number }>(); const position = (item: CanvasItem): { x: number; y: number } => { if (positions.has(item.id)) return positions.get(item.id)!; const parent = item.parentId ? byId.get(item.parentId) : null; const base = parent && parent.type !== 'workspace' ? position(parent) : { x: 0, y: 0 }; const value = { x: item.x + base.x, y: item.y + base.y }; positions.set(item.id, value); return value; }; for (const item of items) { if (['research-note', 'research-deep', 'engine-task', 'roadmap-budget', 'roadmap-table'].includes(item.id)) { const p = position(item); item.x = p.x; item.y = p.y; } } return { items, connections: state.connections }; }
+  private normalizeLegacy(state: State): State { const items = structuredClone(state.items); const byId = new Map(items.map(item => [item.id, item])); const positions = new Map<string, { x: number; y: number }>(); const position = (item: CanvasItem): { x: number; y: number } => { if (positions.has(item.id)) return positions.get(item.id)!; const parent = item.parentId ? byId.get(item.parentId) : null; const base = parent && parent.type !== 'workspace' ? position(parent) : { x: 0, y: 0 }; const value = { x: item.x + base.x, y: item.y + base.y }; positions.set(item.id, value); return value; }; for (const item of items) { if (['research-note', 'research-deep', 'engine-task', 'roadmap-budget', 'roadmap-table'].includes(item.id)) { const p = position(item); item.x = p.x; item.y = p.y; } } return { items: this.expandSketchItems(items), connections: state.connections }; }
+  private expandSketchItems(items: CanvasItem[]): CanvasItem[] {
+    return items.flatMap(item => {
+      const strokes = (item.sketchStrokes || (item.strokes || []).map((points, index): SketchStroke => ({ id: `${item.id}-${index}`, brush: 'pen', points: points.map(point => ({ x: point.x, y: point.y, pressure: point.pressure ?? .5 })), color: item.accent || '#d4111c', size: item.strokeWidth || 3, opacity: item.strokeOpacity || 1 }))).filter(stroke => stroke.points.length);
+      if (item.type !== 'sketch' || strokes.length <= 1) return [item];
+      const angle = (item.rotation || 0) * Math.PI / 180, cos = Math.cos(angle), sin = Math.sin(angle);
+      return strokes.map((stroke, index) => {
+        const world = { ...stroke, points: stroke.points.map(point => { const dx = point.x * item.width / (item.sourceWidth || item.width) - item.width / 2, dy = point.y * item.height / (item.sourceHeight || item.height) - item.height / 2; return { ...point, x: item.x + item.width / 2 + dx * cos - dy * sin, y: item.y + item.height / 2 + dx * sin + dy * cos }; }) };
+        const bounds = strokeBounds([world]);
+        return { ...item, id: index === 0 ? item.id : `${item.id}:${stroke.id}`, x: bounds.x, y: bounds.y, width: bounds.width, height: bounds.height, sourceWidth: bounds.width, sourceHeight: bounds.height, rotation: 0, groupId: undefined, strokes: undefined, sketchStrokes: [{ ...world, points: world.points.map(point => ({ ...point, x: point.x - bounds.x, y: point.y - bounds.y })) }] };
+      });
+    });
+  }
   private state(): State { return { items: structuredClone(this.items()), connections: structuredClone(this.connections()) }; }
   private commit(before: State): void { if (JSON.stringify(before) === JSON.stringify(this.state())) return; this.history.push(before); this.history = this.history.slice(-60); this.future = []; }
   private snapshot(): void { this.history.push(this.state()); this.history = this.history.slice(-60); this.future = []; }
   undo(): void { const state = this.history.pop(); if (!state) return; this.future.push({ items: structuredClone(this.items()), connections: structuredClone(this.connections()) }); this.items.set(state.items); this.connections.set(state.connections); }
   redo(): void { const state = this.future.pop(); if (!state) return; this.history.push({ items: structuredClone(this.items()), connections: structuredClone(this.connections()) }); this.items.set(state.items); this.connections.set(state.connections); }
-  setTool(tool: Tool): void { if (this.tool() === 'sketch' && tool !== 'sketch') this.completeSketch(); this.finishEditing(); this.tool.set(tool); this.paletteOpen.set(tool === 'add'); if (tool !== 'add') this.pendingType.set(null); if (tool !== 'sketch') this.sketchEraser.set(false); else this.selectedIds.set([]); this.pendingAsset.set(null); this.mediaPicker.set(null); this.connectionSourceId.set(null); }
+  setTool(tool: Tool): void { this.finishEditing(); this.tool.set(tool); this.paletteOpen.set(tool === 'add'); this.pendingType.set(tool === 'shape' ? 'shape' : null); if (tool !== 'sketch') this.sketchEraser.set(false); else this.selectedIds.set([]); this.pendingAsset.set(null); this.mediaPicker.set(null); this.connectionSourceId.set(null); this.connectionTargetId.set(null); }
   chooseType(type: ItemType): void { if (type === 'gif' || type === 'sticker') { this.openMedia(type); return; } this.pendingType.set(type); this.paletteOpen.set(false); this.tool.set('select'); }
   openMedia(kind: 'gif' | 'sticker'): void { this.paletteOpen.set(false); this.mediaPicker.set(kind); this.pendingAsset.set(null); }
   pickMedia(asset: PickedMedia): void { this.mediaPicker.set(null); this.pendingAsset.set(asset); this.assetPreview.set(this.centerPoint()); this.selectedIds.set([]); this.sketchEraser.set(false); this.tool.set('select'); }
@@ -168,13 +182,15 @@ export class CanvasPage implements AfterViewInit, OnDestroy {
     if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'c') { event.preventDefault(); this.copy(); return; }
     if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'x') { event.preventDefault(); this.copy(); this.removeSelected(); return; }
     if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'v' && this.clipboard.length) { event.preventDefault(); this.paste(); return; }
-    if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'z') { event.preventDefault(); if (this.tool() === 'sketch') event.shiftKey ? this.redoSketchStroke() : this.undoSketchStroke(); else event.shiftKey ? this.redo() : this.undo(); return; }
-    if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'y' && this.tool() === 'sketch') { event.preventDefault(); this.redoSketchStroke(); return; }
+    if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'z') { event.preventDefault(); event.shiftKey ? this.redo() : this.undo(); return; }
+    if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'y') { event.preventDefault(); this.redo(); return; }
     if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'd') { event.preventDefault(); this.duplicate(); return; }
-    if (event.key === 'Delete' || event.key === 'Backspace') { this.removeSelected(); return; }
+    if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'g') { event.preventDefault(); event.shiftKey ? this.ungroupSelected() : this.groupSelected(); return; }
+    if (event.key === 'Delete' || event.key === 'Backspace') { if (this.selectedConnectionId()) this.removeSelectedConnection(); else this.removeSelected(); return; }
     if (event.key === 'Escape') { if (this.cropId()) this.finishCrop(false); else if (this.editingId()) this.finishEditing(); else if (this.pendingAsset()) this.pendingAsset.set(null); else if (this.mediaPicker()) this.mediaPicker.set(null); else if (this.pendingType()) this.pendingType.set(null); else if (this.paletteOpen()) this.paletteOpen.set(false); else this.selectedIds.set([]); this.connectionSourceId.set(null); return; }
     if (event.key === 'Enter' && this.cropId()) { this.finishCrop(true); return; }
-    const keys: Record<string, Tool> = { v: 'select', h: 'hand', t: 'text', n: 'add', c: 'connect', s: 'sketch', p: 'sketch' };
+    if (event.key === 'Enter' && this.selected()?.type === 'shape') { event.preventDefault(); this.startEditing(this.selected()!.id); return; }
+    const keys: Record<string, Tool> = { v: 'select', h: 'hand', t: 'text', n: 'add', c: 'connect', s: 'shape', p: 'sketch' };
     if (keys[event.key.toLowerCase()]) this.setTool(keys[event.key.toLowerCase()]);
   }
   @HostListener('window:keyup', ['$event']) keyUp(event: KeyboardEvent): void { if (event.code === 'Space') this.spaceHeld.set(false); }
@@ -188,25 +204,45 @@ export class CanvasPage implements AfterViewInit, OnDestroy {
     if (event.pointerType === 'touch') { this.pointers.set(event.pointerId, { x: event.clientX, y: event.clientY }); if (this.pointers.size === 2) { const [a, b] = [...this.pointers.values()]; this.pinch = { distance: Math.hypot(a.x - b.x, a.y - b.y), x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }; this.session = null; this.sketchPoints.set([]); return; } }
     const point = this.point(event.clientX, event.clientY);
     if (event.button === 1 || this.spaceHeld() || this.tool() === 'hand') { this.session = { kind: 'pan', pointerId: event.pointerId, clientX: event.clientX, clientY: event.clientY, x: this.panX(), y: this.panY() }; this.isPanning.set(true); }
-    else if (this.pendingType()) { this.session = { kind: 'place', pointerId: event.pointerId, clientX: event.clientX, clientY: event.clientY, x: point.x, y: point.y }; if (this.pendingType() === 'zone') this.placement.set({ x: point.x, y: point.y, width: 0, height: 0 }); }
+    else if (this.pendingType()) { this.session = { kind: 'place', pointerId: event.pointerId, clientX: event.clientX, clientY: event.clientY, x: point.x, y: point.y }; if (this.pendingType() === 'zone' || this.pendingType() === 'shape') this.placement.set({ x: point.x, y: point.y, width: 0, height: 0 }); }
     else if (this.tool() === 'text') { this.createAt('text', point); return; }
     else if (this.tool() === 'sketch') { this.session = { kind: this.sketchEraser() ? 'erase' : 'sketch', pointerId: event.pointerId, clientX: event.clientX, clientY: event.clientY, x: point.x, y: point.y }; if (this.sketchEraser()) { this.snapshot(); this.eraseSketchAt(point); } else this.sketchPoints.set([{ ...point, pressure: event.pressure || .5 }]); }
-    else if (this.tool() === 'select') { this.finishEditing(); if (!event.shiftKey) this.selectedIds.set([]); this.session = event.pointerType === 'touch' ? { kind: 'pan', pointerId: event.pointerId, clientX: event.clientX, clientY: event.clientY, x: this.panX(), y: this.panY() } : { kind: 'marquee', pointerId: event.pointerId, clientX: event.clientX, clientY: event.clientY, x: point.x, y: point.y }; }
+    else if (this.tool() === 'select') { this.finishEditing(); this.selectedConnectionId.set(null); if (!event.shiftKey) this.selectedIds.set([]); this.session = event.pointerType === 'touch' ? { kind: 'pan', pointerId: event.pointerId, clientX: event.clientX, clientY: event.clientY, x: this.panX(), y: this.panY() } : { kind: 'marquee', pointerId: event.pointerId, clientX: event.clientX, clientY: event.clientY, x: point.x, y: point.y }; }
     else if (this.tool() === 'connect') this.connectionSourceId.set(null);
     (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
   }
   itemPointerDown(event: PointerEvent, item: CanvasItem): void {
     if (event.button !== 0 || (event.target as HTMLElement).closest('button, input, a, [contenteditable="true"]')) return;
     event.stopPropagation();
+    this.selectedConnectionId.set(null);
+    if (this.tool() === 'shape') return;
+    if (item.type === 'sketch' && this.tool() === 'select') {
+      const point = this.point(event.clientX, event.clientY), angle = -(item.rotation || 0) * Math.PI / 180;
+      const dx = point.x - item.x - item.width / 2, dy = point.y - item.y - item.height / 2;
+      const local = { x: (dx * Math.cos(angle) - dy * Math.sin(angle) + item.width / 2) * (item.sourceWidth || item.width) / item.width, y: (dx * Math.sin(angle) + dy * Math.cos(angle) + item.height / 2) * (item.sourceHeight || item.height) / item.height };
+      const stroke = item.sketchStrokes?.[0];
+      if (stroke && distanceToStroke(local, stroke) > Math.max(10 / this.zoom(), brushDiameter(stroke.brush, stroke.size) / 2 + 4)) { this.selectedIds.set([]); return; }
+    }
     if (this.cropId() === item.id) { this.session = { kind: 'crop', pointerId: event.pointerId, clientX: event.clientX, clientY: event.clientY, x: item.cropX || 0, y: item.cropY || 0, itemId: item.id }; (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId); return; }
     if (this.spaceHeld() || this.tool() === 'hand') { this.session = { kind: 'pan', pointerId: event.pointerId, clientX: event.clientX, clientY: event.clientY, x: this.panX(), y: this.panY() }; this.isPanning.set(true); }
-    else if (this.tool() === 'connect') { const source = this.connectionSourceId(); if (source && source !== item.id) { this.snapshot(); this.connections.update((connections) => [...connections, { id: crypto.randomUUID(), sourceId: source, targetId: item.id, direction: 'forward' }]); this.setTool('select'); } else { this.connectionSourceId.set(item.id); this.selectedIds.set([item.id]); } return; }
-    else { this.finishEditing(); const current = this.selectedIds(); this.selectedIds.set(event.shiftKey ? (current.includes(item.id) ? current.filter(id => id !== item.id) : [...current, item.id]) : current.includes(item.id) ? current : [item.id]); if (event.shiftKey || this.tool() !== 'select' || item.locked) return; const moving = new Set(this.selectedIds()); let changed = true; while (changed) { changed = false; for (const child of this.items()) if (child.parentId && moving.has(child.parentId) && !moving.has(child.id)) { moving.add(child.id); changed = true; } } const origins = new Map(this.items().filter(entry => moving.has(entry.id)).map(entry => [entry.id, { x: entry.x, y: entry.y }])); this.session = { kind: 'move', pointerId: event.pointerId, clientX: event.clientX, clientY: event.clientY, x: item.x, y: item.y, itemId: item.id, origins, before: this.state() }; }
+    else if (this.tool() === 'connect') { const source = this.connectionSourceId(); if (source && source !== item.id) { this.snapshot(); this.connections.update((connections) => [...connections, { id: crypto.randomUUID(), sourceId: source, targetId: item.id, sourceBinding: { mode: 'auto' }, targetBinding: { mode: 'auto' }, direction: 'forward', kind: this.connectorKind() }]); this.setTool('select'); } else { this.connectionSourceId.set(item.id); this.selectedIds.set([item.id]); } return; }
+    else { this.finishEditing(); const current = this.selectedIds(); const members = item.groupId ? this.items().filter(entry => entry.groupId === item.groupId).map(entry => entry.id) : [item.id]; this.selectedIds.set(event.shiftKey ? (current.includes(item.id) ? current.filter(id => !members.includes(id)) : [...new Set([...current, ...members])]) : current.includes(item.id) ? current : members); if (event.shiftKey || this.tool() !== 'select' || item.locked) return; const moving = new Set(this.selectedIds()); let changed = true; while (changed) { changed = false; for (const child of this.items()) if (child.parentId && moving.has(child.parentId) && !moving.has(child.id)) { moving.add(child.id); changed = true; } } const origins = new Map(this.items().filter(entry => moving.has(entry.id)).map(entry => [entry.id, { x: entry.x, y: entry.y }])); this.session = { kind: 'move', pointerId: event.pointerId, clientX: event.clientX, clientY: event.clientY, x: item.x, y: item.y, itemId: item.id, origins, before: this.state() }; }
     (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
   }
   resizeDown(event: PointerEvent, item: CanvasItem, corner: 'nw' | 'ne' | 'sw' | 'se' = 'se'): void { event.stopPropagation(); this.session = { kind: 'resize', pointerId: event.pointerId, clientX: event.clientX, clientY: event.clientY, x: item.width, y: item.height, itemId: item.id, corner, before: this.state() }; (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId); }
   rotateDown(event: PointerEvent, item: CanvasItem): void { event.stopPropagation(); const point = this.point(event.clientX, event.clientY); const angle = Math.atan2(point.y - item.y - item.height / 2, point.x - item.x - item.width / 2); this.session = { kind: 'rotate', pointerId: event.pointerId, clientX: event.clientX, clientY: event.clientY, x: angle, y: item.rotation || 0, itemId: item.id, before: this.state() }; (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId); }
-  connectDown(event: PointerEvent, item: CanvasItem): void { event.preventDefault(); event.stopPropagation(); const x = item.x + item.width, y = item.y + item.height / 2; this.session = { kind: 'connect', pointerId: event.pointerId, clientX: event.clientX, clientY: event.clientY, x, y, itemId: item.id }; this.connectionPreview.set({ x1: x, y1: y, x2: x, y2: y }); (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId); }
+  rotateGroupDown(event: PointerEvent): void { event.stopPropagation(); const bounds = this.groupBounds(); if (!bounds) return; const center = { x: bounds.x + bounds.width / 2, y: bounds.y + bounds.height / 2 }, point = this.point(event.clientX, event.clientY); this.session = { kind: 'rotate', pointerId: event.pointerId, clientX: event.clientX, clientY: event.clientY, x: Math.atan2(point.y - center.y, point.x - center.x), y: 0, groupCenter: center, groupIds: [...this.selectedIds()], before: this.state() }; (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId); }
+  connectDown(event: PointerEvent, item: CanvasItem, side: ConnectorSide = 'right'): void { event.preventDefault(); event.stopPropagation(); const anchor = sidePoint(item, side); this.session = { kind: 'connect', pointerId: event.pointerId, clientX: event.clientX, clientY: event.clientY, x: anchor.x, y: anchor.y, itemId: item.id, side }; this.connectionPreview.set({ x1: anchor.x, y1: anchor.y, x2: anchor.x, y2: anchor.y }); (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId); }
+  selectConnection(event: PointerEvent, connection: CanvasConnection): void { if (this.tool() !== 'select') return; event.stopPropagation(); this.selectedIds.set([]); this.selectedConnectionId.set(connection.id); }
+  endpoint(connection: CanvasConnection, terminal: 'source' | 'target'): {x:number;y:number} { const ends=this.connectionEnds(connection); return terminal === 'source' ? ends.a : ends.b; }
+  rebindDown(event: PointerEvent, connection: CanvasConnection, terminal: 'source' | 'target'): void {
+    event.preventDefault(); event.stopPropagation(); this.selectedIds.set([]); this.selectedConnectionId.set(connection.id);
+    const end=this.endpoint(connection, terminal);
+    this.session={kind:'rebind',pointerId:event.pointerId,clientX:event.clientX,clientY:event.clientY,x:end.x,y:end.y,connectionId:connection.id,terminal};
+    (event.currentTarget as Element).setPointerCapture(event.pointerId);
+  }
+  routeHandle(connection: CanvasConnection): {x:number;y:number} { const {a,b,source,target}=this.connectionEnds(connection), horizontal=Math.abs(target.x+target.width/2-source.x-source.width/2)>=Math.abs(target.y+target.height/2-source.y-source.height/2); return horizontal?{x:(a.x+b.x)/2+(connection.routeOffset||0),y:(a.y+b.y)/2}:{x:(a.x+b.x)/2,y:(a.y+b.y)/2+(connection.routeOffset||0)}; }
+  routeDown(event: PointerEvent, connection: CanvasConnection): void { event.preventDefault(); event.stopPropagation(); const {source,target}=this.connectionEnds(connection), horizontal=Math.abs(target.x+target.width/2-source.x-source.width/2)>=Math.abs(target.y+target.height/2-source.y-source.height/2); this.session={kind:'route',pointerId:event.pointerId,clientX:event.clientX,clientY:event.clientY,x:connection.routeOffset||0,y:horizontal?1:0,connectionId:connection.id,before:this.state()}; (event.currentTarget as Element).setPointerCapture(event.pointerId); }
   pointerMove(event: PointerEvent): void {
     if (this.pendingAsset()) this.assetPreview.set(this.point(event.clientX, event.clientY));
     if (this.pointers.has(event.pointerId)) { this.pointers.set(event.pointerId, { x: event.clientX, y: event.clientY }); if (this.pointers.size === 2 && this.pinch) { const [a, b] = [...this.pointers.values()]; const distance = Math.hypot(a.x - b.x, a.y - b.y), x = (a.x + b.x) / 2, y = (a.y + b.y) / 2; this.panX.update(v => v + x - this.pinch!.x); this.panY.update(v => v + y - this.pinch!.y); this.zoomAt(x, y, this.zoom() * distance / Math.max(1, this.pinch.distance)); this.pinch = { distance, x, y }; return; } }
@@ -256,14 +292,60 @@ export class CanvasPage implements AfterViewInit, OnDestroy {
       return { ...item, x: centerX - width / 2, y: centerY - height / 2, width, height };
     })); const item = this.items().find(entry => entry.id === session.itemId); if (item) this.setTransformGuide(`${Math.round(item.width)} × ${Math.round(item.height)}`); this.queueTransformSync(); }
     if (session.kind === 'rotate' && session.itemId) { const item = this.items().find(entry => entry.id === session.itemId); if (item) { const point = this.point(event.clientX, event.clientY); const angle = Math.atan2(point.y - item.y - item.height / 2, point.x - item.x - item.width / 2); let rotation = session.y + (angle - session.x) * 180 / Math.PI; if (event.shiftKey) rotation = Math.round(rotation / 15) * 15; this.update(item.id, { rotation }); this.setTransformGuide(`${Math.round(rotation)}°`); this.queueTransformSync(); } }
+    if (session.kind === 'rotate' && session.groupCenter && session.groupIds && session.before) {
+      const center = session.groupCenter, point = this.point(event.clientX, event.clientY);
+      let delta = Math.atan2(point.y - center.y, point.x - center.x) - session.x;
+      if (event.shiftKey) delta = Math.round(delta * 180 / Math.PI / 15) * 15 * Math.PI / 180;
+      const selected = new Set(session.groupIds), before = new Map(session.before.items.map(item => [item.id, item]));
+      this.items.update(items => items.map(item => { const original = before.get(item.id); if (!selected.has(item.id) || !original) return item; const dx = original.x + original.width / 2 - center.x, dy = original.y + original.height / 2 - center.y; return { ...item, x: center.x + dx * Math.cos(delta) - dy * Math.sin(delta) - original.width / 2, y: center.y + dx * Math.sin(delta) + dy * Math.cos(delta) - original.height / 2, rotation: (original.rotation || 0) + delta * 180 / Math.PI }; }));
+      this.queueTransformSync();
+    }
     if (session.kind === 'marquee') { const point = this.point(event.clientX, event.clientY); this.marquee.set({ x: Math.min(session.x, point.x), y: Math.min(session.y, point.y), width: Math.abs(point.x - session.x), height: Math.abs(point.y - session.y) }); }
-    if (session.kind === 'place' && this.pendingType() === 'zone') { const point = this.point(event.clientX, event.clientY); this.placement.set({ x: Math.min(session.x, point.x), y: Math.min(session.y, point.y), width: Math.abs(point.x - session.x), height: Math.abs(point.y - session.y) }); }
+    if (session.kind === 'place' && (this.pendingType() === 'zone' || this.pendingType() === 'shape')) { const point = this.point(event.clientX, event.clientY); this.placement.set({ x: Math.min(session.x, point.x), y: Math.min(session.y, point.y), width: Math.abs(point.x - session.x), height: Math.abs(point.y - session.y) }); }
     if (session.kind === 'crop' && session.itemId) this.update(session.itemId, { cropX: session.x + dx / this.zoom(), cropY: session.y + dy / this.zoom() });
-    if (session.kind === 'connect') { const point = this.point(event.clientX, event.clientY); this.connectionPreview.set({ x1: session.x, y1: session.y, x2: point.x, y2: point.y }); }
+    if (session.kind === 'connect') { const point = this.point(event.clientX, event.clientY); const target = this.connectorTarget(point, session.itemId!); const precise = target ? nearestPerimeter(target, point) : null; const isPrecise = !!precise && precise.distance <= 12 / this.zoom(); const end = target ? isPrecise ? precise!.point : perimeterPoint(target, {x:session.x,y:session.y}) : point; this.connectionTargetId.set(target?.id || null); this.precisePreview.set(isPrecise ? end : null); this.connectionPreview.set({ x1: session.x, y1: session.y, x2: end.x, y2: end.y }); }
+    if (session.kind === 'route' && session.connectionId) this.connections.update(entries=>entries.map(entry=>entry.id===session.connectionId?{...entry,routeOffset:session.x+(session.y?dx:dy)/this.zoom()}:entry));
+    if (session.kind === 'rebind' && session.connectionId) { const connection=this.connections().find(entry=>entry.id===session.connectionId); if (connection) { const point=this.point(event.clientX,event.clientY), other=this.endpoint(connection,session.terminal==='source'?'target':'source'), target=this.connectorTarget(point,session.terminal==='source'?connection.targetId:connection.sourceId), precise=target?nearestPerimeter(target,point):null, isPrecise=!!precise&&precise.distance<=12/this.zoom(), end=target?(isPrecise?precise!.point:perimeterPoint(target,other)):point; this.connectionTargetId.set(target?.id||null); this.precisePreview.set(isPrecise?end:null); this.connectionPreview.set({x1:other.x,y1:other.y,x2:end.x,y2:end.y}); } }
     if (session.kind === 'sketch') { const point = this.point(event.clientX, event.clientY); const last = this.sketchPoints().at(-1); if (!last || Math.hypot(point.x - last.x, point.y - last.y) > 1.5) this.sketchPoints.update(points => [...points, { ...point, pressure: event.pressure || .5 }]); }
     if (session.kind === 'erase') this.eraseSketchAt(this.point(event.clientX, event.clientY));
   }
-  pointerUp(event: PointerEvent): void { this.pointers.delete(event.pointerId); if (this.pointers.size < 2) this.pinch = null; const session = this.session; this.transformGuide.set(null); if (session?.kind === 'marquee' && this.marquee()) { const rect = this.marquee()!; if (rect.width > 4 || rect.height > 4) this.selectedIds.set(this.visibleItems().filter((item) => item.x < rect.x + rect.width && item.x + item.width > rect.x && item.y < rect.y + rect.height && item.y + item.height > rect.y).map((item) => item.id)); } if (session?.kind === 'place' && this.pendingType()) { const box = this.placement(); this.createAt(this.pendingType()!, { x: box?.width && box.width > 10 ? box.x : session.x, y: box?.height && box.height > 10 ? box.y : session.y }, box?.width && box.width > 10 ? box : undefined); this.pendingType.set(null); } if (session?.kind === 'connect' && session.itemId) { const point = this.point(event.clientX, event.clientY); const target = [...this.items()].reverse().find(item => item.id !== session.itemId && point.x >= item.x && point.x <= item.x + item.width && point.y >= item.y && point.y <= item.y + item.height); if (target) { this.snapshot(); this.connections.update(connections => [...connections, { id: crypto.randomUUID(), sourceId: session.itemId!, targetId: target.id, direction: 'forward' }]); } } if ((session?.kind === 'move' || session?.kind === 'resize' || session?.kind === 'rotate') && session.before) { if (session.kind === 'resize' && session.itemId && this.items().find(entry => entry.id === session.itemId)?.type === 'text') this.update(session.itemId, { textAutoSize: false }); if (session.kind === 'move' && session.moved && session.itemId) this.reparent(session.itemId); this.commit(session.before); } if (session?.kind === 'sketch') this.finishSketch(); this.session = null; this.sketchPoints.set([]); this.marquee.set(null); this.snapGuide.set(null); this.placement.set(null); this.connectionPreview.set(null); this.isPanning.set(false); const target = event.currentTarget as HTMLElement; if (target.hasPointerCapture(event.pointerId)) target.releasePointerCapture(event.pointerId); }
+  pointerUp(event: PointerEvent): void {
+    this.pointers.delete(event.pointerId);
+    if (this.pointers.size < 2) this.pinch = null;
+    const session = this.session;
+    if (session?.pointerId !== event.pointerId) return;
+    this.transformGuide.set(null);
+    if (session?.kind === 'marquee' && this.marquee()) {
+      const rect = this.marquee()!;
+      if (rect.width > 4 || rect.height > 4) this.selectedIds.set(this.visibleItems().filter(item => item.x < rect.x + rect.width && item.x + item.width > rect.x && item.y < rect.y + rect.height && item.y + item.height > rect.y).map(item => item.id));
+    }
+    if (session?.kind === 'place' && this.pendingType()) {
+      const box = this.placement();
+      this.createAt(this.pendingType()!, { x: box?.width && box.width > 10 ? box.x : session.x, y: box?.height && box.height > 10 ? box.y : session.y }, box?.width && box.width > 10 ? box : undefined);
+      this.pendingType.set(null);
+    }
+    if (session?.kind === 'connect' && session.itemId) {
+      const point = this.point(event.clientX, event.clientY);
+      const target = this.connectorTarget(point, session.itemId);
+      if (target) { const precise = nearestPerimeter(target, point); this.snapshot(); this.connections.update(connections => [...connections, { id: crypto.randomUUID(), sourceId: session.itemId!, targetId: target.id, sourceBinding: { mode: 'auto' }, targetBinding: precise.distance <= 12 / this.zoom() ? { mode: 'precise', anchor: precise.anchor } : { mode: 'auto' }, direction: 'forward', kind: this.connectorKind() }]); }
+    }
+    if (session?.kind === 'rebind' && session.connectionId && session.terminal) {
+      const connection=this.connections().find(entry=>entry.id===session.connectionId);
+      if (connection) { const point=this.point(event.clientX,event.clientY), otherId=session.terminal==='source'?connection.targetId:connection.sourceId, target=this.connectorTarget(point,otherId);
+        if (target) { const precise=nearestPerimeter(target,point), binding=precise.distance<=12/this.zoom()?{mode:'precise' as const,anchor:precise.anchor}:{mode:'auto' as const}; this.snapshot(); this.connections.update(entries=>entries.map(entry=>entry.id===connection.id?(session.terminal==='source'?{...entry,sourceId:target.id,sourceBinding:binding}:{...entry,targetId:target.id,targetBinding:binding}):entry)); }
+      }
+    }
+    if (session?.before && ['move', 'resize', 'rotate'].includes(session.kind)) {
+      if (session.kind === 'resize' && session.itemId && this.items().find(entry => entry.id === session.itemId)?.type === 'text') this.update(session.itemId, { textAutoSize: false });
+      if (session.kind === 'move' && session.moved && session.itemId) this.reparent(session.itemId);
+      this.commit(session.before);
+    }
+    if (session?.kind === 'route' && session.before) this.commit(session.before);
+    if (session?.kind === 'sketch') this.finishSketch();
+    this.session = null; this.sketchPoints.set([]); this.marquee.set(null); this.snapGuide.set(null); this.placement.set(null); this.connectionPreview.set(null); this.connectionTargetId.set(null); this.precisePreview.set(null); this.isPanning.set(false);
+    const target = event.currentTarget as HTMLElement;
+    if (target.hasPointerCapture(event.pointerId)) target.releasePointerCapture(event.pointerId);
+  }
   wheel(event: WheelEvent): void { event.preventDefault(); if (event.ctrlKey || event.metaKey) this.zoomAt(event.clientX, event.clientY, this.zoom() * (event.deltaY > 0 ? .9 : 1.1)); else { this.panX.update((x) => x - event.deltaX); this.panY.update((y) => y - event.deltaY); } }
   zoomAt(clientX: number, clientY: number, value: number): void { const rect = this.viewport()?.nativeElement.getBoundingClientRect(); if (!rect) return; const point = this.point(clientX, clientY); const zoom = Math.min(3, Math.max(.25, value)); this.zoom.set(zoom); this.panX.set(clientX - rect.left - point.x * zoom); this.panY.set(clientY - rect.top - point.y * zoom); }
   zoomBy(factor: number): void { const rect = this.viewport()?.nativeElement.getBoundingClientRect(); if (rect) this.zoomAt(rect.left + rect.width / 2, rect.top + rect.height / 2, this.zoom() * factor); }
@@ -283,25 +365,62 @@ export class CanvasPage implements AfterViewInit, OnDestroy {
   editChecklistRow(index: number, event: Event): void { const item = this.selected(); if (item) this.update(item.id, { checklist: item.checklist?.map((entry, i) => i === index ? { ...entry, label: (event.target as HTMLInputElement).value } : entry) }); }
   addBudgetRow(): void { const item = this.selected(); if (item) this.update(item.id, { rows: [...(item.rows || []), { label: 'New item', value: 0 }] }); }
   editBudgetRow(index: number, key: 'label' | 'value', event: Event): void { const item = this.selected(); if (item) this.update(item.id, { rows: item.rows?.map((row, i) => i === index ? { ...row, [key]: key === 'value' ? Number((event.target as HTMLInputElement).value) : (event.target as HTMLInputElement).value } : row) }); }
-  duplicate(): void { if (!this.selectedIds().length) return; const selected = this.items().filter(item => this.selectedIds().includes(item.id)); const ids = new Map(selected.map(item => [item.id, crypto.randomUUID()])); const copies = selected.map(item => ({ ...structuredClone(item), id: ids.get(item.id)!, parentId: item.parentId && ids.has(item.parentId) ? ids.get(item.parentId)! : item.parentId, x: item.x + 24, y: item.y + 24 })); this.snapshot(); this.items.update(items => [...items, ...copies]); this.selectedIds.set(copies.map(item => item.id)); }
+  duplicate(): void { if (!this.selectedIds().length) return; const selected = this.items().filter(item => this.selectedIds().includes(item.id)); const ids = new Map(selected.map(item => [item.id, crypto.randomUUID()])); const groups = new Map(selected.filter(item => item.groupId).map(item => [item.groupId!, crypto.randomUUID()])); const copies = selected.map(item => ({ ...structuredClone(item), id: ids.get(item.id)!, groupId: item.groupId ? groups.get(item.groupId) : undefined, parentId: item.parentId && ids.has(item.parentId) ? ids.get(item.parentId)! : item.parentId, x: item.x + 24, y: item.y + 24 })); this.snapshot(); this.items.update(items => [...items, ...copies]); this.selectedIds.set(copies.map(item => item.id)); }
+  groupSelected(): void { if (this.selectedIds().length < 2) return; const id = crypto.randomUUID(), selected = new Set(this.selectedIds()); this.snapshot(); this.items.update(items => items.map(item => selected.has(item.id) ? { ...item, groupId: id } : item)); }
+  ungroupSelected(): void { const groups = new Set(this.items().filter(item => this.selectedIds().includes(item.id) && item.groupId).map(item => item.groupId)); if (!groups.size) return; this.snapshot(); this.items.update(items => items.map(item => item.groupId && groups.has(item.groupId) ? { ...item, groupId: undefined } : item)); }
+  quickConnectedShape(source: CanvasItem): void {
+    const now = new Date().toISOString();
+    const item: CanvasItem = { id: crypto.randomUUID(), type: 'shape', shapeKind: source.shapeKind || 'rectangle', shapeFill: source.shapeFill || '#ffffff', shapeStroke: source.shapeStroke || '#6b7280', shapeStrokeWidth: source.shapeStrokeWidth || 2, parentId: source.parentId, x: source.x + source.width + 100, y: source.y, width: source.width, height: source.height, title: '', rotation: 0, zIndex: Math.max(1, ...this.items().map(entry => entry.zIndex || 1)) + 1, createdAt: now, updatedAt: now };
+    this.snapshot(); this.items.update(items => [...items, item]); this.connections.update(connections => [...connections, { id: crypto.randomUUID(), sourceId: source.id, targetId: item.id, direction: 'forward', kind: this.connectorKind() }]); this.selectedIds.set([item.id]); queueMicrotask(() => this.startEditing(item.id));
+  }
   removeSelected(): void { const ids = this.selectedIds(); if (!ids.length) return; this.snapshot(); const removed = new Set(ids); let changed = true; while (changed) { changed = false; for (const item of this.items()) if (item.parentId && removed.has(item.parentId) && !removed.has(item.id)) { removed.add(item.id); changed = true; } } this.items.update((items) => items.filter((item) => !removed.has(item.id))); this.connections.update((connections) => connections.filter((connection) => !removed.has(connection.sourceId) && !removed.has(connection.targetId))); this.selectedIds.set([]); }
-  connectionPath(connection: CanvasConnection): string { const source = this.items().find((item) => item.id === connection.sourceId)!; const target = this.items().find((item) => item.id === connection.targetId)!; const x1 = source.x + source.width; const y1 = source.y + source.height / 2; const x2 = target.x; const y2 = target.y + target.height / 2; const bend = Math.max(60, Math.abs(x2 - x1) * .45); return `M ${x1} ${y1} C ${x1 + bend} ${y1}, ${x2 - bend} ${y2}, ${x2} ${y2}`; }
+  removeSelectedConnection(): void { const id=this.selectedConnectionId(); if (!id) return; this.snapshot(); this.connections.update(entries=>entries.filter(entry=>entry.id!==id)); this.selectedConnectionId.set(null); }
+  private connectorTarget(point: {x:number;y:number}, sourceId: string): CanvasItem | undefined {
+    return [...this.items()].reverse().find(item => item.id !== sourceId && item.type !== 'workspace' && item.type !== 'frame' && item.type !== 'zone' && (containsShape(item, point) || nearestPerimeter(item, point).distance <= 16 / this.zoom()));
+  }
+  private connectionEnds(connection: CanvasConnection): { a: { x: number; y: number }; b: { x: number; y: number }; source: CanvasItem; target: CanvasItem } {
+    const source = this.items().find(item => item.id === connection.sourceId)!;
+    const target = this.items().find(item => item.id === connection.targetId)!;
+    const sourceCenter = {x:source.x+source.width/2,y:source.y+source.height/2};
+    const targetCenter = {x:target.x+target.width/2,y:target.y+target.height/2};
+    const a = connection.sourceBinding?.mode === 'precise' && connection.sourceBinding.anchor ? world(source, connection.sourceBinding.anchor) : perimeterPoint(source,targetCenter);
+    const b = connection.targetBinding?.mode === 'precise' && connection.targetBinding.anchor ? world(target, connection.targetBinding.anchor) : perimeterPoint(target,sourceCenter);
+    return { a, b, source, target };
+  }
+  connectionPath(connection: CanvasConnection): string {
+    const { a, b, source, target } = this.connectionEnds(connection);
+    if (connection.kind === 'straight') return `M ${a.x} ${a.y} L ${b.x} ${b.y}`;
+    const horizontal = Math.abs(target.x + target.width/2 - source.x - source.width/2) >= Math.abs(target.y + target.height/2 - source.y - source.height/2);
+    if (connection.kind === 'elbow') {
+      if (horizontal) { const mx=(a.x+b.x)/2+(connection.routeOffset||0); return `M ${a.x} ${a.y} L ${mx} ${a.y} L ${mx} ${b.y} L ${b.x} ${b.y}`; }
+      const my=(a.y+b.y)/2+(connection.routeOffset||0); return `M ${a.x} ${a.y} L ${a.x} ${my} L ${b.x} ${my} L ${b.x} ${b.y}`;
+    }
+    const bend = Math.min(90, Math.max(24, (horizontal ? Math.abs(b.x-a.x) : Math.abs(b.y-a.y))*.35));
+    if (horizontal) { const sign=Math.sign(b.x-a.x)||1; return `M ${a.x} ${a.y} C ${a.x+sign*bend} ${a.y}, ${b.x-sign*bend} ${b.y}, ${b.x} ${b.y}`; }
+    const sign=Math.sign(b.y-a.y)||1; return `M ${a.x} ${a.y} C ${a.x} ${a.y+sign*bend}, ${b.x} ${b.y-sign*bend}, ${b.x} ${b.y}`;
+  }
+  previewPath(preview: { x1: number; y1: number; x2: number; y2: number }): string {
+    const { x1, y1, x2, y2 } = preview;
+    if (this.connectorKind() === 'elbow') { const mid = (x1 + x2) / 2; return `M ${x1} ${y1} L ${mid} ${y1} L ${mid} ${y2} L ${x2} ${y2}`; }
+    if (this.connectorKind() === 'curved') { const bend = Math.max(40, Math.abs(x2 - x1) * .45), direction = Math.sign(x2 - x1 || 1); return `M ${x1} ${y1} C ${x1 + direction * bend} ${y1}, ${x2 - direction * bend} ${y2}, ${x2} ${y2}`; }
+    return `M ${x1} ${y1} L ${x2} ${y2}`;
+  }
   connectionLabelX(connection: CanvasConnection): number { const a = this.items().find((item) => item.id === connection.sourceId)!; const b = this.items().find((item) => item.id === connection.targetId)!; return (a.x + a.width + b.x) / 2; }
   connectionLabelY(connection: CanvasConnection): number { const a = this.items().find((item) => item.id === connection.sourceId)!; const b = this.items().find((item) => item.id === connection.targetId)!; return (a.y + a.height / 2 + b.y + b.height / 2) / 2 - 12; }
-  private reparent(id: string): void { const item = this.items().find(entry => entry.id === id); if (!item || item.type === 'zone' || item.type === 'workspace') return; const x = item.x + item.width / 2, y = item.y + item.height / 2; const zone = [...this.items()].reverse().find(entry => entry.type === 'zone' && entry.id !== id && x >= entry.x && x <= entry.x + entry.width && y >= entry.y && y <= entry.y + entry.height); if (zone) this.update(id, { parentId: zone.id }); else if (this.items().find(entry => entry.id === item.parentId)?.type === 'zone') this.update(id, { parentId: null }); }
+  private reparent(id: string): void { const item = this.items().find(entry => entry.id === id); if (!item || item.type === 'zone' || item.type === 'workspace' || item.type === 'frame') return; const x = item.x + item.width / 2, y = item.y + item.height / 2; const zone = [...this.items()].reverse().find(entry => (entry.type === 'zone' || entry.type === 'frame') && entry.id !== id && x >= entry.x && x <= entry.x + entry.width && y >= entry.y && y <= entry.y + entry.height); if (zone) this.update(id, { parentId: zone.id }); else if (['zone', 'frame'].includes(this.items().find(entry => entry.id === item.parentId)?.type || '')) this.update(id, { parentId: null }); }
   createAt(type: ItemType, point: { x: number; y: number }, box?: { width: number; height: number }): void {
     if (type === 'file' || type === 'voice') { this.replaceId = null; this.imagePlacement = point; this.fileInput()?.nativeElement.click(); return; }
     const viewport = this.viewport()?.nativeElement;
     const mobile = !!viewport && viewport.clientWidth <= 700;
     const visibleWidth = viewport ? viewport.clientWidth / this.zoom() : 390;
-    const width = Math.max(100, box?.width || (type === 'zone' ? 420 : type === 'budget' ? 360 : type === 'table' ? 390 : type === 'image' ? 340 : type === 'list' ? 300 : type === 'task' ? 280 : type === 'link' ? 320 : type === 'text' ? 180 : 260));
-    const height = Math.max(40, box?.height || (type === 'zone' ? 280 : type === 'budget' ? 280 : type === 'table' ? 220 : type === 'image' ? 230 : type === 'task' ? 78 : type === 'list' ? 150 : type === 'link' ? 115 : type === 'text' ? 46 : 170));
+    const width = Math.max(100, box?.width || (type === 'shape' ? 180 : type === 'zone' || type === 'frame' ? 420 : type === 'budget' ? 360 : type === 'table' ? 390 : type === 'image' ? 340 : type === 'list' ? 300 : type === 'task' ? 280 : type === 'link' ? 320 : type === 'text' ? 180 : 260));
+    const height = Math.max(40, box?.height || (type === 'shape' ? 110 : type === 'zone' || type === 'frame' ? 280 : type === 'budget' ? 280 : type === 'table' ? 220 : type === 'image' ? 230 : type === 'task' ? 78 : type === 'list' ? 150 : type === 'link' ? 115 : type === 'text' ? 46 : 170));
     const placedWidth = mobile && !box ? Math.min(width, visibleWidth - 32 / this.zoom()) : width;
     const left = -this.panX() / this.zoom() + 16 / this.zoom();
     const x = mobile && !box ? Math.max(left, Math.min(point.x - placedWidth / 2, left + visibleWidth - 32 / this.zoom() - placedWidth)) : point.x;
-    const item: CanvasItem = { id: crypto.randomUUID(), type, parentId: null, x, y: point.y, width: placedWidth, height, title: '', body: '', textAutoSize: type === 'text', accent: '#d4111c', zoneType: type === 'zone' ? 'standard' : undefined, checklist: type === 'checklist' || type === 'list' ? [{ label: '', completed: false }] : undefined, rows: type === 'budget' ? [{ label: 'New item', value: 0 }] : undefined, tableColumns: type === 'table' ? ['Column 1', 'Column 2'] : undefined, tableRows: type === 'table' ? [['', '']] : undefined, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
+    const item: CanvasItem = { id: crypto.randomUUID(), type, parentId: null, x, y: point.y, width: placedWidth, height, title: '', body: '', textAutoSize: type === 'text', accent: '#d4111c', shapeKind: type === 'shape' ? this.shapeKind() : undefined, shapeFill: type === 'shape' ? '#ffffff' : undefined, shapeStroke: type === 'shape' ? '#6b7280' : undefined, shapeStrokeWidth: type === 'shape' ? 2 : undefined, zoneType: type === 'zone' ? 'standard' : undefined, checklist: type === 'checklist' || type === 'list' ? [{ label: '', completed: false }] : undefined, rows: type === 'budget' ? [{ label: 'New item', value: 0 }] : undefined, tableColumns: type === 'table' ? ['Column 1', 'Column 2'] : undefined, tableRows: type === 'table' ? [['', '']] : undefined, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
     this.snapshot(); this.items.update(items => [...items, item]); this.selectedIds.set([item.id]); this.tool.set('select');
-    if (['note', 'text', 'task', 'zone', 'link', 'list', 'budget', 'table'].includes(type)) queueMicrotask(() => this.startEditing(item.id));
+    if (['note', 'text', 'task', 'zone', 'frame', 'link', 'list', 'budget', 'table', 'shape'].includes(type)) queueMicrotask(() => this.startEditing(item.id));
   }
   selectImageForBlock(id: string): void { const item = this.items().find(entry => entry.id === id); if (!item || item.type !== 'image') return; this.selectedIds.set([id]); this.replaceId = id; this.imagePlacement = { x: item.x, y: item.y }; const input = this.fileInput()?.nativeElement; if (input) { input.accept = 'image/*'; input.click(); } }
   canvasDoubleClick(event: MouseEvent): void { if ((event.target as HTMLElement).closest('[data-item], [data-ui]')) return; this.createAt('note', this.point(event.clientX, event.clientY)); }
@@ -314,7 +433,7 @@ export class CanvasPage implements AfterViewInit, OnDestroy {
   inlineKey(event: KeyboardEvent): void { const id = this.editingId(); const item = this.items().find(entry => entry.id === id); if (event.key === 'Escape' || ((event.ctrlKey || event.metaKey) && event.key === 'Enter') || (item?.type === 'task' && event.key === 'Enter')) { event.preventDefault(); (event.target as HTMLElement).blur(); this.finishEditing(); } }
   taskTitleKey(event: KeyboardEvent, id: string): void { if (event.key === 'Enter' || event.key === 'Escape') { event.preventDefault(); (event.target as HTMLInputElement).blur(); } }
   taskTitleBlur(event: Event, id: string): void { const value = (event.target as HTMLInputElement).value.trim() || 'New task'; const item = this.items().find(entry => entry.id === id); if (item && item.title !== value) { if (!this.richBefore) this.snapshot(); this.update(id, { title: value }); } this.finishEditing(); }
-  setStyle(id: string, patch: Partial<CanvasItem>): void { this.snapshot(); this.update(id, patch); }
+  setStyle(id: string, patch: Partial<CanvasItem>): void { const item = this.items().find(entry => entry.id === id); if (!item) return; this.snapshot(); this.update(id, item.type === 'sketch' && patch.accent ? { ...patch, sketchStrokes: item.sketchStrokes?.map(stroke => ({ ...stroke, color: patch.accent! })) } : patch); }
   setTextSize(id: string, event: Event): void { this.setStyle(id, { fontSize: Number((event.target as HTMLSelectElement).value) }); }
   setFontFamily(id: string, event: Event): void { this.setStyle(id, { fontFamily: (event.target as HTMLSelectElement).value as CanvasItem['fontFamily'] }); }
   setAlignment(id: string, event: Event): void { this.setStyle(id, { textAlign: (event.target as HTMLSelectElement).value as CanvasItem['textAlign'] }); }
@@ -333,7 +452,7 @@ export class CanvasPage implements AfterViewInit, OnDestroy {
   budgetTotal(item: CanvasItem): number { return (item.rows || []).reduce((sum, row) => sum + row.value, 0); }
   setLinkUrl(id: string, event: Event): void { const url = (event.target as HTMLInputElement).value.trim(); this.setStyle(id, { url, title: this.items().find(entry => entry.id === id)?.title || url }); }
   copy(): void { const ids = new Set(this.selectedIds()); this.clipboard = structuredClone(this.items().filter(item => ids.has(item.id))); }
-  paste(): void { if (!this.clipboard.length) return; const copies = this.clipboard.map(item => ({ ...structuredClone(item), id: crypto.randomUUID(), x: item.x + 24, y: item.y + 24 })); this.snapshot(); this.items.update(items => [...items, ...copies]); this.selectedIds.set(copies.map(item => item.id)); this.clipboard = structuredClone(copies); }
+  paste(): void { if (!this.clipboard.length) return; const groups = new Map(this.clipboard.filter(item => item.groupId).map(item => [item.groupId!, crypto.randomUUID()])); const copies = this.clipboard.map(item => ({ ...structuredClone(item), id: crypto.randomUUID(), groupId: item.groupId ? groups.get(item.groupId) : undefined, x: item.x + 24, y: item.y + 24 })); this.snapshot(); this.items.update(items => [...items, ...copies]); this.selectedIds.set(copies.map(item => item.id)); this.clipboard = structuredClone(copies); }
   async fileSelected(event: Event): Promise<void> { const input = event.target as HTMLInputElement; const files = input.files; if (files?.length) await this.importFiles(files, this.imagePlacement || this.centerPoint()); input.value = ''; input.accept = 'image/*,audio/*,.pdf,.txt,.doc,.docx'; this.imagePlacement = null; this.replaceId = null; }
   private centerPoint(): { x: number; y: number } { const rect = this.viewport()?.nativeElement.getBoundingClientRect(); return rect ? this.point(rect.left + rect.width / 2, rect.top + rect.height / 2) : { x: 0, y: 0 }; }
   private async importFiles(files: FileList | File[], point: { x: number; y: number }): Promise<void> { let index = 0; for (const file of Array.from(files)) { const source = await new Promise<string>((resolve, reject) => { const reader = new FileReader(); reader.onload = () => resolve(String(reader.result)); reader.onerror = () => reject(reader.error); reader.readAsDataURL(file); }); let width = 260, height = 130; const image = file.type.startsWith('image/'); if (image) { const size = await new Promise<{ width: number; height: number }>(resolve => { const img = new Image(); img.onload = () => resolve({ width: img.naturalWidth, height: img.naturalHeight }); img.onerror = () => resolve({ width: 320, height: 240 }); img.src = source; }); const scale = Math.min(1, 520 / size.width, 420 / size.height); width = size.width * scale; height = size.height * scale; } if (image && this.replaceId) { this.snapshot(); this.update(this.replaceId, { image: source, title: file.name, cropX: 0, cropY: 0, cropScale: 1 }); break; } const item: CanvasItem = { id: crypto.randomUUID(), type: image ? 'image' : file.type.startsWith('audio/') ? 'voice' : 'file', parentId: null, x: point.x + 24 * index, y: point.y + 24 * index, width, height, title: file.name, image: image ? source : undefined, filename: file.name, url: image ? undefined : source, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() }; this.snapshot(); this.items.update(items => [...items, item]); this.selectedIds.set([item.id]); index++; } }
@@ -348,7 +467,7 @@ export class CanvasPage implements AfterViewInit, OnDestroy {
   imageTransform(item: CanvasItem): string { const scale = item.cropScale || 1; return `translate(${item.cropX || 0}px, ${item.cropY || 0}px) scale(${scale * (item.flipX ? -1 : 1)}, ${scale * (item.flipY ? -1 : 1)})`; }
   layer(direction: 'front' | 'back' | 'top' | 'bottom'): void {
     const selected = new Set(this.selectedIds()); if (!selected.size) return;
-    const ordered = [...this.items()].sort((a, b) => (a.zIndex ?? (a.type === 'zone' || a.type === 'workspace' ? 0 : 1)) - (b.zIndex ?? (b.type === 'zone' || b.type === 'workspace' ? 0 : 1)));
+    const ordered = [...this.items()].sort((a, b) => (a.zIndex ?? (a.type === 'zone' || a.type === 'workspace' || a.type === 'frame' ? 0 : 1)) - (b.zIndex ?? (b.type === 'zone' || b.type === 'workspace' || b.type === 'frame' ? 0 : 1)));
     if (direction === 'top' || direction === 'bottom') {
       const chosen = ordered.filter(item => selected.has(item.id)), rest = ordered.filter(item => !selected.has(item.id));
       ordered.splice(0, ordered.length, ...(direction === 'top' ? [...rest, ...chosen] : [...chosen, ...rest]));
@@ -377,12 +496,15 @@ export class CanvasPage implements AfterViewInit, OnDestroy {
     }));
   }
   private finishSketch(): void {
-    if (this.sketchPoints().length < 2) return;
+    if (!this.sketchPoints().length) return;
     const stroke: SketchStroke = { id: crypto.randomUUID(), brush: this.brush(), points: this.sketchPoints().map(point => ({ x: point.x, y: point.y, pressure: point.pressure ?? .5 })), color: this.sketchColor(), size: this.brushWidth(), opacity: this.brushOpacity() };
-    this.activeSketchStrokes.update(strokes => [...strokes, stroke]); this.undoneSketchStrokes.set([]);
+    const bounds = strokeBounds([stroke]);
+    const normalized = { ...stroke, points: stroke.points.map(point => ({ ...point, x: point.x - bounds.x, y: point.y - bounds.y })) };
+    const item: CanvasItem = { id: stroke.id, type: 'sketch', parentId: null, x: bounds.x, y: bounds.y, width: bounds.width, height: bounds.height, sourceWidth: bounds.width, sourceHeight: bounds.height, title: 'Stroke', sketchStrokes: [normalized], rotation: 0, zIndex: Math.max(1, ...this.items().map(entry => entry.zIndex || 1)) + 1, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
+    this.snapshot(); this.items.update(items => [...items, item]);
   }
-  undoSketchStroke(): void { const strokes = this.activeSketchStrokes(); if (!strokes.length) return; this.undoneSketchStrokes.update(undone => [...undone, strokes.at(-1)!]); this.activeSketchStrokes.set(strokes.slice(0, -1)); }
-  redoSketchStroke(): void { const undone = this.undoneSketchStrokes(); if (!undone.length) return; this.activeSketchStrokes.update(strokes => [...strokes, undone.at(-1)!]); this.undoneSketchStrokes.set(undone.slice(0, -1)); }
+  undoSketchStroke(): void { this.undo(); }
+  redoSketchStroke(): void { this.redo(); }
   editSketch(id: string): void {
     const item = this.items().find(entry => entry.id === id); if (!item || item.type !== 'sketch') return;
     this.setTool('sketch'); this.editingSketchId.set(id);
@@ -391,13 +513,6 @@ export class CanvasPage implements AfterViewInit, OnDestroy {
     this.activeSketchStrokes.set(strokes.map(stroke => ({ ...stroke, points: stroke.points.map(point => { const x = point.x * item.width / (item.sourceWidth || item.width) - item.width / 2, y = point.y * item.height / (item.sourceHeight || item.height) - item.height / 2; return { ...point, x: item.x + item.width / 2 + x * cos - y * sin, y: item.y + item.height / 2 + x * sin + y * cos }; }) })));
   }
   private completeSketch(): void {
-    const strokes = this.activeSketchStrokes(), editingId = this.editingSketchId();
-    if (!strokes.length) { if (editingId) { this.snapshot(); this.items.update(items => items.filter(item => item.id !== editingId)); } this.activeSketchStrokes.set([]); this.undoneSketchStrokes.set([]); this.editingSketchId.set(null); return; }
-    const bounds = strokeBounds(strokes);
-    const normalized = strokes.map(stroke => ({ ...stroke, points: stroke.points.map(point => ({ ...point, x: point.x - bounds.x, y: point.y - bounds.y })) }));
-    this.snapshot();
-    if (editingId) { this.update(editingId, { x: bounds.x, y: bounds.y, width: bounds.width, height: bounds.height, sourceWidth: bounds.width, sourceHeight: bounds.height, rotation: 0, sketchStrokes: normalized, strokes: undefined }); this.selectedIds.set([editingId]); }
-    else { const item: CanvasItem = { id: crypto.randomUUID(), type: 'sketch', parentId: null, x: bounds.x, y: bounds.y, width: bounds.width, height: bounds.height, sourceWidth: bounds.width, sourceHeight: bounds.height, title: 'Sketch', sketchStrokes: normalized, rotation: 0, zIndex: Math.max(1, ...this.items().map(entry => entry.zIndex || 1)) + 1, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() }; this.items.update(items => [...items, item]); this.selectedIds.set([item.id]); }
     this.activeSketchStrokes.set([]); this.undoneSketchStrokes.set([]); this.editingSketchId.set(null);
   }
   tableColumns(item: CanvasItem): string[] { return item.tableColumns?.length ? item.tableColumns : ['Column 1', 'Column 2']; }
