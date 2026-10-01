@@ -112,6 +112,13 @@ export interface CanvasConnection {
   sourceBinding?: ConnectorBinding;
   targetBinding?: ConnectorBinding;
   routeOffset?: number;
+  sourceJunctionId?: string;
+  targetJunctionId?: string;
+}
+export interface CanvasJunction {
+  id: string;
+  parentConnectorId: string;
+  positionRatio: number;
 }
 
 const now = '2026-09-29T00:00:00.000Z';

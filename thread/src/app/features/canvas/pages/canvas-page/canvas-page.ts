@@ -1,7 +1,7 @@
 import { CommonModule, isPlatformBrowser } from '@angular/common';
 import { AfterViewInit, Component, ElementRef, HostListener, OnDestroy, PLATFORM_ID, computed, effect, inject, signal, viewChild } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
-import { BudgetCurrency, BudgetMode, CanvasConnection, CanvasItem, ChartConfig, ConnectorKind, ConnectorSide, ItemType, ShapeKind, SketchBrush, SketchStroke, ThreadDataset, demoConnections, demoItems } from '../../canvas.model';
+import { BudgetCurrency, BudgetMode, CanvasConnection, CanvasItem, CanvasJunction, ChartConfig, ConnectorKind, ConnectorSide, ItemType, ShapeKind, SketchBrush, SketchStroke, ThreadDataset, demoConnections, demoItems } from '../../canvas.model';
 import { DatasetStore } from '../../data/dataset-store';
 import { ThreadChart } from '../../components/thread-chart';
 import { containsShape, nearestPerimeter, perimeterPoint, sidePoint, world } from '../../sketch/connector-geometry';
@@ -15,8 +15,8 @@ import { ScrollDirective } from '../../../../shared/scroll.directive';
 import { brushDiameter, distanceToStroke, strokeBounds, strokeOutlinePath } from '../../sketch/sketch-geometry';
 
 type Tool = 'select' | 'hand' | 'text' | 'add' | 'connect' | 'sketch' | 'shape';
-type Session = { kind: 'pan' | 'move' | 'resize' | 'rotate' | 'marquee' | 'place' | 'crop' | 'connect' | 'rebind' | 'route' | 'sketch' | 'erase'; pointerId: number; clientX: number; clientY: number; x: number; y: number; itemId?: string; connectionId?: string; terminal?: 'source' | 'target'; side?: ConnectorSide; corner?: 'nw' | 'ne' | 'sw' | 'se'; before?: State; origins?: Map<string, { x: number; y: number }>; groupCenter?: { x: number; y: number }; groupIds?: string[]; moved?: boolean };
-type State = { items: CanvasItem[]; connections: CanvasConnection[]; datasets?: ThreadDataset[] };
+type Session = { kind: 'pan' | 'move' | 'resize' | 'rotate' | 'marquee' | 'place' | 'crop' | 'connect' | 'rebind' | 'route' | 'branch' | 'junction-slide' | 'sketch' | 'erase'; pointerId: number; clientX: number; clientY: number; x: number; y: number; itemId?: string; connectionId?: string; junctionId?: string; ratio?: number; terminal?: 'source' | 'target'; side?: ConnectorSide; corner?: 'nw' | 'ne' | 'sw' | 'se'; before?: State; origins?: Map<string, { x: number; y: number }>; groupCenter?: { x: number; y: number }; groupIds?: string[]; moved?: boolean };
+type State = { items: CanvasItem[]; connections: CanvasConnection[]; junctions?: CanvasJunction[]; datasets?: ThreadDataset[] };
 
 @Component({ selector: 'app-canvas-page', standalone: true, providers: [DatasetStore], imports: [CommonModule, RichTextEditor, MediaPicker, SketchRenderer, ThreadHeader, ScrollDirective, ThreadChart], templateUrl: './canvas-page.html', styleUrl: './canvas-page.css' })
 export class CanvasPage implements AfterViewInit, OnDestroy {
@@ -32,6 +32,7 @@ export class CanvasPage implements AfterViewInit, OnDestroy {
   private readonly initial = this.upgradeDataState(this.read());
   readonly items = signal<CanvasItem[]>(this.initial.items);
   readonly connections = signal<CanvasConnection[]>(this.initial.connections);
+  readonly junctions = signal<CanvasJunction[]>(this.initial.junctions || []);
   readonly contextId = signal<string | null>(null);
   readonly selectedIds = signal<string[]>([]);
   readonly tool = signal<Tool>('select');
@@ -53,6 +54,7 @@ export class CanvasPage implements AfterViewInit, OnDestroy {
   shapeIcon(kind: ShapeKind): string { return ({ rectangle: '□', rounded: '▢', circle: '○', diamond: '◇', triangle: '△', cloud: '☁' } as Record<ShapeKind, string>)[kind]; }
   readonly connectorKind = signal<ConnectorKind>('straight');
   readonly connectionTargetId = signal<string | null>(null);
+  readonly junctionCandidate = signal<{ connectionId: string; ratio: number; x: number; y: number } | null>(null);
   readonly selectedConnectionId = signal<string | null>(null);
   readonly precisePreview = signal<{ x: number; y: number } | null>(null);
   readonly brushWidth = signal(3);
@@ -107,7 +109,7 @@ export class CanvasPage implements AfterViewInit, OnDestroy {
 
   constructor() {
     this.datasetStore.replace(this.initial.datasets || []);
-    effect(() => { if (this.browser) { try { localStorage.setItem(this.storageKey, JSON.stringify({ version: 3, items: this.items(), connections: this.connections(), datasets: this.datasets() })); } catch { /* Large files can exceed local storage. */ } } });
+    effect(() => { if (this.browser) { try { localStorage.setItem(this.storageKey, JSON.stringify({ version: 3, items: this.items(), connections: this.connections(), junctions: this.junctions(), datasets: this.datasets() })); } catch { /* Large files can exceed local storage. */ } } });
     effect(() => { this.selectedIds(); this.zoom(); this.panX(); this.panY(); if (this.browser) this.queueTransformSync(); });
   }
   ngAfterViewInit(): void {
@@ -137,7 +139,7 @@ export class CanvasPage implements AfterViewInit, OnDestroy {
 
   private read(): State {
     if (!this.browser) return { items: demoItems, connections: demoConnections };
-    try { const stored = localStorage.getItem(this.storageKey); if (stored) { const state = JSON.parse(stored) as State & { version?: number }; if (state.version !== 2 && state.version !== 3) return this.normalizeLegacy(state); return { items: this.expandSketchItems(state.items.map(item => item.sketchAsset === 'sticker' ? { ...item, type: 'sticker' as const, title: 'Rough star', image: '/stickers/rough-star.svg', assetId: 'rough-star', sketchAsset: undefined } : item.sketchAsset === 'gif' ? { ...item, type: 'gif' as const, sketchAsset: undefined } : item)), connections: state.connections, datasets: state.datasets }; } } catch { }
+    try { const stored = localStorage.getItem(this.storageKey); if (stored) { const state = JSON.parse(stored) as State & { version?: number }; if (state.version !== 2 && state.version !== 3) return this.normalizeLegacy(state); return { items: this.expandSketchItems(state.items.map(item => item.sketchAsset === 'sticker' ? { ...item, type: 'sticker' as const, title: 'Rough star', image: '/stickers/rough-star.svg', assetId: 'rough-star', sketchAsset: undefined } : item.sketchAsset === 'gif' ? { ...item, type: 'gif' as const, sketchAsset: undefined } : item)), connections: state.connections, junctions: state.junctions || [], datasets: state.datasets }; } } catch { }
     return this.spaceId === 'thread' ? { items: [
       { ...demoItems.find(item => item.id === 'research')!, parentId: null, x: 170, y: 150, width: 730, height: 450, title: 'Ideas in progress' },
       { ...demoItems.find(item => item.id === 'note-1')!, parentId: 'research', x: 220, y: 250, width: 270, height: 190 },
@@ -166,7 +168,7 @@ export class CanvasPage implements AfterViewInit, OnDestroy {
       }
       return { ...item, datasetId:id, rows:undefined, tableColumns:undefined, tableRows:undefined };
     });
-    return {items,connections:state.connections,datasets};
+    return {items,connections:state.connections,junctions:state.junctions || [],datasets};
   }
   private expandSketchItems(items: CanvasItem[]): CanvasItem[] {
     return items.flatMap(item => {
@@ -180,13 +182,13 @@ export class CanvasPage implements AfterViewInit, OnDestroy {
       });
     });
   }
-  private state(): State { return { items: structuredClone(this.items()), connections: structuredClone(this.connections()), datasets: structuredClone(this.datasets()) }; }
+  private state(): State { return { items: structuredClone(this.items()), connections: structuredClone(this.connections()), junctions: structuredClone(this.junctions()), datasets: structuredClone(this.datasets()) }; }
   private commit(before: State): void { if (JSON.stringify(before) === JSON.stringify(this.state())) return; this.history.push(before); this.history = this.history.slice(-60); this.future = []; }
   private snapshot(): void { this.history.push(this.state()); this.history = this.history.slice(-60); this.future = []; }
   beginDataEdit(): void { if (!this.dataEditBefore) this.dataEditBefore=this.state(); }
   endDataEdit(): void { if (this.dataEditBefore) this.commit(this.dataEditBefore); this.dataEditBefore=null; }
-  undo(): void { const state = this.history.pop(); if (!state) return; this.future.push(this.state()); this.items.set(state.items); this.connections.set(state.connections); this.datasetStore.replace(state.datasets || []); }
-  redo(): void { const state = this.future.pop(); if (!state) return; this.history.push(this.state()); this.items.set(state.items); this.connections.set(state.connections); this.datasetStore.replace(state.datasets || []); }
+  undo(): void { const state = this.history.pop(); if (!state) return; this.future.push(this.state()); this.items.set(state.items); this.connections.set(state.connections); this.junctions.set(state.junctions || []); this.datasetStore.replace(state.datasets || []); }
+  redo(): void { const state = this.future.pop(); if (!state) return; this.history.push(this.state()); this.items.set(state.items); this.connections.set(state.connections); this.junctions.set(state.junctions || []); this.datasetStore.replace(state.datasets || []); }
   setTool(tool: Tool): void { this.finishEditing(); this.tool.set(tool); this.paletteOpen.set(tool === 'add'); this.pendingType.set(tool === 'shape' ? 'shape' : null); if (tool !== 'sketch') this.sketchEraser.set(false); else this.selectedIds.set([]); this.pendingAsset.set(null); this.mediaPicker.set(null); this.connectionSourceId.set(null); this.connectionTargetId.set(null); }
   chooseType(type: ItemType): void { if (type === 'gif' || type === 'sticker') { this.openMedia(type); return; } this.pendingType.set(type); this.paletteOpen.set(false); this.tool.set('select'); }
   openMedia(kind: 'gif' | 'sticker'): void { this.paletteOpen.set(false); this.mediaPicker.set(kind); this.pendingAsset.set(null); }
@@ -263,7 +265,28 @@ export class CanvasPage implements AfterViewInit, OnDestroy {
   rotateDown(event: PointerEvent, item: CanvasItem): void { event.stopPropagation(); const point = this.point(event.clientX, event.clientY); const angle = Math.atan2(point.y - item.y - item.height / 2, point.x - item.x - item.width / 2); this.session = { kind: 'rotate', pointerId: event.pointerId, clientX: event.clientX, clientY: event.clientY, x: angle, y: item.rotation || 0, itemId: item.id, before: this.state() }; (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId); }
   rotateGroupDown(event: PointerEvent): void { event.stopPropagation(); const bounds = this.groupBounds(); if (!bounds) return; const center = { x: bounds.x + bounds.width / 2, y: bounds.y + bounds.height / 2 }, point = this.point(event.clientX, event.clientY); this.session = { kind: 'rotate', pointerId: event.pointerId, clientX: event.clientX, clientY: event.clientY, x: Math.atan2(point.y - center.y, point.x - center.x), y: 0, groupCenter: center, groupIds: [...this.selectedIds()], before: this.state() }; (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId); }
   connectDown(event: PointerEvent, item: CanvasItem, side: ConnectorSide = 'right'): void { event.preventDefault(); event.stopPropagation(); const anchor = sidePoint(item, side); this.session = { kind: 'connect', pointerId: event.pointerId, clientX: event.clientX, clientY: event.clientY, x: anchor.x, y: anchor.y, itemId: item.id, side }; this.connectionPreview.set({ x1: anchor.x, y1: anchor.y, x2: anchor.x, y2: anchor.y }); (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId); }
-  selectConnection(event: PointerEvent, connection: CanvasConnection): void { if (this.tool() !== 'select') return; event.stopPropagation(); this.selectedIds.set([]); this.selectedConnectionId.set(connection.id); }
+  selectConnection(event: PointerEvent, connection: CanvasConnection): void { if (this.tool() !== 'select' && this.tool() !== 'connect') return; event.stopPropagation(); this.selectedIds.set([]); this.selectedConnectionId.set(connection.id); }
+  private pathPoint(connection: CanvasConnection, ratio: number): {x:number;y:number} {
+    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    path.setAttribute('d', this.connectionPath(connection));
+    const point = path.getPointAtLength(path.getTotalLength() * Math.max(0, Math.min(1, ratio)));
+    return { x: point.x, y: point.y };
+  }
+  junctionPoint(junction: CanvasJunction): {x:number;y:number} { const parent=this.connections().find(entry=>entry.id===junction.parentConnectorId); return parent?this.pathPoint(parent,junction.positionRatio):{x:0,y:0}; }
+  private nearestOnConnection(connection: CanvasConnection, point: {x:number;y:number}): {connectionId:string;ratio:number;x:number;y:number;distance:number} {
+    const path=document.createElementNS('http://www.w3.org/2000/svg','path'); path.setAttribute('d',this.connectionPath(connection));
+    const length=path.getTotalLength(); let best={connectionId:connection.id,ratio:0,x:0,y:0,distance:Infinity};
+    const steps=Math.max(24,Math.ceil(length/8));
+    for(let i=0;i<=steps;i++){ const ratio=i/steps, p=path.getPointAtLength(length*ratio), distance=Math.hypot(point.x-p.x,point.y-p.y); if(distance<best.distance) best={connectionId:connection.id,ratio,x:p.x,y:p.y,distance}; }
+    return best;
+  }
+  private joinCandidate(point:{x:number;y:number}, excludeId?:string) { let best:ReturnType<CanvasPage['nearestOnConnection']>|null=null; for(const connection of this.visibleConnections()) { if(connection.id===excludeId || this.dependsOn(connection.id,excludeId)) continue; const candidate=this.nearestOnConnection(connection,point); if(candidate.distance<14/this.zoom() && (!best||candidate.distance<best.distance)) best=candidate; } return best; }
+  private dependsOn(id:string,ancestor?:string,seen=new Set<string>()):boolean { if(!ancestor||seen.has(id)) return false; if(id===ancestor) return true; seen.add(id); const connection=this.connections().find(entry=>entry.id===id); return !!connection && [connection.sourceJunctionId,connection.targetJunctionId].some(jid=>{const parent=this.junctions().find(j=>j.id===jid)?.parentConnectorId; return !!parent&&this.dependsOn(parent,ancestor,seen);}); }
+  private getOrCreateJunction(candidate:{connectionId:string;ratio:number;x:number;y:number}):CanvasJunction { const existing=this.junctions().find(j=>j.parentConnectorId===candidate.connectionId&&Math.hypot(this.junctionPoint(j).x-candidate.x,this.junctionPoint(j).y-candidate.y)<12/this.zoom()); if(existing) return existing; const junction={id:crypto.randomUUID(),parentConnectorId:candidate.connectionId,positionRatio:candidate.ratio}; this.junctions.update(entries=>[...entries,junction]); return junction; }
+  connectionHover(event:PointerEvent,connection:CanvasConnection):void { if(this.session||this.editingId()||(this.tool()!=='select'&&this.tool()!=='connect')) return; const candidate=this.nearestOnConnection(connection,this.point(event.clientX,event.clientY)); this.junctionCandidate.set(candidate); }
+  connectionLeave(connection:CanvasConnection):void { if(!this.session&&this.junctionCandidate()?.connectionId===connection.id) this.junctionCandidate.set(null); }
+  branchDown(event:PointerEvent,connection:CanvasConnection):void { if(this.tool()!=='select'&&this.tool()!=='connect') return; event.preventDefault(); event.stopPropagation(); const candidate=this.nearestOnConnection(connection,this.point(event.clientX,event.clientY)); this.junctionCandidate.set(candidate); this.session={kind:'branch',pointerId:event.pointerId,clientX:event.clientX,clientY:event.clientY,x:candidate.x,y:candidate.y,connectionId:connection.id,ratio:candidate.ratio}; this.connectionPreview.set({x1:candidate.x,y1:candidate.y,x2:candidate.x,y2:candidate.y}); (event.currentTarget as Element).setPointerCapture(event.pointerId); }
+  junctionDown(event:PointerEvent,junction:CanvasJunction):void { event.preventDefault(); event.stopPropagation(); const point=this.junctionPoint(junction); if(this.tool()==='connect'){this.session={kind:'branch',pointerId:event.pointerId,clientX:event.clientX,clientY:event.clientY,x:point.x,y:point.y,connectionId:junction.parentConnectorId,junctionId:junction.id}; this.connectionPreview.set({x1:point.x,y1:point.y,x2:point.x,y2:point.y});} else {this.session={kind:'junction-slide',pointerId:event.pointerId,clientX:event.clientX,clientY:event.clientY,x:point.x,y:point.y,junctionId:junction.id,connectionId:junction.parentConnectorId,before:this.state()};} (event.currentTarget as Element).setPointerCapture(event.pointerId); }
   endpoint(connection: CanvasConnection, terminal: 'source' | 'target'): {x:number;y:number} { const ends=this.connectionEnds(connection); return terminal === 'source' ? ends.a : ends.b; }
   rebindDown(event: PointerEvent, connection: CanvasConnection, terminal: 'source' | 'target'): void {
     event.preventDefault(); event.stopPropagation(); this.selectedIds.set([]); this.selectedConnectionId.set(connection.id);
@@ -333,9 +356,10 @@ export class CanvasPage implements AfterViewInit, OnDestroy {
     if (session.kind === 'marquee') { const point = this.point(event.clientX, event.clientY); this.marquee.set({ x: Math.min(session.x, point.x), y: Math.min(session.y, point.y), width: Math.abs(point.x - session.x), height: Math.abs(point.y - session.y) }); }
     if (session.kind === 'place' && (this.pendingType() === 'zone' || this.pendingType() === 'shape')) { const point = this.point(event.clientX, event.clientY); this.placement.set({ x: Math.min(session.x, point.x), y: Math.min(session.y, point.y), width: Math.abs(point.x - session.x), height: Math.abs(point.y - session.y) }); }
     if (session.kind === 'crop' && session.itemId) this.update(session.itemId, { cropX: session.x + dx / this.zoom(), cropY: session.y + dy / this.zoom() });
-    if (session.kind === 'connect') { const point = this.point(event.clientX, event.clientY); const target = this.connectorTarget(point, session.itemId!); const precise = target ? nearestPerimeter(target, point) : null; const isPrecise = !!precise && precise.distance <= 12 / this.zoom(); const end = target ? isPrecise ? precise!.point : perimeterPoint(target, {x:session.x,y:session.y}) : point; this.connectionTargetId.set(target?.id || null); this.precisePreview.set(isPrecise ? end : null); this.connectionPreview.set({ x1: session.x, y1: session.y, x2: end.x, y2: end.y }); }
+    if (session.kind === 'connect' || session.kind === 'branch') { const point = this.point(event.clientX, event.clientY); const sourceId=session.itemId || this.connections().find(c=>c.id===session.connectionId)?.sourceId || ''; const target = this.connectorTarget(point, sourceId); const precise = target ? nearestPerimeter(target, point) : null; const isPrecise = !!precise && precise.distance <= 12 / this.zoom(); const join=target?null:this.joinCandidate(point,session.connectionId); const end = target ? isPrecise ? precise!.point : perimeterPoint(target, {x:session.x,y:session.y}) : join || point; this.connectionTargetId.set(target?.id || null); this.precisePreview.set(isPrecise ? end : null); this.junctionCandidate.set(join); this.connectionPreview.set({ x1: session.x, y1: session.y, x2: end.x, y2: end.y }); }
     if (session.kind === 'route' && session.connectionId) this.connections.update(entries=>entries.map(entry=>entry.id===session.connectionId?{...entry,routeOffset:session.x+(session.y?dx:dy)/this.zoom()}:entry));
     if (session.kind === 'rebind' && session.connectionId) { const connection=this.connections().find(entry=>entry.id===session.connectionId); if (connection) { const point=this.point(event.clientX,event.clientY), other=this.endpoint(connection,session.terminal==='source'?'target':'source'), target=this.connectorTarget(point,session.terminal==='source'?connection.targetId:connection.sourceId), precise=target?nearestPerimeter(target,point):null, isPrecise=!!precise&&precise.distance<=12/this.zoom(), end=target?(isPrecise?precise!.point:perimeterPoint(target,other)):point; this.connectionTargetId.set(target?.id||null); this.precisePreview.set(isPrecise?end:null); this.connectionPreview.set({x1:other.x,y1:other.y,x2:end.x,y2:end.y}); } }
+    if (session.kind === 'junction-slide' && session.junctionId && session.connectionId) { const parent=this.connections().find(c=>c.id===session.connectionId); if(parent){const candidate=this.nearestOnConnection(parent,this.point(event.clientX,event.clientY)); this.junctions.update(entries=>entries.map(j=>j.id===session.junctionId?{...j,positionRatio:candidate.ratio}:j));} }
     if (session.kind === 'sketch') { const point = this.point(event.clientX, event.clientY); const last = this.sketchPoints().at(-1); if (!last || Math.hypot(point.x - last.x, point.y - last.y) > 1.5) this.sketchPoints.update(points => [...points, { ...point, pressure: event.pressure || .5 }]); }
     if (session.kind === 'erase') this.eraseSketchAt(this.point(event.clientX, event.clientY));
   }
@@ -357,12 +381,16 @@ export class CanvasPage implements AfterViewInit, OnDestroy {
     if (session?.kind === 'connect' && session.itemId) {
       const point = this.point(event.clientX, event.clientY);
       const target = this.connectorTarget(point, session.itemId);
-      if (target) { const precise = nearestPerimeter(target, point); this.snapshot(); this.connections.update(connections => [...connections, { id: crypto.randomUUID(), sourceId: session.itemId!, targetId: target.id, sourceBinding: { mode: 'auto' }, targetBinding: precise.distance <= 12 / this.zoom() ? { mode: 'precise', anchor: precise.anchor } : { mode: 'auto' }, direction: 'forward', kind: this.connectorKind() }]); }
+      if (target) { this.snapshot(); this.connections.update(connections => [...connections, { id: crypto.randomUUID(), sourceId: session.itemId!, targetId: target.id, sourceBinding: { mode: 'auto' }, targetBinding: { mode: 'auto' }, direction: 'forward', kind: this.connectorKind() }]); }
+      else { const join=this.joinCandidate(point); if(join){const parent=this.connections().find(c=>c.id===join.connectionId)!; this.snapshot(); const junction=this.getOrCreateJunction(join); this.connections.update(entries=>[...entries,{id:crypto.randomUUID(),sourceId:session.itemId!,targetId:parent.targetId,targetJunctionId:junction.id,sourceBinding:{mode:'auto'},direction:'forward',kind:this.connectorKind()}]);} }
     }
+    if(session?.kind==='branch' && session.connectionId && session.moved){const parent=this.connections().find(c=>c.id===session.connectionId), point=this.point(event.clientX,event.clientY); if(parent){const target=this.connectorTarget(point,parent.sourceId), join=target?null:this.joinCandidate(point,parent.id); if(target||join){this.snapshot(); const origin=session.junctionId?this.junctions().find(j=>j.id===session.junctionId):this.getOrCreateJunction({connectionId:parent.id,ratio:session.ratio!,x:session.x,y:session.y}); if(origin){const other=join?this.connections().find(c=>c.id===join.connectionId):null; const destination=join?this.getOrCreateJunction(join):null; this.connections.update(entries=>[...entries,{id:crypto.randomUUID(),sourceId:parent.sourceId,sourceJunctionId:origin.id,targetId:target?.id||other!.targetId,targetJunctionId:destination?.id,direction:'forward',kind:this.connectorKind()}]);}}} }
+    if(session?.kind==='branch' && !session.moved && session.connectionId) this.selectedConnectionId.set(session.connectionId);
     if (session?.kind === 'rebind' && session.connectionId && session.terminal) {
       const connection=this.connections().find(entry=>entry.id===session.connectionId);
       if (connection) { const point=this.point(event.clientX,event.clientY), otherId=session.terminal==='source'?connection.targetId:connection.sourceId, target=this.connectorTarget(point,otherId);
-        if (target) { const precise=nearestPerimeter(target,point), binding=precise.distance<=12/this.zoom()?{mode:'precise' as const,anchor:precise.anchor}:{mode:'auto' as const}; this.snapshot(); this.connections.update(entries=>entries.map(entry=>entry.id===connection.id?(session.terminal==='source'?{...entry,sourceId:target.id,sourceBinding:binding}:{...entry,targetId:target.id,targetBinding:binding}):entry)); }
+        if (target) { this.snapshot(); this.connections.update(entries=>entries.map(entry=>entry.id===connection.id?(session.terminal==='source'?{...entry,sourceId:target.id,sourceJunctionId:undefined,sourceBinding:{mode:'auto'}}:{...entry,targetId:target.id,targetJunctionId:undefined,targetBinding:{mode:'auto'}}):entry)); }
+        else { const join=this.joinCandidate(point,connection.id); if(join){const parent=this.connections().find(c=>c.id===join.connectionId)!; this.snapshot(); const junction=this.getOrCreateJunction(join); this.connections.update(entries=>entries.map(entry=>entry.id===connection.id?(session.terminal==='source'?{...entry,sourceId:parent.sourceId,sourceJunctionId:junction.id}:{...entry,targetId:parent.targetId,targetJunctionId:junction.id}):entry));} }
       }
     }
     if (session?.before && ['move', 'resize', 'rotate'].includes(session.kind)) {
@@ -371,8 +399,9 @@ export class CanvasPage implements AfterViewInit, OnDestroy {
       this.commit(session.before);
     }
     if (session?.kind === 'route' && session.before) this.commit(session.before);
+    if (session?.kind === 'junction-slide' && session.before) this.commit(session.before);
     if (session?.kind === 'sketch') this.finishSketch();
-    this.session = null; this.sketchPoints.set([]); this.marquee.set(null); this.snapGuide.set(null); this.placement.set(null); this.connectionPreview.set(null); this.connectionTargetId.set(null); this.precisePreview.set(null); this.isPanning.set(false);
+    this.session = null; this.sketchPoints.set([]); this.marquee.set(null); this.snapGuide.set(null); this.placement.set(null); this.connectionPreview.set(null); this.connectionTargetId.set(null); this.precisePreview.set(null); this.junctionCandidate.set(null); this.isPanning.set(false);
     const target = event.currentTarget as HTMLElement;
     if (target.hasPointerCapture(event.pointerId)) target.releasePointerCapture(event.pointerId);
   }
@@ -400,11 +429,12 @@ export class CanvasPage implements AfterViewInit, OnDestroy {
   ungroupSelected(): void { const groups = new Set(this.items().filter(item => this.selectedIds().includes(item.id) && item.groupId).map(item => item.groupId)); if (!groups.size) return; this.snapshot(); this.items.update(items => items.map(item => item.groupId && groups.has(item.groupId) ? { ...item, groupId: undefined } : item)); }
   quickConnectedShape(source: CanvasItem): void {
     const now = new Date().toISOString();
-    const item: CanvasItem = { id: crypto.randomUUID(), type: 'shape', shapeKind: source.shapeKind || 'rectangle', shapeFill: source.shapeFill || '#ffffff', shapeStroke: source.shapeStroke || '#6b7280', shapeStrokeWidth: source.shapeStrokeWidth || 2, parentId: source.parentId, x: source.x + source.width + 100, y: source.y, width: source.width, height: source.height, title: '', rotation: 0, zIndex: Math.max(1, ...this.items().map(entry => entry.zIndex || 1)) + 1, createdAt: now, updatedAt: now };
+    const item: CanvasItem = { id: crypto.randomUUID(), type: 'shape', shapeKind: source.shapeKind || 'rectangle', shapeFill: source.shapeFill || '#ffffff', shapeStroke: source.shapeStroke || '#6b7280', shapeStrokeWidth: source.shapeStrokeWidth || 1, parentId: source.parentId, x: source.x + source.width + 100, y: source.y, width: source.width, height: source.height, title: '', rotation: 0, zIndex: Math.max(1, ...this.items().map(entry => entry.zIndex || 1)) + 1, createdAt: now, updatedAt: now };
     this.snapshot(); this.items.update(items => [...items, item]); this.connections.update(connections => [...connections, { id: crypto.randomUUID(), sourceId: source.id, targetId: item.id, direction: 'forward', kind: this.connectorKind() }]); this.selectedIds.set([item.id]); queueMicrotask(() => this.startEditing(item.id));
   }
-  removeSelected(): void { const ids = this.selectedIds(); if (!ids.length) return; this.snapshot(); const removed = new Set(ids); let changed = true; while (changed) { changed = false; for (const item of this.items()) if (item.parentId && removed.has(item.parentId) && !removed.has(item.id)) { removed.add(item.id); changed = true; } } this.items.update((items) => items.filter((item) => !removed.has(item.id))); this.connections.update((connections) => connections.filter((connection) => !removed.has(connection.sourceId) && !removed.has(connection.targetId))); this.selectedIds.set([]); }
-  removeSelectedConnection(): void { const id=this.selectedConnectionId(); if (!id) return; this.snapshot(); this.connections.update(entries=>entries.filter(entry=>entry.id!==id)); this.selectedConnectionId.set(null); }
+  removeSelected(): void { const ids = this.selectedIds(); if (!ids.length) return; this.snapshot(); const removed = new Set(ids); let changed = true; while (changed) { changed = false; for (const item of this.items()) if (item.parentId && removed.has(item.parentId) && !removed.has(item.id)) { removed.add(item.id); changed = true; } } this.items.update((items) => items.filter((item) => !removed.has(item.id))); this.removeConnectionGraph(new Set(this.connections().filter(c=>removed.has(c.sourceId)||removed.has(c.targetId)).map(c=>c.id))); this.selectedIds.set([]); }
+  removeSelectedConnection(): void { const id=this.selectedConnectionId(); if (!id) return; this.snapshot(); this.removeConnectionGraph(new Set([id])); this.selectedConnectionId.set(null); }
+  private removeConnectionGraph(removed:Set<string>):void {let changed=true; while(changed){changed=false; for(const connection of this.connections()){const parents=[connection.sourceJunctionId,connection.targetJunctionId].map(id=>this.junctions().find(j=>j.id===id)?.parentConnectorId); if(!removed.has(connection.id)&&parents.some(id=>id&&removed.has(id))){removed.add(connection.id);changed=true;}}} this.connections.update(entries=>entries.filter(c=>!removed.has(c.id))); this.junctions.update(entries=>entries.filter(j=>!removed.has(j.parentConnectorId)));}
   private connectorTarget(point: {x:number;y:number}, sourceId: string): CanvasItem | undefined {
     return [...this.items()].reverse().find(item => item.id !== sourceId && item.type !== 'workspace' && item.type !== 'frame' && item.type !== 'zone' && item.type !== 'chart' && (containsShape(item, point) || nearestPerimeter(item, point).distance <= 16 / this.zoom()));
   }
@@ -419,8 +449,11 @@ export class CanvasPage implements AfterViewInit, OnDestroy {
     const sourceSide: ConnectorSide=horizontal?(dx>=0?'right':'left'):(dy>=0?'bottom':'top');
     const targetSide: ConnectorSide=horizontal?(dx>=0?'left':'right'):(dy>=0?'top':'bottom');
     const orthogonal=connection.kind==='elbow' || connection.kind==='curved';
-    const a = connection.sourceBinding?.mode === 'precise' && connection.sourceBinding.anchor ? world(source, connection.sourceBinding.anchor) : orthogonal ? sidePoint(source,sourceSide) : perimeterPoint(source,targetCenter);
-    const b = connection.targetBinding?.mode === 'precise' && connection.targetBinding.anchor ? world(target, connection.targetBinding.anchor) : orthogonal ? sidePoint(target,targetSide) : perimeterPoint(target,sourceCenter);
+    const sourceJunction=this.junctions().find(j=>j.id===connection.sourceJunctionId);
+    const targetJunction=this.junctions().find(j=>j.id===connection.targetJunctionId);
+    const junctionA=sourceJunction?this.junctionPoint(sourceJunction):null, junctionB=targetJunction?this.junctionPoint(targetJunction):null;
+    const a = junctionA || (connection.sourceBinding?.mode === 'precise' && connection.sourceBinding.anchor ? world(source, connection.sourceBinding.anchor) : orthogonal && !junctionB ? sidePoint(source,sourceSide) : perimeterPoint(source,junctionB || targetCenter));
+    const b = junctionB || (connection.targetBinding?.mode === 'precise' && connection.targetBinding.anchor ? world(target, connection.targetBinding.anchor) : orthogonal && !junctionA ? sidePoint(target,targetSide) : perimeterPoint(target,junctionA || sourceCenter));
     return { a, b, source, target };
   }
   connectionPath(connection: CanvasConnection): string {
@@ -457,7 +490,7 @@ export class CanvasPage implements AfterViewInit, OnDestroy {
     this.snapshot();
     const dataset = type === 'budget' ? this.datasetStore.create([{label:'Item',type:'text',key:'item'},{label:'Amount',type:'currency',key:'amount'},{label:'Category',type:'category',key:'category'}]) : type === 'table' ? this.datasetStore.create([{label:'Column 1',type:'text'},{label:'Column 2',type:'text'}]) : undefined;
     const chartSource = type === 'chart' ? this.datasets().find(data => this.canChart(data)) : undefined;
-    const item: CanvasItem = { id: crypto.randomUUID(), type, parentId: null, x, y: point.y, width: placedWidth, height, title: '', body: '', datasetId: dataset?.id || chartSource?.id, chartConfig: type === 'chart' ? this.defaultChartConfig(chartSource) : undefined, budgetMode:type==='budget'?'simple':undefined, budgetCurrency:type==='budget'?'JOD':undefined, textAutoSize: type === 'text', accent: '#d4111c', shapeKind: type === 'shape' ? this.shapeKind() : undefined, shapeFill: type === 'shape' ? '#ffffff' : undefined, shapeStroke: type === 'shape' ? '#6b7280' : undefined, shapeStrokeWidth: type === 'shape' ? 2 : undefined, zoneType: type === 'zone' ? 'standard' : undefined, checklist: type === 'checklist' || type === 'list' ? [{ label: '', completed: false }] : undefined, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
+    const item: CanvasItem = { id: crypto.randomUUID(), type, parentId: null, x, y: point.y, width: placedWidth, height, title: '', body: '', datasetId: dataset?.id || chartSource?.id, chartConfig: type === 'chart' ? this.defaultChartConfig(chartSource) : undefined, budgetMode:type==='budget'?'simple':undefined, budgetCurrency:type==='budget'?'JOD':undefined, textAutoSize: type === 'text', accent: '#d4111c', shapeKind: type === 'shape' ? this.shapeKind() : undefined, shapeFill: type === 'shape' ? '#ffffff' : undefined, shapeStroke: type === 'shape' ? '#6b7280' : undefined, shapeStrokeWidth: type === 'shape' ? 1 : undefined, zoneType: type === 'zone' ? 'standard' : undefined, checklist: type === 'checklist' || type === 'list' ? [{ label: '', completed: false }] : undefined, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
     this.items.update(items => [...items, item]); this.selectedIds.set([item.id]); this.tool.set('select');
     if (['note', 'text', 'task', 'zone', 'frame', 'link', 'list', 'budget', 'table', 'shape'].includes(type)) queueMicrotask(() => this.startEditing(item.id));
   }

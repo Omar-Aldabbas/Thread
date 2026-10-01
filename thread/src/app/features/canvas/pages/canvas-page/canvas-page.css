@@ -243,4 +243,13 @@ button { cursor:pointer; border:0; background:none; color:inherit; }
 .shape-quick-add { position:absolute; z-index:8; top:calc(50% - 12px); right:-37px; display:grid; place-items:center; width:24px; height:24px; padding:0; border:1px solid var(--color-border); border-radius:var(--radius-xs); background:var(--color-surface); color:var(--color-text-secondary); font-size:18px; font-weight:700; }
 .shape-quick-add:hover { border-color:var(--color-primary); color:var(--color-primary); }
 .canvas-item.shape-item.selected { outline-width:1px; outline-offset:2px; }
-
+.shape-label { inset:8px 12px; color:var(--color-text-primary); font-size:14px; font-weight:550; line-height:1.35; overflow:hidden; white-space:pre-wrap; }
+.shape-item .resize-handle { width:10px; height:10px; border:1px solid var(--color-primary); border-radius:1px; background:var(--color-surface); box-shadow:none; }
+.shape-item .resize-handle::after { content:''; position:absolute; inset:-9px; }
+.shape-item .rotate-handle { width:12px; height:12px; border:1px solid var(--color-primary); background:var(--color-surface); box-shadow:none; }
+.shape-item .rotate-handle::after { top:11px; left:5px; width:1px; height:17px; }
+.sketch-tools .sketch-tab { width:auto; min-width:56px; padding:0 9px; font-size:12px; font-weight:650; }
+.sketch-tools .connector-kind { width:auto; padding:0 9px; font-size:12px; }
+.junction-dot { fill:var(--color-surface); stroke:var(--color-primary); pointer-events:none; }
+.junction-hit { fill:transparent; pointer-events:all; cursor:grab; touch-action:none; }
+.junction-candidate { fill:var(--color-surface); stroke:var(--color-primary); }
