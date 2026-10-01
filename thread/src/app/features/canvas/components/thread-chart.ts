@@ -1,5 +1,5 @@
 import { isPlatformBrowser } from '@angular/common';
-import { AfterViewInit, Component, ElementRef, OnDestroy, PLATFORM_ID, computed, effect, inject, input, viewChild } from '@angular/core';
+import { AfterViewInit, Component, ElementRef, OnDestroy, PLATFORM_ID, computed, effect, inject, input, output, viewChild } from '@angular/core';
 import { BarChart, LineChart, PieChart } from 'echarts/charts';
 import { GridComponent, LegendComponent, TooltipComponent } from 'echarts/components';
 import { CanvasRenderer } from 'echarts/renderers';
@@ -16,6 +16,7 @@ echarts.use([BarChart, LineChart, PieChart, GridComponent, LegendComponent, Tool
 export class ThreadChart implements AfterViewInit, OnDestroy {
   readonly dataset = input<ThreadDataset | undefined>();
   readonly config = input<ChartConfig | undefined>();
+  readonly pointSelect = output<string>();
   readonly plot = viewChild<ElementRef<HTMLElement>>('plot');
   private readonly browser = isPlatformBrowser(inject(PLATFORM_ID));
   private chart?: echarts.ECharts;
@@ -29,6 +30,7 @@ export class ThreadChart implements AfterViewInit, OnDestroy {
     if (!this.browser) return;
     const element = this.plot()?.nativeElement; if (!element) return;
     this.chart = echarts.init(element, undefined, { renderer: 'canvas' });
+    this.chart.on('click', params => this.pointSelect.emit(String(params.name || '')));
     this.observer = new ResizeObserver(() => { this.chart?.resize(); this.render(); }); this.observer.observe(element);
     this.render();
   }

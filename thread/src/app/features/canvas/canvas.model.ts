@@ -18,10 +18,10 @@ export type ItemType =
   | 'frame'
   | 'voice'
   | 'budget';
-export type DataColumnType = 'text' | 'number' | 'currency' | 'date' | 'category';
-export interface ThreadDataColumn { id: string; key: string; label: string; type: DataColumnType }
+export type DataColumnType = 'text' | 'number' | 'currency' | 'date' | 'category' | 'checkbox' | 'calculated';
+export interface ThreadDataColumn { id: string; key: string; label: string; type: DataColumnType; calculation?: { left: string; operator: '+' | '-' | '*' | '/' | '%'; right: string } }
 export interface ThreadDataRow { id: string; values: Record<string, string | number | null> }
-export interface ThreadDataset { id: string; columns: ThreadDataColumn[]; rows: ThreadDataRow[] }
+export interface ThreadDataset { id: string; columns: ThreadDataColumn[]; rows: ThreadDataRow[]; groups?: string[]; activePeriod?: string; periodValues?: Record<string, Record<string, { planned: number; actual: number }>> }
 export type BudgetCurrency = 'JOD' | 'USD' | 'EUR' | 'GBP';
 export type BudgetMode = 'simple' | 'project';
 export interface ChartConfig { type: 'bar' | 'donut' | 'line' | 'comparison'; categoryField?: string; valueField?: string; series?: string[] }
@@ -73,10 +73,14 @@ export interface CanvasItem {
   rows?: { label: string; value: number }[];
   tableColumns?: string[];
   tableRows?: string[][];
+  tableColumnOrder?: string[];
+  tableColumnWidths?: Record<string, number>;
   datasetId?: string;
   budgetMode?: BudgetMode;
   budgetCurrency?: BudgetCurrency;
   budgetTarget?: number;
+  budgetPeriod?: 'one-time' | 'monthly';
+  budgetMonth?: string;
   chartConfig?: ChartConfig;
   strokes?: { x: number; y: number; pressure?: number }[][];
   sketchStrokes?: SketchStroke[];
