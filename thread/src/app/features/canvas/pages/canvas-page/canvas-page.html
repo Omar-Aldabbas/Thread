@@ -30,7 +30,7 @@
     (pointerdown)="pointerDown($event)"
     (pointermove)="pointerMove($event)"
     (pointerup)="pointerUp($event)"
-    (pointercancel)="pointerUp($event)"
+    (pointercancel)="pointerCancel($event)"
     (dblclick)="canvasDoubleClick($event)"
     (wheel)="wheel($event)"
     (dragover)="dragOver($event)"
@@ -144,7 +144,7 @@
           (pointerdown)="itemPointerDown($event, item)"
           (pointermove)="pointerMove($event)"
           (pointerup)="pointerUp($event)"
-          (pointercancel)="pointerUp($event)"
+          (pointercancel)="pointerCancel($event)"
           (dblclick)="$event.stopPropagation(); startEditing(item.id, $event.target)"
           tabindex="0"
           [attr.aria-label]="item.type + ': ' + item.title"
@@ -509,7 +509,7 @@
       (pointerdown)="$event.stopPropagation(); pointerDown($event)"
       (pointermove)="$event.stopPropagation(); pointerMove($event)"
       (pointerup)="$event.stopPropagation(); pointerUp($event)"
-      (pointercancel)="$event.stopPropagation(); pointerUp($event)"
+      (pointercancel)="$event.stopPropagation(); pointerCancel($event)"
     >
       <svg
         class="sketch-layer-world"

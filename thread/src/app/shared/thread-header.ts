@@ -7,7 +7,7 @@ import { PreferencesService } from './preferences.service';
   standalone: true,
   template: `
     <header class="thread-header" data-ui>
-      <button class="brand-button" type="button" (click)="goToSpaces()" aria-label="All spaces">THREAD<span>.</span></button>
+      <button class="brand-button" type="button" (click)="goToSpaces()" aria-label="All spaces">THREA<span>D</span>.</button>
       @if (title()) { <span class="header-divider"></span><span class="space-name">{{ title() }}</span> }
       <div class="header-actions"><ng-content /></div>
       <button class="profile-button" type="button" (click)="goToSettings()"
