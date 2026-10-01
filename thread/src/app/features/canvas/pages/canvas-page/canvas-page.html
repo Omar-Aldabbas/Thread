@@ -322,113 +322,58 @@
               </button>
             </div>
           } @else if (item.type === 'budget') {
-            <div class="budget-content" appScroll="y" scrollbar="hover">
-              <div
-                class="list-title"
-                [attr.contenteditable]="editingId() === item.id"
-                [attr.data-edit-id]="editingId() === item.id ? item.id : null"
-                (keydown)="inlineKey($event)"
-                (blur)="inlineBlur($event, item.id, 'title')"
-                [textContent]="item.title || (editingId() === item.id ? '' : 'Budget')"
-              ></div>
-              @for (row of item.rows || []; track $index) {
-                <div class="budget-row">
-                  <input
-                    [value]="row.label"
-                    placeholder="Item"
-                    (pointerdown)="$event.stopPropagation()"
-                    (change)="setBudgetRow(item.id, $index, 'label', $event)"
-                  /><input
-                    type="number"
-                    [value]="row.value"
-                    (pointerdown)="$event.stopPropagation()"
-                    (change)="setBudgetRow(item.id, $index, 'value', $event)"
-                  />
-                </div>
-              }
-              <div class="budget-total">
-                Total <strong>{{ budgetTotal(item) }}</strong>
+            <div class="budget-content smart-block" [class.project-budget]="item.budgetMode === 'project'" appScroll="y" scrollbar="hover">
+              <div class="smart-head">
+                <div class="smart-title" [attr.contenteditable]="editingId() === item.id" [attr.data-edit-id]="editingId() === item.id ? item.id : null" (keydown)="inlineKey($event)" (blur)="inlineBlur($event, item.id, 'title')" [textContent]="item.title || (editingId() === item.id ? '' : 'Budget')"></div>
+                <select class="smart-currency" [value]="item.budgetCurrency || 'JOD'" (pointerdown)="$event.stopPropagation()" (change)="setBudgetCurrency(item,$event)" aria-label="Budget currency"><option>JOD</option><option>USD</option><option>EUR</option><option>GBP</option></select>
               </div>
-              <button
-                class="inline-add"
-                (click)="addBudgetEntry(item.id)"
-                (pointerdown)="$event.stopPropagation()"
-              >
-                + Entry
-              </button>
+              @if (dataset(item); as data) {
+                @if (item.budgetMode === 'project') { <div class="budget-column-head"><span>Item</span><span>Planned</span><span>Actual</span></div> }
+                <div class="budget-entries" appScroll="y" scrollbar="hover">
+                  @for (row of data.rows; track row.id) {
+                    <div class="budget-row" [attr.data-budget-row]="row.id">
+                      <input [value]="row.values[budgetItemField(data)] || ''" placeholder="Item name" (pointerdown)="$event.stopPropagation()" (focus)="beginDataEdit()" (input)="setBudgetCell(item,row.id,budgetItemField(data),$event)" (blur)="endDataEdit()" (keydown)="budgetKey($event,item,row.id)" [attr.aria-label]="'Item ' + ($index + 1)" />
+                      @if (item.budgetMode === 'project') {
+                        <input type="number" [value]="row.values[budgetField(data,'Planned')] ?? 0" (pointerdown)="$event.stopPropagation()" (focus)="beginDataEdit()" (input)="setBudgetCell(item,row.id,budgetField(data,'Planned'),$event)" (blur)="endDataEdit()" (keydown)="budgetKey($event,item,row.id)" [attr.aria-label]="'Planned ' + ($index + 1)" />
+                        <input type="number" [value]="row.values[budgetField(data,'Actual')] ?? 0" (pointerdown)="$event.stopPropagation()" (focus)="beginDataEdit()" (input)="setBudgetCell(item,row.id,budgetField(data,'Actual'),$event)" (blur)="endDataEdit()" (keydown)="budgetKey($event,item,row.id)" [attr.aria-label]="'Actual ' + ($index + 1)" />
+                      } @else {
+                        <input type="number" [value]="row.values[budgetAmountField(data)] ?? 0" (pointerdown)="$event.stopPropagation()" (focus)="beginDataEdit()" (input)="setBudgetCell(item,row.id,budgetAmountField(data),$event)" (blur)="endDataEdit()" (keydown)="budgetKey($event,item,row.id)" [attr.aria-label]="'Amount ' + ($index + 1)" />
+                      }
+                      <button class="budget-row-delete" (pointerdown)="$event.stopPropagation()" (click)="deleteBudgetEntry(item,row.id)" aria-label="Delete item">×</button>
+                      <details class="budget-row-options" (pointerdown)="$event.stopPropagation()"><summary aria-label="Item options">···</summary><label>Category<input [value]="row.values[budgetCategoryField(data)] || ''" placeholder="Optional" (focus)="beginDataEdit()" (input)="setBudgetCell(item,row.id,budgetCategoryField(data),$event)" (blur)="endDataEdit()" /></label></details>
+                    </div>
+                  } @empty { <div class="smart-empty">No items yet</div> }
+                </div>
+                <button class="smart-add" (pointerdown)="$event.stopPropagation()" (click)="addBudgetEntry(item.id)">{{ data.rows.length ? '+ Add item' : '+ Add first item' }}</button>
+                <div class="budget-total">
+                  <span>Total</span>
+                  @if (item.budgetMode === 'project') { <strong>{{ money(budgetValue(data,budgetField(data,'Planned'))) }}</strong><strong>{{ money(budgetValue(data,budgetField(data,'Actual'))) }}</strong> }
+                  @else { <strong>{{ money(budgetValue(data,budgetAmountField(data))) }}</strong> }
+                </div>
+                @if (item.budgetMode === 'project') { <div class="budget-meta">Variance {{ money(budgetValue(data,budgetField(data,'Planned')) - budgetValue(data,budgetField(data,'Actual'))) }} {{ item.budgetCurrency || 'JOD' }}</div> }
+                @if (item.budgetTarget) { <div class="budget-target"><span>{{ money(remaining(item)) }} remaining</span><span>{{ money(item.budgetTarget) }} limit</span><div class="budget-progress"><i [style.width.%]="usedPercent(item)"></i></div></div> }
+                <div class="smart-actions"><button (pointerdown)="$event.stopPropagation()" (click)="setBudgetMode(item,item.budgetMode === 'project' ? 'simple' : 'project')">{{ item.budgetMode === 'project' ? 'Simple' : 'Project' }} mode</button><details class="budget-settings" (pointerdown)="$event.stopPropagation()"><summary>Limit</summary><label>Budget limit<input type="number" min="0" [value]="item.budgetTarget || ''" placeholder="No limit" (change)="setBudgetTarget(item,$event)" /></label></details><button (pointerdown)="$event.stopPropagation()" (click)="createLinkedView(item,'table')">Create table</button><button (pointerdown)="$event.stopPropagation()" (click)="createLinkedView(item,'chart','donut')">Create chart</button></div>
+              }
             </div>
           } @else if (item.type === 'table') {
-            <div class="table-content">
-              <div
-                class="table-title"
-                [attr.contenteditable]="editingId() === item.id"
-                [attr.data-edit-id]="editingId() === item.id ? item.id : null"
-                (keydown)="inlineKey($event)"
-                (blur)="inlineBlur($event, item.id, 'title')"
-                [textContent]="item.title || (editingId() === item.id ? '' : 'Table')"
-              ></div>
-              <div class="table-scroll" appScroll="both" scrollbar="auto">
-                <table>
-                  <thead>
-                    <tr>
-                      @for (column of tableColumns(item); track $index; let columnIndex = $index) {
-                        <th>
-                          <input
-                            [value]="column"
-                            [attr.aria-label]="'Column ' + (columnIndex + 1) + ' name'"
-                            (pointerdown)="$event.stopPropagation()"
-                            (change)="setTableHeader(item.id, columnIndex, $event)"
-                          /><button
-                            (pointerdown)="$event.stopPropagation()"
-                            (click)="removeTableColumn(item.id, columnIndex)"
-                            [attr.aria-label]="'Remove column ' + (columnIndex + 1)"
-                          >
-                            ×
-                          </button>
-                        </th>
-                      }
-                    </tr>
-                  </thead>
-                  <tbody>
-                    @for (row of tableRows(item); track $index; let rowIndex = $index) {
-                      <tr>
-                        @for (
-                          column of tableColumns(item);
-                          track $index;
-                          let columnIndex = $index
-                        ) {
-                          <td>
-                            <input
-                              [value]="row[columnIndex] || ''"
-                              [attr.aria-label]="
-                                'Row ' + (rowIndex + 1) + ', column ' + (columnIndex + 1)
-                              "
-                              (pointerdown)="$event.stopPropagation()"
-                              (change)="setTableCell(item.id, rowIndex, columnIndex, $event)"
-                            />
-                          </td>
-                        }
-                        <td class="row-action">
-                          <button
-                            (pointerdown)="$event.stopPropagation()"
-                            (click)="removeTableRow(item.id, rowIndex)"
-                            [attr.aria-label]="'Remove row ' + (rowIndex + 1)"
-                          >
-                            ×
-                          </button>
-                        </td>
-                      </tr>
-                    }
-                  </tbody>
-                </table>
+            <div class="table-content smart-block">
+              <div class="smart-head"><div class="smart-title" [attr.contenteditable]="editingId() === item.id" [attr.data-edit-id]="editingId() === item.id ? item.id : null" (keydown)="inlineKey($event)" (blur)="inlineBlur($event, item.id, 'title')" [textContent]="item.title || (editingId() === item.id ? '' : 'Table')"></div><span class="linked-label">Linked view</span></div>
+              @if (dataset(item); as data) {
+                <div class="table-scroll" appScroll="both" scrollbar="auto"><table><thead><tr>
+                  @for (column of data.columns; track column.id) { <th><input [value]="column.label" [attr.aria-label]="'Column ' + ($index + 1) + ' name'" (pointerdown)="$event.stopPropagation()" (change)="setTableHeader(item,column.id,$event)" /><select class="column-type" [value]="column.type" [attr.aria-label]="column.label + ' type'" (pointerdown)="$event.stopPropagation()" (change)="setTableColumnType(item,column.id,$event)"><option value="text">Text</option><option value="number">Number</option><option value="currency">Currency</option><option value="date">Date</option><option value="category">Category</option></select><button (pointerdown)="$event.stopPropagation()" (click)="removeTableColumn(item,column.id)" [attr.aria-label]="'Remove ' + column.label">×</button></th> }
+                </tr></thead><tbody>
+                  @for (row of data.rows; track row.id; let rowIndex = $index) { <tr>@for (column of data.columns; track column.id) { <td><input [value]="row.values[column.key] ?? ''" [attr.aria-label]="'Row ' + (rowIndex + 1) + ', ' + column.label" (pointerdown)="$event.stopPropagation()" (focus)="beginDataEdit()" (input)="setTableCell(item,row.id,column.key,$event)" (blur)="endDataEdit()" /></td> }<td class="row-action"><button (pointerdown)="$event.stopPropagation()" (click)="removeTableRow(item,row.id)" aria-label="Remove row">×</button></td></tr> }
+                </tbody></table>@if (!data.rows.length) { <div class="smart-empty">Add a row to begin</div> }</div>
+                <div class="table-actions"><button (pointerdown)="$event.stopPropagation()" (click)="addTableRow(item.id)">+ Row</button><button (pointerdown)="$event.stopPropagation()" (click)="addTableColumn(item.id)">+ Column</button>@if (canChart(data)) { <button (pointerdown)="$event.stopPropagation()" (click)="createLinkedView(item,'chart')">Create chart</button><button (pointerdown)="$event.stopPropagation()" (click)="createLinkedView(item,'budget')">Create budget</button> }</div>
+              }
+            </div>
+          } @else if (item.type === 'chart') {
+            <div class="chart-content smart-block"><div class="smart-head"><div class="smart-title" [attr.contenteditable]="editingId() === item.id" [attr.data-edit-id]="editingId() === item.id ? item.id : null" (keydown)="inlineKey($event)" (blur)="inlineBlur($event,item.id,'title')" [textContent]="item.title || (editingId() === item.id ? '' : 'Chart')"></div><span class="linked-label">Linked view</span></div>
+              <div class="chart-controls" (pointerdown)="$event.stopPropagation()">
+                <select aria-label="Chart data source" [value]="chartSourceId(item)" (change)="linkChartSource(item,$event)"><option value="" disabled>Select data source</option>@for (source of dataSources(); track source.item.id) { @if (canChart(source.data)) { <option [value]="source.item.id">{{ source.item.title || (source.item.type === 'budget' ? 'Budget' : 'Table') }}</option> } }</select>
+                @if (dataset(item); as data) { <select aria-label="Chart type" [value]="item.chartConfig?.type || 'bar'" (change)="setChartConfig(item,{type:$any($event.target).value})">@for (kind of chartTypes(data); track kind) { <option [value]="kind">{{ kind }}</option> }</select><select aria-label="Label field" [value]="item.chartConfig?.categoryField" (change)="setChartConfig(item,{categoryField:$any($event.target).value})">@for (column of data.columns; track column.id) { @if (column.type === 'text' || column.type === 'category' || column.type === 'date') { <option [value]="column.key">{{ column.label }}</option> } }</select><select aria-label="Value field" [value]="item.chartConfig?.valueField" (change)="setChartConfig(item,{valueField:$any($event.target).value})">@for (column of data.columns; track column.id) { @if (column.type === 'number' || column.type === 'currency') { <option [value]="column.key">{{ column.label }}</option> } }</select> }
               </div>
-              <div class="table-actions">
-                <button (pointerdown)="$event.stopPropagation()" (click)="addTableRow(item.id)">
-                  + Row</button
-                ><button (pointerdown)="$event.stopPropagation()" (click)="addTableColumn(item.id)">
-                  + Column
-                </button>
-              </div>
+              <app-thread-chart [dataset]="dataset(item)" [config]="item.chartConfig" />
             </div>
           } @else if (item.type === 'sketch') {
             <app-sketch-renderer [item]="item" />
@@ -500,7 +445,7 @@
             @for (side of ['top','right','bottom','left']; track side) {
               <button class="shape-port" [class.port-top]="side === 'top'" [class.port-right]="side === 'right'" [class.port-bottom]="side === 'bottom'" [class.port-left]="side === 'left'" [style.transform]="'scale(' + 1 / zoom() + ')'" (pointerdown)="connectDown($event, item, $any(side))" [attr.aria-label]="'Connect from ' + side"></button>
             }
-          } @else if (tool() === 'connect') {
+          } @else if (tool() === 'connect' && item.type !== 'chart') {
             <button
               class="connect-handle"
               (pointerdown)="connectDown($event, item)"
@@ -679,6 +624,7 @@
             { type: 'frame', icon: '▧' },
             { type: 'budget', icon: '$' },
             { type: 'table', icon: '▦' },
+            { type: 'chart', icon: '▥' },
           ];
           track entry.type
         ) {

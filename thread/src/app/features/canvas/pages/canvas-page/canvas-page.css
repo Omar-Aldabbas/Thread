@@ -1,4 +1,4 @@
-﻿:host { display:block; width:100%; height:100%; }
+:host { display:block; width:100%; height:100%; }
 .thread-app { position:relative; display:flex; flex-direction:column; width:100%; height:100%; overflow:hidden; background:var(--color-background); color:var(--color-text-primary); font-family:Inter,ui-sans-serif,system-ui,sans-serif; }
 button { cursor:pointer; border:0; background:none; color:inherit; }
 .thread-header { position:relative; z-index:20; display:flex; align-items:center; gap:16px; height:54px; flex:none; padding:0 20px; border-bottom:1px solid var(--color-border-light); background:var(--color-surface); }
@@ -228,7 +228,8 @@ button { cursor:pointer; border:0; background:none; color:inherit; }
 .shape-tools { position:absolute; z-index:36; top:68px; left:82px; display:flex; gap:4px; max-width:calc(100% - 100px); padding:6px; overflow-x:auto; touch-action:pan-x; }
 .shape-tools button { min-width:38px; height:38px; font-size:19px; white-space:nowrap; }
 .shape-tools button.active { background:var(--color-primary); color:white; }
-.shape-port { position:absolute; z-index:7; width:16px; height:16px; padding:0; border:0; border-radius:50%; background:transparent; touch-action:none; cursor:crosshair; }
+.shape-port { position:absolute; z-index:7; width:16px; height:16px; padding:0; border:0; border-radius:50%; background:transparent; touch-action:none; cursor:crosshair; opacity:0; }
+.canvas-item:hover .shape-port,.canvas-item.connection-source .shape-port,.canvas-item.connection-target .shape-port,.shape-port:focus-visible { opacity:1; }
 .shape-port::after { content:''; position:absolute; top:4px; left:4px; width:8px; height:8px; box-sizing:border-box; border:1.5px solid var(--color-text-secondary); border-radius:50%; background:var(--color-surface); box-shadow:0 0 0 2px var(--color-surface); }
 .shape-port:hover::after,.shape-port:focus-visible::after { border-color:var(--color-primary); background:var(--color-primary); }
 .shape-port.port-top { top:-8px; left:calc(50% - 8px); }
@@ -242,4 +243,4 @@ button { cursor:pointer; border:0; background:none; color:inherit; }
 .shape-quick-add { position:absolute; z-index:8; top:calc(50% - 12px); right:-37px; display:grid; place-items:center; width:24px; height:24px; padding:0; border:1px solid var(--color-border); border-radius:var(--radius-xs); background:var(--color-surface); color:var(--color-text-secondary); font-size:18px; font-weight:700; }
 .shape-quick-add:hover { border-color:var(--color-primary); color:var(--color-primary); }
 .canvas-item.shape-item.selected { outline-width:1px; outline-offset:2px; }
-@media(max-width:700px) { .tool-rail.canvas-action-bar { grid-template-columns:repeat(7,1fr); } .shape-tools { top:auto; right:8px; bottom:calc(72px + env(safe-area-inset-bottom)); left:8px; max-width:none; } }
+

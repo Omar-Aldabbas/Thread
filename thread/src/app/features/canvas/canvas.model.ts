@@ -12,11 +12,19 @@ export type ItemType =
   | 'file'
   | 'link'
   | 'table'
+  | 'chart'
   | 'sketch'
   | 'shape'
   | 'frame'
   | 'voice'
   | 'budget';
+export type DataColumnType = 'text' | 'number' | 'currency' | 'date' | 'category';
+export interface ThreadDataColumn { id: string; key: string; label: string; type: DataColumnType }
+export interface ThreadDataRow { id: string; values: Record<string, string | number | null> }
+export interface ThreadDataset { id: string; columns: ThreadDataColumn[]; rows: ThreadDataRow[] }
+export type BudgetCurrency = 'JOD' | 'USD' | 'EUR' | 'GBP';
+export type BudgetMode = 'simple' | 'project';
+export interface ChartConfig { type: 'bar' | 'donut' | 'line' | 'comparison'; categoryField?: string; valueField?: string; series?: string[] }
 export type ZoneType = 'standard' | 'nested' | 'portal';
 export type SketchBrush = 'pen' | 'marker' | 'highlighter' | 'neon';
 export type ShapeKind = 'rectangle' | 'rounded' | 'circle' | 'diamond' | 'triangle' | 'cloud';
@@ -65,6 +73,11 @@ export interface CanvasItem {
   rows?: { label: string; value: number }[];
   tableColumns?: string[];
   tableRows?: string[][];
+  datasetId?: string;
+  budgetMode?: BudgetMode;
+  budgetCurrency?: BudgetCurrency;
+  budgetTarget?: number;
+  chartConfig?: ChartConfig;
   strokes?: { x: number; y: number; pressure?: number }[][];
   sketchStrokes?: SketchStroke[];
   shapeKind?: ShapeKind;

@@ -1,7 +1,9 @@
 import { CommonModule, isPlatformBrowser } from '@angular/common';
 import { AfterViewInit, Component, ElementRef, HostListener, OnDestroy, PLATFORM_ID, computed, effect, inject, signal, viewChild } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
-import { CanvasConnection, CanvasItem, ConnectorKind, ConnectorSide, ItemType, ShapeKind, SketchBrush, SketchStroke, demoConnections, demoItems } from '../../canvas.model';
+import { BudgetCurrency, BudgetMode, CanvasConnection, CanvasItem, ChartConfig, ConnectorKind, ConnectorSide, ItemType, ShapeKind, SketchBrush, SketchStroke, ThreadDataset, demoConnections, demoItems } from '../../canvas.model';
+import { DatasetStore } from '../../data/dataset-store';
+import { ThreadChart } from '../../components/thread-chart';
 import { containsShape, nearestPerimeter, perimeterPoint, sidePoint, world } from '../../sketch/connector-geometry';
 import { RichTextEditor } from '../../components/rich-text-editor';
 import { PreferencesService } from '../../../../shared/preferences.service';
@@ -14,18 +16,20 @@ import { brushDiameter, distanceToStroke, strokeBounds, strokeOutlinePath } from
 
 type Tool = 'select' | 'hand' | 'text' | 'add' | 'connect' | 'sketch' | 'shape';
 type Session = { kind: 'pan' | 'move' | 'resize' | 'rotate' | 'marquee' | 'place' | 'crop' | 'connect' | 'rebind' | 'route' | 'sketch' | 'erase'; pointerId: number; clientX: number; clientY: number; x: number; y: number; itemId?: string; connectionId?: string; terminal?: 'source' | 'target'; side?: ConnectorSide; corner?: 'nw' | 'ne' | 'sw' | 'se'; before?: State; origins?: Map<string, { x: number; y: number }>; groupCenter?: { x: number; y: number }; groupIds?: string[]; moved?: boolean };
-type State = { items: CanvasItem[]; connections: CanvasConnection[] };
+type State = { items: CanvasItem[]; connections: CanvasConnection[]; datasets?: ThreadDataset[] };
 
-@Component({ selector: 'app-canvas-page', standalone: true, imports: [CommonModule, RichTextEditor, MediaPicker, SketchRenderer, ThreadHeader, ScrollDirective], templateUrl: './canvas-page.html', styleUrl: './canvas-page.css' })
+@Component({ selector: 'app-canvas-page', standalone: true, providers: [DatasetStore], imports: [CommonModule, RichTextEditor, MediaPicker, SketchRenderer, ThreadHeader, ScrollDirective, ThreadChart], templateUrl: './canvas-page.html', styleUrl: './canvas-page.css' })
 export class CanvasPage implements AfterViewInit, OnDestroy {
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
+  readonly datasetStore = inject(DatasetStore);
+  readonly datasets = this.datasetStore.datasets;
   readonly preferences = inject(PreferencesService);
   private readonly browser = isPlatformBrowser(inject(PLATFORM_ID));
   private readonly spaceId = this.route.snapshot.paramMap.get('id') || 'thread';
   private readonly storageKey = `thread-canvas-${this.spaceId}`;
   readonly viewport = viewChild<ElementRef<HTMLElement>>('viewport');
-  private readonly initial = this.read();
+  private readonly initial = this.upgradeDataState(this.read());
   readonly items = signal<CanvasItem[]>(this.initial.items);
   readonly connections = signal<CanvasConnection[]>(this.initial.connections);
   readonly contextId = signal<string | null>(null);
@@ -76,6 +80,7 @@ export class CanvasPage implements AfterViewInit, OnDestroy {
   private session: Session | null = null;
   private history: State[] = [];
   private future: State[] = [];
+  private dataEditBefore: State | null = null;
   private transformOverlay: CanvasTransformOverlay | null = null;
   private transformBefore: State | null = null;
   private transformStart: CanvasItem | null = null;
@@ -101,7 +106,8 @@ export class CanvasPage implements AfterViewInit, OnDestroy {
   childCount(id: string): number { return this.items().filter((item) => item.parentId === id).length; }
 
   constructor() {
-    effect(() => { if (this.browser) { try { localStorage.setItem(this.storageKey, JSON.stringify({ version: 2, items: this.items(), connections: this.connections() })); } catch { /* Large files can exceed local storage. */ } } });
+    this.datasetStore.replace(this.initial.datasets || []);
+    effect(() => { if (this.browser) { try { localStorage.setItem(this.storageKey, JSON.stringify({ version: 3, items: this.items(), connections: this.connections(), datasets: this.datasets() })); } catch { /* Large files can exceed local storage. */ } } });
     effect(() => { this.selectedIds(); this.zoom(); this.panX(); this.panY(); if (this.browser) this.queueTransformSync(); });
   }
   ngAfterViewInit(): void {
@@ -131,7 +137,7 @@ export class CanvasPage implements AfterViewInit, OnDestroy {
 
   private read(): State {
     if (!this.browser) return { items: demoItems, connections: demoConnections };
-    try { const stored = localStorage.getItem(this.storageKey); if (stored) { const state = JSON.parse(stored) as State & { version?: number }; if (state.version !== 2) return this.normalizeLegacy(state); return { items: this.expandSketchItems(state.items.map(item => item.sketchAsset === 'sticker' ? { ...item, type: 'sticker' as const, title: 'Rough star', image: '/stickers/rough-star.svg', assetId: 'rough-star', sketchAsset: undefined } : item.sketchAsset === 'gif' ? { ...item, type: 'gif' as const, sketchAsset: undefined } : item)), connections: state.connections }; } } catch { }
+    try { const stored = localStorage.getItem(this.storageKey); if (stored) { const state = JSON.parse(stored) as State & { version?: number }; if (state.version !== 2 && state.version !== 3) return this.normalizeLegacy(state); return { items: this.expandSketchItems(state.items.map(item => item.sketchAsset === 'sticker' ? { ...item, type: 'sticker' as const, title: 'Rough star', image: '/stickers/rough-star.svg', assetId: 'rough-star', sketchAsset: undefined } : item.sketchAsset === 'gif' ? { ...item, type: 'gif' as const, sketchAsset: undefined } : item)), connections: state.connections, datasets: state.datasets }; } } catch { }
     return this.spaceId === 'thread' ? { items: [
       { ...demoItems.find(item => item.id === 'research')!, parentId: null, x: 170, y: 150, width: 730, height: 450, title: 'Ideas in progress' },
       { ...demoItems.find(item => item.id === 'note-1')!, parentId: 'research', x: 220, y: 250, width: 270, height: 190 },
@@ -140,6 +146,28 @@ export class CanvasPage implements AfterViewInit, OnDestroy {
     ], connections: [] } : { items: [], connections: [] };
   }
   private normalizeLegacy(state: State): State { const items = structuredClone(state.items); const byId = new Map(items.map(item => [item.id, item])); const positions = new Map<string, { x: number; y: number }>(); const position = (item: CanvasItem): { x: number; y: number } => { if (positions.has(item.id)) return positions.get(item.id)!; const parent = item.parentId ? byId.get(item.parentId) : null; const base = parent && parent.type !== 'workspace' ? position(parent) : { x: 0, y: 0 }; const value = { x: item.x + base.x, y: item.y + base.y }; positions.set(item.id, value); return value; }; for (const item of items) { if (['research-note', 'research-deep', 'engine-task', 'roadmap-budget', 'roadmap-table'].includes(item.id)) { const p = position(item); item.x = p.x; item.y = p.y; } } return { items: this.expandSketchItems(items), connections: state.connections }; }
+  private upgradeDataState(state: State): State {
+    const datasets = structuredClone(state.datasets || []);
+    const items = state.items.map(item => {
+      if (item.type !== 'budget' && item.type !== 'table') return item;
+      if (item.datasetId && datasets.some(data => data.id === item.datasetId)) return item;
+      const id = item.datasetId || crypto.randomUUID();
+      if (item.type === 'budget') {
+        datasets.push({ id, columns: [
+          {id:crypto.randomUUID(),key:'item',label:'Item',type:'text'},
+          {id:crypto.randomUUID(),key:'amount',label:'Amount',type:'currency'},
+          {id:crypto.randomUUID(),key:'category',label:'Category',type:'category'}
+        ], rows: (item.rows || []).filter(row => row.label !== 'New item' || row.value !== 0).map(row => ({id:crypto.randomUUID(),values:{item:row.label,amount:row.value,category:''}})) });
+      } else {
+        const oldRows = item.tableRows?.length ? item.tableRows : item.body ? item.body.split('\n').filter(Boolean).map(row => row.split('|')) : [];
+        const labels = item.tableColumns?.length ? item.tableColumns : ['Column 1','Column 2'];
+        const columns = labels.map((label,index) => { const values=oldRows.map(row=>row[index]?.trim()).filter(Boolean) as string[]; return {id:crypto.randomUUID(),key:`column_${index+1}`,label,type:/^(date|month|year|day)$/i.test(label)?'date' as const:values.length&&values.every(value=>Number.isFinite(Number(value)))?'number' as const:'text' as const}; });
+        datasets.push({id,columns,rows:oldRows.filter(row=>row.some(value=>value.trim())).map(row=>({id:crypto.randomUUID(),values:Object.fromEntries(columns.map((column,index)=>[column.key,row[index]||'']))}))});
+      }
+      return { ...item, datasetId:id, rows:undefined, tableColumns:undefined, tableRows:undefined };
+    });
+    return {items,connections:state.connections,datasets};
+  }
   private expandSketchItems(items: CanvasItem[]): CanvasItem[] {
     return items.flatMap(item => {
       const strokes = (item.sketchStrokes || (item.strokes || []).map((points, index): SketchStroke => ({ id: `${item.id}-${index}`, brush: 'pen', points: points.map(point => ({ x: point.x, y: point.y, pressure: point.pressure ?? .5 })), color: item.accent || '#d4111c', size: item.strokeWidth || 3, opacity: item.strokeOpacity || 1 }))).filter(stroke => stroke.points.length);
@@ -152,11 +180,13 @@ export class CanvasPage implements AfterViewInit, OnDestroy {
       });
     });
   }
-  private state(): State { return { items: structuredClone(this.items()), connections: structuredClone(this.connections()) }; }
+  private state(): State { return { items: structuredClone(this.items()), connections: structuredClone(this.connections()), datasets: structuredClone(this.datasets()) }; }
   private commit(before: State): void { if (JSON.stringify(before) === JSON.stringify(this.state())) return; this.history.push(before); this.history = this.history.slice(-60); this.future = []; }
   private snapshot(): void { this.history.push(this.state()); this.history = this.history.slice(-60); this.future = []; }
-  undo(): void { const state = this.history.pop(); if (!state) return; this.future.push({ items: structuredClone(this.items()), connections: structuredClone(this.connections()) }); this.items.set(state.items); this.connections.set(state.connections); }
-  redo(): void { const state = this.future.pop(); if (!state) return; this.history.push({ items: structuredClone(this.items()), connections: structuredClone(this.connections()) }); this.items.set(state.items); this.connections.set(state.connections); }
+  beginDataEdit(): void { if (!this.dataEditBefore) this.dataEditBefore=this.state(); }
+  endDataEdit(): void { if (this.dataEditBefore) this.commit(this.dataEditBefore); this.dataEditBefore=null; }
+  undo(): void { const state = this.history.pop(); if (!state) return; this.future.push(this.state()); this.items.set(state.items); this.connections.set(state.connections); this.datasetStore.replace(state.datasets || []); }
+  redo(): void { const state = this.future.pop(); if (!state) return; this.history.push(this.state()); this.items.set(state.items); this.connections.set(state.connections); this.datasetStore.replace(state.datasets || []); }
   setTool(tool: Tool): void { this.finishEditing(); this.tool.set(tool); this.paletteOpen.set(tool === 'add'); this.pendingType.set(tool === 'shape' ? 'shape' : null); if (tool !== 'sketch') this.sketchEraser.set(false); else this.selectedIds.set([]); this.pendingAsset.set(null); this.mediaPicker.set(null); this.connectionSourceId.set(null); this.connectionTargetId.set(null); }
   chooseType(type: ItemType): void { if (type === 'gif' || type === 'sticker') { this.openMedia(type); return; } this.pendingType.set(type); this.paletteOpen.set(false); this.tool.set('select'); }
   openMedia(kind: 'gif' | 'sticker'): void { this.paletteOpen.set(false); this.mediaPicker.set(kind); this.pendingAsset.set(null); }
@@ -225,7 +255,7 @@ export class CanvasPage implements AfterViewInit, OnDestroy {
     }
     if (this.cropId() === item.id) { this.session = { kind: 'crop', pointerId: event.pointerId, clientX: event.clientX, clientY: event.clientY, x: item.cropX || 0, y: item.cropY || 0, itemId: item.id }; (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId); return; }
     if (this.spaceHeld() || this.tool() === 'hand') { this.session = { kind: 'pan', pointerId: event.pointerId, clientX: event.clientX, clientY: event.clientY, x: this.panX(), y: this.panY() }; this.isPanning.set(true); }
-    else if (this.tool() === 'connect') { const source = this.connectionSourceId(); if (source && source !== item.id) { this.snapshot(); this.connections.update((connections) => [...connections, { id: crypto.randomUUID(), sourceId: source, targetId: item.id, sourceBinding: { mode: 'auto' }, targetBinding: { mode: 'auto' }, direction: 'forward', kind: this.connectorKind() }]); this.setTool('select'); } else { this.connectionSourceId.set(item.id); this.selectedIds.set([item.id]); } return; }
+    else if (this.tool() === 'connect') { if (item.type === 'chart') return; const source = this.connectionSourceId(); if (source && source !== item.id) { this.snapshot(); this.connections.update((connections) => [...connections, { id: crypto.randomUUID(), sourceId: source, targetId: item.id, sourceBinding: { mode: 'auto' }, targetBinding: { mode: 'auto' }, direction: 'forward', kind: this.connectorKind() }]); this.setTool('select'); } else { this.connectionSourceId.set(item.id); this.selectedIds.set([item.id]); } return; }
     else { this.finishEditing(); const current = this.selectedIds(); const members = item.groupId ? this.items().filter(entry => entry.groupId === item.groupId).map(entry => entry.id) : [item.id]; this.selectedIds.set(event.shiftKey ? (current.includes(item.id) ? current.filter(id => !members.includes(id)) : [...new Set([...current, ...members])]) : current.includes(item.id) ? current : members); if (event.shiftKey || this.tool() !== 'select' || item.locked) return; const moving = new Set(this.selectedIds()); let changed = true; while (changed) { changed = false; for (const child of this.items()) if (child.parentId && moving.has(child.parentId) && !moving.has(child.id)) { moving.add(child.id); changed = true; } } const origins = new Map(this.items().filter(entry => moving.has(entry.id)).map(entry => [entry.id, { x: entry.x, y: entry.y }])); this.session = { kind: 'move', pointerId: event.pointerId, clientX: event.clientX, clientY: event.clientY, x: item.x, y: item.y, itemId: item.id, origins, before: this.state() }; }
     (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
   }
@@ -241,8 +271,8 @@ export class CanvasPage implements AfterViewInit, OnDestroy {
     this.session={kind:'rebind',pointerId:event.pointerId,clientX:event.clientX,clientY:event.clientY,x:end.x,y:end.y,connectionId:connection.id,terminal};
     (event.currentTarget as Element).setPointerCapture(event.pointerId);
   }
-  routeHandle(connection: CanvasConnection): {x:number;y:number} { const {a,b,source,target}=this.connectionEnds(connection), horizontal=Math.abs(target.x+target.width/2-source.x-source.width/2)>=Math.abs(target.y+target.height/2-source.y-source.height/2); return horizontal?{x:(a.x+b.x)/2+(connection.routeOffset||0),y:(a.y+b.y)/2}:{x:(a.x+b.x)/2,y:(a.y+b.y)/2+(connection.routeOffset||0)}; }
-  routeDown(event: PointerEvent, connection: CanvasConnection): void { event.preventDefault(); event.stopPropagation(); const {source,target}=this.connectionEnds(connection), horizontal=Math.abs(target.x+target.width/2-source.x-source.width/2)>=Math.abs(target.y+target.height/2-source.y-source.height/2); this.session={kind:'route',pointerId:event.pointerId,clientX:event.clientX,clientY:event.clientY,x:connection.routeOffset||0,y:horizontal?1:0,connectionId:connection.id,before:this.state()}; (event.currentTarget as Element).setPointerCapture(event.pointerId); }
+  routeHandle(connection: CanvasConnection): {x:number;y:number} { const {a,b,source,target}=this.connectionEnds(connection), horizontal=this.horizontalConnection(source,target); return horizontal?{x:(a.x+b.x)/2+(connection.routeOffset||0),y:(a.y+b.y)/2}:{x:(a.x+b.x)/2,y:(a.y+b.y)/2+(connection.routeOffset||0)}; }
+  routeDown(event: PointerEvent, connection: CanvasConnection): void { event.preventDefault(); event.stopPropagation(); const {source,target}=this.connectionEnds(connection), horizontal=this.horizontalConnection(source,target); this.session={kind:'route',pointerId:event.pointerId,clientX:event.clientX,clientY:event.clientY,x:connection.routeOffset||0,y:horizontal?1:0,connectionId:connection.id,before:this.state()}; (event.currentTarget as Element).setPointerCapture(event.pointerId); }
   pointerMove(event: PointerEvent): void {
     if (this.pendingAsset()) this.assetPreview.set(this.point(event.clientX, event.clientY));
     if (this.pointers.has(event.pointerId)) { this.pointers.set(event.pointerId, { x: event.clientX, y: event.clientY }); if (this.pointers.size === 2 && this.pinch) { const [a, b] = [...this.pointers.values()]; const distance = Math.hypot(a.x - b.x, a.y - b.y), x = (a.x + b.x) / 2, y = (a.y + b.y) / 2; this.panX.update(v => v + x - this.pinch!.x); this.panY.update(v => v + y - this.pinch!.y); this.zoomAt(x, y, this.zoom() * distance / Math.max(1, this.pinch.distance)); this.pinch = { distance, x, y }; return; } }
@@ -376,21 +406,27 @@ export class CanvasPage implements AfterViewInit, OnDestroy {
   removeSelected(): void { const ids = this.selectedIds(); if (!ids.length) return; this.snapshot(); const removed = new Set(ids); let changed = true; while (changed) { changed = false; for (const item of this.items()) if (item.parentId && removed.has(item.parentId) && !removed.has(item.id)) { removed.add(item.id); changed = true; } } this.items.update((items) => items.filter((item) => !removed.has(item.id))); this.connections.update((connections) => connections.filter((connection) => !removed.has(connection.sourceId) && !removed.has(connection.targetId))); this.selectedIds.set([]); }
   removeSelectedConnection(): void { const id=this.selectedConnectionId(); if (!id) return; this.snapshot(); this.connections.update(entries=>entries.filter(entry=>entry.id!==id)); this.selectedConnectionId.set(null); }
   private connectorTarget(point: {x:number;y:number}, sourceId: string): CanvasItem | undefined {
-    return [...this.items()].reverse().find(item => item.id !== sourceId && item.type !== 'workspace' && item.type !== 'frame' && item.type !== 'zone' && (containsShape(item, point) || nearestPerimeter(item, point).distance <= 16 / this.zoom()));
+    return [...this.items()].reverse().find(item => item.id !== sourceId && item.type !== 'workspace' && item.type !== 'frame' && item.type !== 'zone' && item.type !== 'chart' && (containsShape(item, point) || nearestPerimeter(item, point).distance <= 16 / this.zoom()));
   }
+  private horizontalConnection(source: CanvasItem,target: CanvasItem): boolean { return Math.abs(target.x+target.width/2-source.x-source.width/2)-(source.width+target.width)/2 >= Math.abs(target.y+target.height/2-source.y-source.height/2)-(source.height+target.height)/2; }
   private connectionEnds(connection: CanvasConnection): { a: { x: number; y: number }; b: { x: number; y: number }; source: CanvasItem; target: CanvasItem } {
     const source = this.items().find(item => item.id === connection.sourceId)!;
     const target = this.items().find(item => item.id === connection.targetId)!;
     const sourceCenter = {x:source.x+source.width/2,y:source.y+source.height/2};
     const targetCenter = {x:target.x+target.width/2,y:target.y+target.height/2};
-    const a = connection.sourceBinding?.mode === 'precise' && connection.sourceBinding.anchor ? world(source, connection.sourceBinding.anchor) : perimeterPoint(source,targetCenter);
-    const b = connection.targetBinding?.mode === 'precise' && connection.targetBinding.anchor ? world(target, connection.targetBinding.anchor) : perimeterPoint(target,sourceCenter);
+    const dx=targetCenter.x-sourceCenter.x, dy=targetCenter.y-sourceCenter.y;
+    const horizontal=this.horizontalConnection(source,target);
+    const sourceSide: ConnectorSide=horizontal?(dx>=0?'right':'left'):(dy>=0?'bottom':'top');
+    const targetSide: ConnectorSide=horizontal?(dx>=0?'left':'right'):(dy>=0?'top':'bottom');
+    const orthogonal=connection.kind==='elbow' || connection.kind==='curved';
+    const a = connection.sourceBinding?.mode === 'precise' && connection.sourceBinding.anchor ? world(source, connection.sourceBinding.anchor) : orthogonal ? sidePoint(source,sourceSide) : perimeterPoint(source,targetCenter);
+    const b = connection.targetBinding?.mode === 'precise' && connection.targetBinding.anchor ? world(target, connection.targetBinding.anchor) : orthogonal ? sidePoint(target,targetSide) : perimeterPoint(target,sourceCenter);
     return { a, b, source, target };
   }
   connectionPath(connection: CanvasConnection): string {
     const { a, b, source, target } = this.connectionEnds(connection);
-    if (connection.kind === 'straight') return `M ${a.x} ${a.y} L ${b.x} ${b.y}`;
-    const horizontal = Math.abs(target.x + target.width/2 - source.x - source.width/2) >= Math.abs(target.y + target.height/2 - source.y - source.height/2);
+    if (!connection.kind || connection.kind === 'straight') return `M ${a.x} ${a.y} L ${b.x} ${b.y}`;
+    const horizontal = this.horizontalConnection(source,target);
     if (connection.kind === 'elbow') {
       if (horizontal) { const mx=(a.x+b.x)/2+(connection.routeOffset||0); return `M ${a.x} ${a.y} L ${mx} ${a.y} L ${mx} ${b.y} L ${b.x} ${b.y}`; }
       const my=(a.y+b.y)/2+(connection.routeOffset||0); return `M ${a.x} ${a.y} L ${a.x} ${my} L ${b.x} ${my} L ${b.x} ${b.y}`;
@@ -413,13 +449,16 @@ export class CanvasPage implements AfterViewInit, OnDestroy {
     const viewport = this.viewport()?.nativeElement;
     const mobile = !!viewport && viewport.clientWidth <= 700;
     const visibleWidth = viewport ? viewport.clientWidth / this.zoom() : 390;
-    const width = Math.max(100, box?.width || (type === 'shape' ? 180 : type === 'zone' || type === 'frame' ? 420 : type === 'budget' ? 360 : type === 'table' ? 390 : type === 'image' ? 340 : type === 'list' ? 300 : type === 'task' ? 280 : type === 'link' ? 320 : type === 'text' ? 180 : 260));
-    const height = Math.max(40, box?.height || (type === 'shape' ? 110 : type === 'zone' || type === 'frame' ? 280 : type === 'budget' ? 280 : type === 'table' ? 220 : type === 'image' ? 230 : type === 'task' ? 78 : type === 'list' ? 150 : type === 'link' ? 115 : type === 'text' ? 46 : 170));
+    const width = Math.max(100, box?.width || (type === 'shape' ? 180 : type === 'zone' || type === 'frame' ? 420 : type === 'budget' ? 320 : type === 'table' ? 390 : type === 'chart' ? 390 : type === 'image' ? 340 : type === 'list' ? 300 : type === 'task' ? 280 : type === 'link' ? 320 : type === 'text' ? 180 : 260));
+    const height = Math.max(40, box?.height || (type === 'shape' ? 110 : type === 'zone' || type === 'frame' ? 280 : type === 'budget' ? 172 : type === 'table' ? 180 : type === 'chart' ? 270 : type === 'image' ? 230 : type === 'task' ? 78 : type === 'list' ? 150 : type === 'link' ? 115 : type === 'text' ? 46 : 170));
     const placedWidth = mobile && !box ? Math.min(width, visibleWidth - 32 / this.zoom()) : width;
     const left = -this.panX() / this.zoom() + 16 / this.zoom();
     const x = mobile && !box ? Math.max(left, Math.min(point.x - placedWidth / 2, left + visibleWidth - 32 / this.zoom() - placedWidth)) : point.x;
-    const item: CanvasItem = { id: crypto.randomUUID(), type, parentId: null, x, y: point.y, width: placedWidth, height, title: '', body: '', textAutoSize: type === 'text', accent: '#d4111c', shapeKind: type === 'shape' ? this.shapeKind() : undefined, shapeFill: type === 'shape' ? '#ffffff' : undefined, shapeStroke: type === 'shape' ? '#6b7280' : undefined, shapeStrokeWidth: type === 'shape' ? 2 : undefined, zoneType: type === 'zone' ? 'standard' : undefined, checklist: type === 'checklist' || type === 'list' ? [{ label: '', completed: false }] : undefined, rows: type === 'budget' ? [{ label: 'New item', value: 0 }] : undefined, tableColumns: type === 'table' ? ['Column 1', 'Column 2'] : undefined, tableRows: type === 'table' ? [['', '']] : undefined, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
-    this.snapshot(); this.items.update(items => [...items, item]); this.selectedIds.set([item.id]); this.tool.set('select');
+    this.snapshot();
+    const dataset = type === 'budget' ? this.datasetStore.create([{label:'Item',type:'text',key:'item'},{label:'Amount',type:'currency',key:'amount'},{label:'Category',type:'category',key:'category'}]) : type === 'table' ? this.datasetStore.create([{label:'Column 1',type:'text'},{label:'Column 2',type:'text'}]) : undefined;
+    const chartSource = type === 'chart' ? this.datasets().find(data => this.canChart(data)) : undefined;
+    const item: CanvasItem = { id: crypto.randomUUID(), type, parentId: null, x, y: point.y, width: placedWidth, height, title: '', body: '', datasetId: dataset?.id || chartSource?.id, chartConfig: type === 'chart' ? this.defaultChartConfig(chartSource) : undefined, budgetMode:type==='budget'?'simple':undefined, budgetCurrency:type==='budget'?'JOD':undefined, textAutoSize: type === 'text', accent: '#d4111c', shapeKind: type === 'shape' ? this.shapeKind() : undefined, shapeFill: type === 'shape' ? '#ffffff' : undefined, shapeStroke: type === 'shape' ? '#6b7280' : undefined, shapeStrokeWidth: type === 'shape' ? 2 : undefined, zoneType: type === 'zone' ? 'standard' : undefined, checklist: type === 'checklist' || type === 'list' ? [{ label: '', completed: false }] : undefined, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
+    this.items.update(items => [...items, item]); this.selectedIds.set([item.id]); this.tool.set('select');
     if (['note', 'text', 'task', 'zone', 'frame', 'link', 'list', 'budget', 'table', 'shape'].includes(type)) queueMicrotask(() => this.startEditing(item.id));
   }
   selectImageForBlock(id: string): void { const item = this.items().find(entry => entry.id === id); if (!item || item.type !== 'image') return; this.selectedIds.set([id]); this.replaceId = id; this.imagePlacement = { x: item.x, y: item.y }; const input = this.fileInput()?.nativeElement; if (input) { input.accept = 'image/*'; input.click(); } }
@@ -447,9 +486,30 @@ export class CanvasPage implements AfterViewInit, OnDestroy {
   setListRow(id: string, index: number, event: Event): void { const item = this.items().find(entry => entry.id === id); if (!item) return; const value = (event.target as HTMLInputElement).value; if (item.checklist?.[index]?.label === value) return; this.setStyle(id, { checklist: item.checklist?.map((row, i) => i === index ? { ...row, label: value } : row) }); }
   addListRow(id: string): void { const item = this.items().find(entry => entry.id === id); if (!item) return; const index = item.checklist?.length || 0; this.setStyle(id, { checklist: [...(item.checklist || []), { label: '', completed: false }], height: Math.max(item.height, 95 + (index + 1) * 32) }); setTimeout(() => document.querySelector<HTMLInputElement>(`[data-node-id="${id}"] .list-row:nth-child(${index + 1}) input`)?.focus()); }
   listKey(event: KeyboardEvent, id: string, index: number): void { if (event.key === 'Enter') { event.preventDefault(); this.setListRow(id, index, event); this.addListRow(id); } else if (event.key === 'Escape') (event.target as HTMLInputElement).blur(); }
-  setBudgetRow(id: string, index: number, key: 'label' | 'value', event: Event): void { const item = this.items().find(entry => entry.id === id); if (!item) return; const raw = (event.target as HTMLInputElement).value; this.setStyle(id, { rows: item.rows?.map((row, i) => i === index ? { ...row, [key]: key === 'value' ? Number(raw) : raw } : row) }); }
-  addBudgetEntry(id: string): void { const item = this.items().find(entry => entry.id === id); if (item) this.setStyle(id, { rows: [...(item.rows || []), { label: '', value: 0 }], height: item.height + 32 }); }
-  budgetTotal(item: CanvasItem): number { return (item.rows || []).reduce((sum, row) => sum + row.value, 0); }
+  dataset(item: CanvasItem): ThreadDataset | undefined { return this.datasetStore.get(item.datasetId); }
+  dataSources(excludeId?: string): { item: CanvasItem; data: ThreadDataset }[] { return this.items().filter(item => ['budget','table'].includes(item.type) && item.id !== excludeId).flatMap(item => { const data=this.dataset(item); return data ? [{item,data}] : []; }); }
+  private numericColumns(data?: ThreadDataset) { return data?.columns.filter(column => column.type === 'number' || column.type === 'currency') || []; }
+  canChart(data?: ThreadDataset): boolean { return !!data && !!this.numericColumns(data).length && !!data.columns.find(column => ['text','category','date'].includes(column.type)); }
+  canBudget(data?: ThreadDataset): boolean { return this.canChart(data); }
+  private defaultChartConfig(data?: ThreadDataset): ChartConfig { const label=data?.columns.find(column=>['text','category','date'].includes(column.type)); const numbers=this.numericColumns(data), planned=data?.columns.find(column=>column.label==='Planned'), actual=data?.columns.find(column=>column.label==='Actual'); const series=planned&&actual?[planned.key,actual.key]:numbers.slice(0,2).map(column=>column.key); return { type:label?.type==='date'?'line':numbers.length>1?'comparison':'bar',categoryField:label?.key,valueField:planned?.key||numbers[0]?.key,series:numbers.length>1?series:undefined }; }
+  money(value: number | string | null | undefined): string { return new Intl.NumberFormat('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}).format(Number(value)||0); }
+  budgetItemField(data?: ThreadDataset): string { return data?.columns.find(column=>column.key==='item')?.key || data?.columns.find(column=>['text','category','date'].includes(column.type))?.key || 'item'; }
+  budgetAmountField(data?: ThreadDataset): string { return data?.columns.find(column=>column.key==='amount')?.key || this.numericColumns(data)[0]?.key || 'amount'; }
+  budgetCategoryField(data?: ThreadDataset): string { return data?.columns.find(column=>column.type==='category')?.key || 'category'; }
+  budgetValue(data: ThreadDataset | undefined, key: string): number { return (data?.rows||[]).reduce((sum,row)=>sum+(Number(row.values[key])||0),0); }
+  budgetUsed(item: CanvasItem): number { const data=this.dataset(item); return this.budgetValue(data,item.budgetMode==='project'?this.budgetField(data,'Actual'):this.budgetAmountField(data)); }
+  chartSourceId(item: CanvasItem): string { return this.dataSources().find(source=>source.data.id===item.datasetId)?.item.id||''; }
+  remaining(item: CanvasItem): number { return Math.max(0,(item.budgetTarget||0)-this.budgetUsed(item)); }
+  usedPercent(item: CanvasItem): number { return item.budgetTarget ? Math.min(100,this.budgetUsed(item)/item.budgetTarget*100) : 0; }
+  budgetHeight(item: CanvasItem): number { return Math.min(420,Math.max(172,128+(this.dataset(item)?.rows.length||0)*34+(item.budgetTarget?38:0))); }
+  setBudgetCell(item: CanvasItem, rowId: string, key: string, event: Event): void { const data=this.dataset(item); if (!data) return; const column=data.columns.find(entry=>entry.key===key); const raw=(event.target as HTMLInputElement).value; const value=column?.type==='currency'||column?.type==='number'?Number(raw)||0:raw; if (data.rows.find(row=>row.id===rowId)?.values[key]===value) return; if (!this.dataEditBefore) this.snapshot(); this.datasetStore.updateCell(data.id,rowId,key,value); }
+  budgetKey(event: KeyboardEvent, item: CanvasItem, rowId: string): void { if (event.key==='Escape') { const data=this.dataset(item), row=data?.rows.find(entry=>entry.id===rowId); if (row && !String(row.values[this.budgetItemField(data)]||'').trim() && !Number(row.values[this.budgetAmountField(data)]) && !Number(row.values[this.budgetField(data,'Planned')]) && !Number(row.values[this.budgetField(data,'Actual')])) { if (!this.dataEditBefore) this.snapshot(); this.datasetStore.deleteRow(item.datasetId!,rowId); } (event.target as HTMLInputElement).blur(); } else if (event.key==='Enter') { event.preventDefault(); (event.target as HTMLInputElement).blur(); } }
+  addBudgetEntry(id: string): void { const item=this.items().find(entry=>entry.id===id), data=item&&this.dataset(item); if (!item||!data) return; this.snapshot(); const row=this.datasetStore.addRow(data.id,{[this.budgetItemField(data)]:'',[this.budgetAmountField(data)]:0,[this.budgetCategoryField(data)]:''}); this.update(id,{height:this.budgetHeight(item)}); queueMicrotask(()=>document.querySelector<HTMLInputElement>(`[data-budget-row="${row.id}"] input`)?.focus()); }
+  deleteBudgetEntry(item: CanvasItem,rowId:string): void { if (!item.datasetId) return; this.snapshot(); this.datasetStore.deleteRow(item.datasetId,rowId); this.update(item.id,{height:this.budgetHeight(item)}); }
+  setBudgetCurrency(item: CanvasItem,event: Event): void { this.setStyle(item.id,{budgetCurrency:(event.target as HTMLSelectElement).value as BudgetCurrency}); }
+  setBudgetMode(item: CanvasItem,mode: BudgetMode): void { const data=this.dataset(item); if (!data||item.budgetMode===mode) return; this.snapshot(); if (mode==='project' && !data.columns.some(column=>column.label==='Planned')) { this.datasetStore.addColumn(data.id,'Planned','currency'); this.datasetStore.addColumn(data.id,'Actual','currency'); const updated=this.datasetStore.get(data.id)!; const planned=updated.columns.find(column=>column.label==='Planned')!,actual=updated.columns.find(column=>column.label==='Actual')!; for (const row of updated.rows) { this.datasetStore.updateCell(data.id,row.id,planned.key,Number(row.values[this.budgetAmountField(data)])||0); this.datasetStore.updateCell(data.id,row.id,actual.key,0); } } this.update(item.id,{budgetMode:mode,height:Math.min(420,this.budgetHeight(item)+(mode==='project'?42:0))}); }
+  budgetField(data:ThreadDataset|undefined,label:string): string { return data?.columns.find(column=>column.label===label)?.key||label.toLowerCase(); }
+  setBudgetTarget(item: CanvasItem,event: Event): void { const value=Number((event.target as HTMLInputElement).value); this.setStyle(item.id,{budgetTarget:value>0?value:undefined,height:value>0?Math.min(420,item.height+38):Math.max(172,item.height-38)}); }
   setLinkUrl(id: string, event: Event): void { const url = (event.target as HTMLInputElement).value.trim(); this.setStyle(id, { url, title: this.items().find(entry => entry.id === id)?.title || url }); }
   copy(): void { const ids = new Set(this.selectedIds()); this.clipboard = structuredClone(this.items().filter(item => ids.has(item.id))); }
   paste(): void { if (!this.clipboard.length) return; const groups = new Map(this.clipboard.filter(item => item.groupId).map(item => [item.groupId!, crypto.randomUUID()])); const copies = this.clipboard.map(item => ({ ...structuredClone(item), id: crypto.randomUUID(), groupId: item.groupId ? groups.get(item.groupId) : undefined, x: item.x + 24, y: item.y + 24 })); this.snapshot(); this.items.update(items => [...items, ...copies]); this.selectedIds.set(copies.map(item => item.id)); this.clipboard = structuredClone(copies); }
@@ -515,12 +575,17 @@ export class CanvasPage implements AfterViewInit, OnDestroy {
   private completeSketch(): void {
     this.activeSketchStrokes.set([]); this.undoneSketchStrokes.set([]); this.editingSketchId.set(null);
   }
-  tableColumns(item: CanvasItem): string[] { return item.tableColumns?.length ? item.tableColumns : ['Column 1', 'Column 2']; }
-  tableRows(item: CanvasItem): string[][] { if (item.tableRows?.length) return item.tableRows; if (item.body) return item.body.split('\n').filter(Boolean).map(row => row.split('|')); return [['', '']]; }
-  setTableHeader(id: string, column: number, event: Event): void { const item = this.items().find(entry => entry.id === id); if (!item) return; const columns = [...this.tableColumns(item)]; columns[column] = (event.target as HTMLInputElement).value; this.setStyle(id, { tableColumns: columns, tableRows: this.tableRows(item) }); }
-  setTableCell(id: string, row: number, column: number, event: Event): void { const item = this.items().find(entry => entry.id === id); if (!item) return; const rows = this.tableRows(item).map(entry => [...entry]); rows[row] ??= Array(this.tableColumns(item).length).fill(''); rows[row][column] = (event.target as HTMLInputElement).value; this.setStyle(id, { tableRows: rows, tableColumns: this.tableColumns(item) }); }
-  addTableRow(id: string): void { const item = this.items().find(entry => entry.id === id); if (!item) return; const columns = this.tableColumns(item); this.setStyle(id, { tableColumns: columns, tableRows: [...this.tableRows(item), Array(columns.length).fill('')], height: item.height + 34 }); }
-  addTableColumn(id: string): void { const item = this.items().find(entry => entry.id === id); if (!item) return; const columns = [...this.tableColumns(item), `Column ${this.tableColumns(item).length + 1}`]; this.setStyle(id, { tableColumns: columns, tableRows: this.tableRows(item).map(row => [...row, '']), width: item.width + 120 }); }
-  removeTableRow(id: string, row: number): void { const item = this.items().find(entry => entry.id === id); if (!item || this.tableRows(item).length <= 1) return; this.setStyle(id, { tableRows: this.tableRows(item).filter((_, index) => index !== row), tableColumns: this.tableColumns(item) }); }
-  removeTableColumn(id: string, column: number): void { const item = this.items().find(entry => entry.id === id); if (!item || this.tableColumns(item).length <= 1) return; this.setStyle(id, { tableColumns: this.tableColumns(item).filter((_, index) => index !== column), tableRows: this.tableRows(item).map(row => row.filter((_, index) => index !== column)) }); }
+  tableColumns(item: CanvasItem) { return this.dataset(item)?.columns || []; }
+  tableRows(item: CanvasItem) { return this.dataset(item)?.rows || []; }
+  setTableHeader(item: CanvasItem, columnId: string, event: Event): void { const data=this.dataset(item); if (!data) return; const label=(event.target as HTMLInputElement).value.trim()||'Column'; this.snapshot(); this.datasetStore.renameColumn(data.id,columnId,label); if (/^(date|month|year|day)$/i.test(label)) this.datasetStore.setColumnType(data.id,columnId,'date'); }
+  setTableColumnType(item: CanvasItem,columnId:string,event:Event): void { if (!item.datasetId) return; this.snapshot(); this.datasetStore.setColumnType(item.datasetId,columnId,(event.target as HTMLSelectElement).value as 'text'|'number'|'currency'|'date'|'category'); }
+  setTableCell(item: CanvasItem, rowId: string, key: string, event: Event): void { const data=this.dataset(item); if (!data) return; const raw=(event.target as HTMLInputElement).value; const column=data.columns.find(entry=>entry.key===key); if (!this.dataEditBefore) this.snapshot(); if (column?.type==='text' && raw.trim() && Number.isFinite(Number(raw)) && (data.rows.every(row=>!String(row.values[key]||'').trim()||Number.isFinite(Number(row.values[key]))))) this.datasetStore.setColumnType(data.id,column.id,'number'); const numeric=this.datasetStore.get(data.id)?.columns.find(entry=>entry.key===key)?.type; this.datasetStore.updateCell(data.id,rowId,key,numeric==='number'||numeric==='currency'?Number(raw)||0:raw); }
+  addTableRow(id: string): void { const item=this.items().find(entry=>entry.id===id); if (!item?.datasetId) return; this.snapshot(); this.datasetStore.addRow(item.datasetId); this.update(id,{height:Math.min(420,Math.max(item.height,126+this.tableRows(item).length*35))}); }
+  addTableColumn(id: string): void { const item=this.items().find(entry=>entry.id===id); if (!item?.datasetId) return; this.snapshot(); this.datasetStore.addColumn(item.datasetId,`Column ${this.tableColumns(item).length+1}`); this.update(id,{width:item.width+120}); }
+  removeTableRow(item: CanvasItem, rowId: string): void { if (!item.datasetId) return; this.snapshot(); this.datasetStore.deleteRow(item.datasetId,rowId); }
+  removeTableColumn(item: CanvasItem, columnId: string): void { if (!item.datasetId||this.tableColumns(item).length<=1) return; this.snapshot(); this.datasetStore.deleteColumn(item.datasetId,columnId); }
+  chartTypes(data?: ThreadDataset): ChartConfig['type'][] { if (!this.canChart(data)) return []; const numbers=this.numericColumns(data), dated=!!data?.columns.some(column=>column.type==='date'); return [...(dated?['line' as const]:[]),'bar',...(!dated?['donut' as const]:[]),...(numbers.length>1?['comparison' as const]:[])]; }
+  createLinkedView(source: CanvasItem,type: 'budget'|'table'|'chart',chartType?:ChartConfig['type']): void { const data=this.dataset(source); if (!data || (type==='chart'&&!this.canChart(data)) || (type==='budget'&&!this.canBudget(data))) return; this.snapshot(); if (type==='budget'&&!data.columns.some(column=>column.type==='category')) this.datasetStore.addColumn(data.id,'Category','category'); const now=new Date().toISOString(); const item:CanvasItem={id:crypto.randomUUID(),type,parentId:source.parentId,x:source.x+source.width+28,y:source.y,width:type==='budget'?320:390,height:type==='budget'?172:type==='table'?180:270,title:'',datasetId:data.id,budgetMode:type==='budget'?'simple':undefined,budgetCurrency:type==='budget'?'JOD':undefined,chartConfig:type==='chart'?{...this.defaultChartConfig(data),type:chartType||this.defaultChartConfig(data).type}:undefined,zIndex:Math.max(1,...this.items().map(entry=>entry.zIndex||1))+1,createdAt:now,updatedAt:now}; this.items.update(items=>[...items,item]); this.selectedIds.set([item.id]); }
+  linkChartSource(item: CanvasItem,event: Event): void { const sourceId=(event.target as HTMLSelectElement).value,source=this.items().find(entry=>entry.id===sourceId),data=source&&this.dataset(source); if (!data||!this.canChart(data)) return; this.setStyle(item.id,{datasetId:data.id,chartConfig:this.defaultChartConfig(data)}); }
+  setChartConfig(item: CanvasItem,patch: Partial<ChartConfig>): void { this.setStyle(item.id,{chartConfig:{...this.defaultChartConfig(this.dataset(item)),...item.chartConfig,...patch}}); }
 }
