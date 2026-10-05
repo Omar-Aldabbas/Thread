@@ -98,7 +98,7 @@
             @for (terminal of ['source','target']; track terminal) {
               <circle class="connection-endpoint" [attr.cx]="endpoint(connection, $any(terminal)).x" [attr.cy]="endpoint(connection, $any(terminal)).y" [attr.r]="5 / zoom()" [attr.stroke-width]="1.5 / zoom()" (pointerdown)="rebindDown($event, connection, $any(terminal))" (pointermove)="pointerMove($event)" (pointerup)="pointerUp($event)" />
             }
-            @if (connection.kind === 'elbow') {
+            @if (connection.kind === 'elbow' && !erRoutes().has(connection.id)) {
               <circle class="connection-route-handle" [attr.cx]="routeHandle(connection).x" [attr.cy]="routeHandle(connection).y" [attr.r]="4 / zoom()" [attr.stroke-width]="1.5 / zoom()" (pointerdown)="routeDown($event, connection)" (pointermove)="pointerMove($event)" (pointerup)="pointerUp($event)" />
             }
           }
@@ -129,7 +129,7 @@
         @if (connection.label || connection.sourceCardinality || connection.targetCardinality) {
           <button class="relationship-label" type="button" [style.left.px]="connectionLabelX(connection)" [style.top.px]="connectionLabelY(connection)" (pointerdown)="$event.stopPropagation(); selectConnection($event, connection)" (click)="$event.stopPropagation(); selectedConnectionId.set(connection.id)" [attr.aria-label]="'Relationship ' + (connection.label || 'between entities')">
             @if (connection.sourceCardinality) { <small>{{ connection.sourceCardinality }}</small> }
-            <span>{{ connection.label || 'relates to' }}</span>
+            <span>{{ connection.label || connectionFieldLabel(connection) || 'relates to' }}</span>
             @if (connection.targetCardinality) { <small>{{ connection.targetCardinality }}</small> }
           </button>
         }
@@ -182,17 +182,11 @@
               ></strong>
             </div>
           } @else if (item.type === 'shape') {
-            <svg class="shape-geometry" viewBox="0 0 100 100" preserveAspectRatio="none" [attr.fill]="item.shapeFill || '#ffffff'" [attr.stroke]="item.shapeStroke || '#6b7280'" [attr.stroke-width]="item.shapeStrokeWidth || 1" aria-hidden="true">
-              @switch (item.shapeKind) {
-                @case ('rounded') { <rect x="2" y="2" width="96" height="96" rx="4" /> }
-                @case ('circle') { <ellipse cx="50" cy="50" rx="48" ry="48" /> }
-                @case ('diamond') { <polygon points="50,2 98,50 50,98 2,50" /> }
-                @case ('triangle') { <polygon points="50,2 98,98 2,98" /> }
-                @case ('cloud') { <path d="M 25 78 C 10 78 5 62 13 52 C 17 47 22 45 28 45 C 29 25 45 14 60 22 C 67 25 72 31 75 39 C 91 38 99 50 95 63 C 93 72 85 78 75 78 Z" /> }
-                @default { <rect x="2" y="2" width="96" height="96" /> }
-              }
+            <svg class="shape-geometry" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+              <path [attr.d]="shapePaths[item.shapeKind || 'rectangle']" [attr.fill]="item.shapeFill || '#ffffff'" [attr.stroke]="item.shapeStroke || '#475569'" [attr.stroke-width]="item.shapeStrokeWidth || 2" [attr.stroke-dasharray]="item.shapeStrokeStyle === 'dashed' ? '6 4' : null" stroke-linejoin="round" vector-effect="non-scaling-stroke" />
+              @if (item.shapeKind === 'cylinder') { <path d="M2 14C2 30 98 30 98 14" fill="none" [attr.stroke]="item.shapeStroke || '#475569'" [attr.stroke-width]="item.shapeStrokeWidth || 2" vector-effect="non-scaling-stroke" /> }
             </svg>
-            <div class="shape-label" [attr.contenteditable]="editingId() === item.id" [attr.data-edit-id]="editingId() === item.id ? item.id : null" (keydown)="inlineKey($event)" (blur)="inlineBlur($event, item.id, 'title')" [textContent]="item.title"></div>
+            <div class="shape-label" [attr.data-shape]="item.shapeKind || 'rectangle'" [style.font-size.px]="item.fontSize || 16" [style.font-weight]="item.fontWeight || 600" [style.color]="item.textColor || '#1e293b'" [style.text-align]="item.textAlign || 'center'" [attr.contenteditable]="editingId() === item.id" [attr.data-edit-id]="editingId() === item.id ? item.id : null" (keydown)="inlineKey($event)" (blur)="inlineBlur($event, item.id, 'title')" [textContent]="item.title"></div>
           } @else if (item.type === 'image') {
             @if (item.image) {
               <div class="image-frame">
@@ -410,14 +404,39 @@
             </div>
           } @else if (item.type === 'er-entity') {
             <div class="er-entity-card">
-              <div class="er-entity-head"><span>ENTITY</span><strong [attr.contenteditable]="editingId() === item.id" [attr.data-edit-id]="editingId() === item.id ? item.id : null" (keydown)="inlineKey($event)" (blur)="inlineBlur($event, item.id, 'title')" [textContent]="item.title || 'New entity'"></strong></div>
+              <div class="er-entity-head"><span>ENTITY ? DRAG HEADER TO MOVE @if (erEntityIssue(item); as issue) { <b class="er-entity-warning" [title]="issue">!</b> }</span>@if (tool() === 'select') { <input class="er-name-input" aria-label="Entity name" placeholder="Entity name" [value]="item.title" (pointerdown)="erControlDown($event, item)" (change)="setString(item.id, 'title', $event)" (keydown)="$event.stopPropagation()" /> } @else { <strong>{{ item.title || 'New entity' }}</strong> }</div>
               <div class="er-fields" appScroll="y" scrollbar="hover">
-                @for (field of item.erFields || []; track field.id) {
-                  <div class="er-field"><span class="er-key" [class.primary]="field.key === 'primary'" [class.foreign]="field.key === 'foreign'">{{ field.key === 'primary' ? 'PK' : field.key === 'foreign' ? 'FK' : '·' }}</span><strong>{{ field.name }}</strong><span class="er-type">{{ field.dataType }}</span>@if (field.required) { <span class="er-required" title="Required">*</span> }</div>
+                @for (field of item.erFields || []; track field.id; let fieldIndex = $index) {
+                  <div class="er-field-block">
+                    <div class="er-field" [class.er-field-editing]="tool() === 'select'">
+                      @if (tool() === 'select') {
+                        <select class="er-inline-key" [attr.aria-label]="'Key role for ' + field.name" [value]="field.key" (pointerdown)="erControlDown($event, item)" (change)="updateErField(item, field.id, { key: $any($event.target).value }); erExpandedFieldId.set($any($event.target).value === 'foreign' ? field.id : erExpandedFieldId())"><option value="none">?</option><option value="primary">PK</option><option value="foreign">FK</option></select>
+                        <input class="er-inline-name" [attr.data-er-field]="field.id" [attr.aria-label]="'Field name in ' + item.title" [value]="field.name" (pointerdown)="erControlDown($event, item)" (change)="updateErField(item, field.id, { name: $any($event.target).value })" (keydown)="erFieldKey($event, item)" />
+                        <select class="er-inline-type" [attr.aria-label]="'Data type for ' + field.name" [value]="erTypeChoice(field)" (pointerdown)="erControlDown($event, item)" (change)="setErType(item, field, $any($event.target).value)">@for (type of erDataTypes; track type) { <option [value]="type">{{ type }}</option> }<option value="REFERENCE">Reference (FK)</option><option value="CUSTOM">Custom type?</option></select>
+                        <button class="er-field-options" [class.has-issue]="!!erFieldIssue(item, field)" [attr.aria-label]="'Options for ' + field.name" [attr.aria-expanded]="erExpandedFieldId() === field.id" (pointerdown)="erControlDown($event, item)" (click)="$event.stopPropagation(); erExpandedFieldId.set(erExpandedFieldId() === field.id ? null : field.id)">?</button>
+                      } @else {
+                        <span class="er-key" [class.primary]="field.key === 'primary'" [class.foreign]="field.key === 'foreign'">{{ field.key === 'primary' ? 'PK' : field.key === 'foreign' ? 'FK' : '?' }}</span><strong>{{ field.name }}</strong><span class="er-type">{{ field.dataType }}</span>@if (field.required) { <span class="er-required" title="Required">*</span> }
+                      }
+                    </div>
+                    @if (field.required || field.unique || field.reference || field.dataType === 'ENUM') { <div class="er-field-summary">@if (field.required) { <span>Required</span> } @if (field.unique) { <span>Unique</span> } @if (field.reference) { <span>? {{ erReferenceLabel(field) }}</span> } @if (field.dataType === 'ENUM') { <span>{{ field.enumValues?.join(' ? ') || 'Add enum values' }}</span> }</div> }
+                    @if (tool() === 'select' && erExpandedFieldId() === field.id) {
+                      <div class="er-inline-options" (pointerdown)="erControlDown($event, item)" (keydown)="$event.stopPropagation()">
+                        @if (erTypeChoice(field) === 'CUSTOM') { <label>Custom data type<input [value]="field.dataType === 'CUSTOM' ? '' : field.dataType" placeholder="e.g. VARCHAR(255)" (change)="updateErField(item, field.id, { dataType: $any($event.target).value })" /></label> }
+                        @if (field.key === 'foreign') { <label>References<select [value]="field.reference ? field.reference.entityId + '/' + field.reference.fieldId : ''" (change)="setErReference(item, field, $any($event.target).value)"><option value="">Choose primary or unique field?</option>@for (option of erReferenceOptions(item, field); track option.value) { <option [value]="option.value">{{ option.label }}</option> }</select></label> }
+                        @if (field.dataType === 'ENUM') { <label>Allowed values<textarea rows="2" [disabled]="!!field.reference" placeholder="draft, active, archived" [value]="field.enumValues?.join(', ') || ''" (change)="setErEnum(item, field, $event)"></textarea></label> }
+                        <div class="er-constraint-toggles"><label><input type="checkbox" [checked]="field.required" [disabled]="field.key === 'primary'" (change)="updateErField(item, field.id, { required: $any($event.target).checked })" /> Required</label><label><input type="checkbox" [checked]="field.unique" (change)="updateErField(item, field.id, { unique: $any($event.target).checked })" /> Unique</label></div>
+                        <label>Default value<input [value]="field.defaultValue || ''" placeholder="Optional ? e.g. 0 or now()" (change)="updateErField(item, field.id, { defaultValue: $any($event.target).value })" /></label>
+                        <label>Note<input [value]="field.note || ''" placeholder="Describe this field" (change)="updateErField(item, field.id, { note: $any($event.target).value })" /></label>
+                        @if (erFieldIssue(item, field); as issue) { <p class="er-field-warning" role="status">{{ issue }}</p> }
+                        <div class="er-field-reorder"><button [disabled]="fieldIndex === 0" (click)="moveErField(item, field.id, -1)" aria-label="Move field up">? Move up</button><button [disabled]="fieldIndex === (item.erFields?.length || 0) - 1" (click)="moveErField(item, field.id, 1)" aria-label="Move field down">? Move down</button></div>
+                        <div class="er-field-actions"><button (click)="$event.stopPropagation(); erExpandedFieldId.set(null)">Done</button><button class="danger" (click)="$event.stopPropagation(); removeErField(item, field.id)">Delete field</button></div>
+                      </div>
+                    }
+                  </div>
                 }
-                <button class="er-add-field" type="button" (pointerdown)="$event.stopPropagation()" (click)="$event.stopPropagation(); addErField(item); inspectorOpen.set(true)">+ Add field</button>
+                @if (tool() === 'select') { <button class="er-add-field" type="button" (pointerdown)="erControlDown($event, item)" (click)="$event.stopPropagation(); addErField(item)">+ Add field <span>Enter ?</span></button> }
               </div>
-              <div class="er-entity-foot"><span>{{ item.erFields?.length || 0 }} {{ item.erFields?.length === 1 ? 'field' : 'fields' }}</span><button type="button" (pointerdown)="$event.stopPropagation()" (click)="$event.stopPropagation(); beginErConnection(item)">Connect entity →</button></div>
+              <div class="er-entity-foot"><span>{{ item.erFields?.length || 0 }} fields ? Click a name to edit</span><button type="button" (pointerdown)="$event.stopPropagation()" (click)="$event.stopPropagation(); beginErConnection(item)">Connect ?</button></div>
             </div>
           } @else if (item.type === 'table') {
             <div class="table-content smart-block">
@@ -546,7 +565,7 @@
             @for (corner of ['nw', 'ne', 'sw', 'se']; track corner) {
               <button class="resize-handle" [style.transform]="'scale(' + 1 / zoom() + ')'" [class.corner-nw]="corner === 'nw'" [class.corner-ne]="corner === 'ne'" [class.corner-sw]="corner === 'sw'" [class.corner-se]="corner === 'se'" (pointerdown)="resizeDown($event, item, $any(corner))" [attr.aria-label]="'Resize ' + item.title + ' from ' + corner"></button>
             }
-            <button class="rotate-handle" [style.top.px]="-32 / zoom()" [style.transform]="'scale(' + 1 / zoom() + ')'" (pointerdown)="rotateDown($event, item)" [attr.aria-label]="'Rotate ' + item.title"></button>
+            @if (item.type !== 'er-entity') { <button class="rotate-handle" [style.top.px]="-32 / zoom()" [style.transform]="'scale(' + 1 / zoom() + ')'" (pointerdown)="rotateDown($event, item)" [attr.aria-label]="'Rotate ' + item.title"></button> }
           }
         </article>
       }
@@ -619,10 +638,12 @@
       data-shortcut="V"
       (click)="setTool('select')"
       aria-label="Select"
+      title="Select (V): select, edit, and move objects"
+      [attr.aria-pressed]="tool() === 'select' && !pendingType()"
     >
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 3 13 9-6 1.3L9 20 5 3Z"/></svg><small>Select</small></button
-    ><button [class.active]="tool() === 'hand'" (click)="setTool('hand')" aria-label="Pan" data-shortcut="H">
-      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 12V8a1.5 1.5 0 0 1 3 0v3-6a1.5 1.5 0 0 1 3 0v6-4a1.5 1.5 0 0 1 3 0v4-2a1.5 1.5 0 0 1 3 0v6c0 3-2 5-5 5h-3c-2 0-3-1-4-2l-3-4a1.6 1.6 0 0 1 2.5-2L7 13"/></svg><small>Move</small></button
+    ><div class="tool-divider navigation-divider" aria-hidden="true"></div><button class="pan-tool" [class.active]="tool() === 'hand'" [attr.aria-pressed]="tool() === 'hand'" (click)="setTool('hand')" aria-label="Pan board" title="Pan (H): move the board. Hold Space for temporary pan." data-shortcut="H">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 12V8a1.5 1.5 0 0 1 3 0v3-6a1.5 1.5 0 0 1 3 0v6-4a1.5 1.5 0 0 1 3 0v4-2a1.5 1.5 0 0 1 3 0v6c0 3-2 5-5 5h-3c-2 0-3-1-4-2l-3-4a1.6 1.6 0 0 1 2.5-2L7 13"/></svg><small>Pan</small></button
     ><button
       class="mobile-task"
       data-shortcut="Task"
@@ -641,6 +662,7 @@
     ><button [class.active]="tool() === 'sketch' || tool() === 'shape' || tool() === 'connect' || tool() === 'text'" (click)="setTool('sketch')" aria-label="Sketch" data-shortcut="P">
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m4 20 4.5-1 11-11a2 2 0 0 0-3-3l-11 11L4 20ZM14 7l3 3"/></svg><small>Sketch</small></button>
   </nav>
+  @if (tool() === 'hand') { <div class="hint-pill tool-instruction navigation-hint" data-ui>Pan board · Drag anywhere · V to select objects</div> }
   @if (paletteOpen()) {
     <div class="create-palette" appScroll="y" scrollbar="auto" data-ui>
       <div class="palette-title">
@@ -736,10 +758,11 @@
       <button (click)="redoSketchStroke()" aria-label="Redo stroke"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m16 8 4 4-4 4m4-4H10a6 6 0 0 0 0 12"/></svg></button>
       }
       @if (tool() === 'shape') {
-        @for (kind of ['rectangle','rounded','circle','diamond','triangle','cloud']; track kind) {
-          <button [class.active]="shapeKind() === kind" (click)="shapeKind.set($any(kind))" [attr.aria-label]="kind">{{ shapeIcon($any(kind)) }}</button>
+        @for (kind of shapeKinds; track kind) {
+          <button class="shape-choice" [class.active]="shapeKind() === kind" (click)="shapeKind.set(kind)" [attr.aria-label]="shapeNames[kind]" [title]="shapeNames[kind]"><svg viewBox="0 0 100 100" aria-hidden="true"><path [attr.d]="shapePaths[kind]" /></svg><small>{{ shapeNames[kind] }}</small></button>
         }
       }
+      @if (tool() === 'shape') { <select aria-label="Shape color theme" [value]="shapeTheme()" (change)="shapeTheme.set(+$any($event.target).value)">@for (theme of shapeThemes; track theme.name; let index = $index) { <option [value]="index">{{ theme.name }}</option> }</select> }
       @if (tool() === 'connect') {
         @for (kind of ['straight','elbow','curved']; track kind) {
           <button class="connector-kind" [class.active]="connectorKind() === kind" (click)="connectorKind.set($any(kind))">{{ kind }}</button>
@@ -752,6 +775,16 @@
     <div class="hint-pill tool-instruction" data-ui>
       {{ connectionSourceId() ? 'Tap the target card to complete the connection' : 'Tap one card, then another to connect them' }}
     </div>
+    @if (connectionSourceId(); as sourceId) {
+      @if (connectionSourceEntity()?.type === 'er-entity') {
+        <div class="er-connect-panel" data-ui>
+          <label for="er-target">Connect {{ connectionSourceEntity()?.title }} to</label>
+          <select id="er-target" #erTarget (change)="connectionTargetId.set(erTarget.value)"><option value="">Choose an entity…</option>@for (entity of erEntities(); track entity.id) { @if (entity.id !== sourceId) { <option [value]="entity.id">{{ entity.title || 'Unnamed entity' }}</option> } }</select>
+          <button [disabled]="!erTarget.value" (click)="connectErTarget(sourceId, erTarget.value)">Connect</button>
+          <button (click)="setTool('select')">Cancel</button>
+        </div>
+      }
+    }
   }
   <div class="zoom-controls canvas-action-bar" data-ui>
     <button (click)="zoomBy(0.8)" aria-label="Zoom out">−</button
@@ -766,7 +799,7 @@
         @if (selectedIds().length > 1) { <button (click)="groupSelected()">Group</button> }
         @if (item.groupId) { <button (click)="ungroupSelected()">Ungroup</button> }
         @if (selectedIds().length === 1 && item.type === 'task') { <button (click)="addTaskNear(item.id)">+ Task</button><button (click)="addSubtask(item.id)">+ Subtask</button> }
-        @if (selectedIds().length === 1 && item.type === 'er-entity') { <button (click)="inspectorOpen.set(true)">Edit fields</button><button (click)="beginErConnection(item)">Connect</button><button (click)="addRelatedErEntity(item)">+ Related entity</button> }
+        @if (item.type === 'er-entity') { @if (selectedIds().length === 1) { <button (click)="editErFields(item)">Field details</button><button (click)="beginErConnection(item)">Connect</button><button (click)="addRelatedErEntity(item)">+ Related entity</button> } <button (click)="exportErDiagram()">Export DBML</button><button (click)="arrangeErDiagram()" title="Arrange ER entities in this view and automatically route relationships">Arrange diagram</button> }
         @if (selectedIds().length === 1 && (item.type === 'text' || item.type === 'note')) {
           <select
             aria-label="Font family"
@@ -858,7 +891,7 @@
       </div>
       <div class="inspector-body">
         @if (selectedIds().length === 1 && selected(); as item) {
-          <div class="inspector-grid">
+          @if (item.type !== 'er-entity') { <div class="inspector-grid">
             <label
               >X<input
                 type="number"
@@ -881,6 +914,7 @@
                 (change)="setProperty(item.id, 'height', $event)"
             /></label>
           </div>
+          }
           @if (item.type === 'task') {
             <label
               >Status<select
@@ -936,21 +970,30 @@
           @if (item.type === 'image' || item.type === 'gif' || item.type === 'sticker') { <div class="inspector-grid"><button class="inspector-action" (click)="flip(item.id, 'x')">Flip horizontal</button><button class="inspector-action" (click)="flip(item.id, 'y')">Flip vertical</button></div> }
           @if (item.type === 'sketch') { <label class="accent-control">Stroke color<input type="color" [value]="item.accent || '#d4111c'" (change)="setStyle(item.id, {accent: $any($event.target).value})" /></label> }
           @if (item.type === 'shape') {
+            <label>Shape<select [value]="item.shapeKind || 'rectangle'" (change)="setStyle(item.id, { shapeKind: $any($event.target).value })">@for (kind of shapeKinds; track kind) { <option [value]="kind">{{ shapeNames[kind] }}</option> }</select></label>
+            <div class="shape-theme-options">@for (theme of shapeThemes; track theme.name; let index = $index) { <button [style.background]="theme.fill" [style.border-color]="theme.stroke" [style.color]="theme.text" (click)="applyShapeTheme(item, index)">{{ theme.name }}</button> }</div>
+            <label>Border style<select [value]="item.shapeStrokeStyle || 'solid'" (change)="setStyle(item.id, { shapeStrokeStyle: $any($event.target).value })"><option value="solid">Solid</option><option value="dashed">Dashed</option></select></label>
+            <label>Label<input [value]="item.title" (change)="setString(item.id, 'title', $event)" /></label>
+            <div class="inspector-grid"><label>Label size<input type="number" min="10" max="64" [value]="item.fontSize || 16" (change)="setTextSize(item.id, $event)" /></label><label>Label color<input type="color" [value]="item.textColor || '#1e293b'" (change)="setStyle(item.id, { textColor: $any($event.target).value })" /></label></div>
             <label>Fill<input type="color" [value]="item.shapeFill || '#ffffff'" (change)="setStyle(item.id, {shapeFill: $any($event.target).value})" /></label>
             <label>Outline<input type="color" [value]="item.shapeStroke || '#6b7280'" (change)="setStyle(item.id, {shapeStroke: $any($event.target).value})" /></label>
-            <label>Outline weight<input type="range" min="1" max="8" [value]="item.shapeStrokeWidth || 1" (change)="setStyle(item.id, {shapeStrokeWidth: +$any($event.target).value})" /></label>
+            <label>Outline weight<input type="range" min="1" max="8" [value]="item.shapeStrokeWidth || 2" (change)="setStyle(item.id, {shapeStrokeWidth: +$any($event.target).value})" /></label>
           }
           @if (item.type === 'er-entity') {
+            <p class="er-help">Edit names and types directly on the card. Press Enter to add another field. Use the type menu for enums and references. Open ? for constraints, defaults, notes, and field order.</p>
             <label>Entity name<input [value]="item.title" (change)="setStyle(item.id, { title: $any($event.target).value })" /></label>
             <div class="er-inspector-heading">Fields <span>{{ item.erFields?.length || 0 }}</span></div>
             @for (field of item.erFields || []; track field.id) {
               <div class="er-field-editor">
-                <div class="inspector-grid"><label>Field name<input [value]="field.name" (change)="updateErField(item, field.id, { name: $any($event.target).value })" /></label><label>Data type<input [value]="field.dataType" (change)="updateErField(item, field.id, { dataType: $any($event.target).value })" /></label></div>
-                <div class="inspector-grid"><label>Key<select [value]="field.key" (change)="updateErField(item, field.id, { key: $any($event.target).value })"><option value="none">None</option><option value="primary">Primary key</option><option value="foreign">Foreign key</option></select></label><label class="er-required-toggle"><input type="checkbox" [checked]="field.required" (change)="updateErField(item, field.id, { required: $any($event.target).checked })" /> Required</label></div>
+                <button class="er-open-inline" (click)="openErField(item, field)">Edit this field on canvas ?</button>
+                <div class="inspector-grid"><label>Field name<input [attr.data-er-field]="field.id" [value]="field.name" (change)="updateErField(item, field.id, { name: $any($event.target).value })" (keydown)="erFieldKey($event, item)" /></label><label>Data type<select [value]="erTypeChoice(field)" (change)="setErType(item, field, $any($event.target).value)">@for (type of erDataTypes; track type) { <option [value]="type">{{ type }}</option> }<option value="REFERENCE">Reference (FK)</option><option value="CUSTOM">Custom type?</option></select></label></div>
+                <div class="inspector-grid"><label>Key<select [value]="field.key" (change)="updateErField(item, field.id, { key: $any($event.target).value })"><option value="none">None</option><option value="primary">Primary key</option><option value="foreign">Foreign key</option></select></label><label class="er-required-toggle"><input type="checkbox" [checked]="field.required" [disabled]="field.key === 'primary'" (change)="updateErField(item, field.id, { required: $any($event.target).checked })" /> Required</label></div>
                 <button class="er-remove-field" (click)="removeErField(item, field.id)" [attr.aria-label]="'Remove ' + field.name">Remove field</button>
               </div>
             }
             <button class="inspector-action" (click)="addErField(item)">+ Add field</button>
+            <button class="inspector-action" (click)="addRelatedErEntity(item)">+ Related entity with foreign key</button>
+            <button class="inspector-action" (click)="arrangeErDiagram()">Arrange diagram</button>
           }
           @if (item.type === 'link') {
             <label
@@ -979,9 +1022,12 @@
       <div class="inspector-head"><div><small>CONNECTION DETAILS</small><h2>Relationship</h2></div><button (click)="selectedConnectionId.set(null)" aria-label="Close relationship details">×</button></div>
       @if (selectedConnection(); as connection) {
         <div class="inspector-body">
+          <p class="er-help">{{ connectionFieldLabel(connection, true) }}</p>
           <label>Relationship label<input [value]="connection.label || ''" placeholder="e.g. places" (change)="setConnection(connection.id, { label: $any($event.target).value })" /></label>
           <div class="inspector-grid"><label>From<select [value]="connection.sourceCardinality || '1'" (change)="setConnection(connection.id, { sourceCardinality: $any($event.target).value })"><option value="1">One</option><option value="0..1">Zero or one</option><option value="many">Many</option><option value="0..many">Zero or many</option></select></label><label>To<select [value]="connection.targetCardinality || 'many'" (change)="setConnection(connection.id, { targetCardinality: $any($event.target).value })"><option value="1">One</option><option value="0..1">Zero or one</option><option value="many">Many</option><option value="0..many">Zero or many</option></select></label></div>
           <label>Line<select [value]="connection.kind || 'straight'" (change)="setConnection(connection.id, { kind: $any($event.target).value })"><option value="straight">Straight</option><option value="elbow">Elbow</option><option value="curved">Curved</option></select></label>
+          <button class="inspector-action" (click)="setConnection(connection.id, { kind: 'elbow', routeOffset: 0, sourceBinding: { mode: 'auto' }, targetBinding: { mode: 'auto' } })">Reset to automatic routing</button>
+          @if (connection.sourceCardinality && connection.targetCardinality) { <button class="inspector-action" (click)="addParallelRelationship(connection)">+ Another relationship between these entities</button> }
           <button class="inspector-action danger" (click)="removeSelectedConnection()">Delete relationship</button>
         </div>
       }

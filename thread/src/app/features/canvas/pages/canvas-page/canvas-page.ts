@@ -4,6 +4,9 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { BudgetCurrency, CanvasConnection, CanvasItem, CanvasJunction, ChartConfig, ConnectorKind, ConnectorSide, ErField, ItemType, ShapeKind, SketchBrush, SketchStroke, ThreadDataset, demoConnections, demoItems } from '../../canvas.model';
 import { DatasetStore } from '../../data/dataset-store';
 import { canvasId } from '../../canvas-id';
+import { arrangeErEntities, routeErConnections } from '../../er-layout';
+import { erDataTypes, enumValues, erFieldIssue, exportErDbml } from '../../er-schema';
+import { shapeKinds, shapeNames, shapePaths, shapeThemes } from '../../shapes';
 import { ThreadChart } from '../../components/thread-chart';
 import { containsShape, nearestPerimeter, perimeterPoint, sidePoint, world } from '../../sketch/connector-geometry';
 import { RichTextEditor } from '../../components/rich-text-editor';
@@ -33,6 +36,15 @@ export class CanvasPage implements AfterViewInit, OnDestroy {
   private readonly initial = this.upgradeDataState(this.read());
   readonly items = signal<CanvasItem[]>(this.initial.items);
   readonly connections = signal<CanvasConnection[]>(this.initial.connections);
+  readonly erRoutes = computed(() => routeErConnections(this.items(), this.connections()));
+  readonly erEntities = computed(() => this.items().filter(item => item.type === 'er-entity'));
+  readonly erExpandedFieldId = signal<string | null>(null);
+  readonly erDataTypes = erDataTypes;
+  readonly shapeKinds = shapeKinds;
+  readonly shapeNames = shapeNames;
+  readonly shapePaths = shapePaths;
+  readonly shapeThemes = shapeThemes;
+  readonly shapeTheme = signal(0);
   readonly junctions = signal<CanvasJunction[]>(this.initial.junctions || []);
   readonly contextId = signal<string | null>(null);
   readonly selectedIds = signal<string[]>([]);
@@ -52,7 +64,8 @@ export class CanvasPage implements AfterViewInit, OnDestroy {
   readonly sketchEraser = signal(false);
   readonly brush = signal<SketchBrush>('pen');
   readonly shapeKind = signal<ShapeKind>('rectangle');
-  shapeIcon(kind: ShapeKind): string { return ({ rectangle: '□', rounded: '▢', circle: '○', diamond: '◇', triangle: '△', cloud: '☁' } as Record<ShapeKind, string>)[kind]; }
+  shapeIcon(kind: ShapeKind): string { return shapeNames[kind]; }
+  applyShapeTheme(item: CanvasItem, index: number): void { const theme = shapeThemes[index]; if (theme) this.setStyle(item.id, { shapeFill: theme.fill, shapeStroke: theme.stroke, textColor: theme.text }); }
   readonly connectorKind = signal<ConnectorKind>('straight');
   readonly connectionTargetId = signal<string | null>(null);
   readonly junctionCandidate = signal<{ connectionId: string; ratio: number; x: number; y: number } | null>(null);
@@ -74,6 +87,7 @@ export class CanvasPage implements AfterViewInit, OnDestroy {
   private pinch: { distance: number; x: number; y: number } | null = null;
   readonly inspectorOpen = signal(false);
   readonly connectionSourceId = signal<string | null>(null);
+  readonly connectionSourceEntity = computed(() => this.items().find(item => item.id === this.connectionSourceId()) || null);
   readonly search = signal('');
   readonly searchOpen = signal(false);
   readonly panX = signal(0);
@@ -291,12 +305,12 @@ export class CanvasPage implements AfterViewInit, OnDestroy {
     else if (this.pendingType()) { this.session = { kind: 'place', pointerId: event.pointerId, clientX: event.clientX, clientY: event.clientY, x: point.x, y: point.y }; if (this.pendingType() === 'zone' || this.pendingType() === 'shape') this.placement.set({ x: point.x, y: point.y, width: 0, height: 0 }); }
     else if (this.tool() === 'text') { this.createAt('text', point); return; }
     else if (this.tool() === 'sketch') { this.session = { kind: this.sketchEraser() ? 'erase' : 'sketch', pointerId: event.pointerId, clientX: event.clientX, clientY: event.clientY, x: point.x, y: point.y }; if (this.sketchEraser()) { this.snapshot(); this.eraseSketchAt(point); } else this.sketchPoints.set([{ ...point, pressure: event.pressure || .5 }]); }
-    else if (this.tool() === 'select') { this.finishEditing(); this.selectedConnectionId.set(null); if (!event.shiftKey) this.selectedIds.set([]); this.session = event.pointerType === 'touch' ? { kind: 'pan', pointerId: event.pointerId, clientX: event.clientX, clientY: event.clientY, x: this.panX(), y: this.panY() } : { kind: 'marquee', pointerId: event.pointerId, clientX: event.clientX, clientY: event.clientY, x: point.x, y: point.y }; }
+    else if (this.tool() === 'select') { this.finishEditing(); this.selectedConnectionId.set(null); if (!event.shiftKey) this.selectedIds.set([]); this.session = { kind: 'marquee', pointerId: event.pointerId, clientX: event.clientX, clientY: event.clientY, x: point.x, y: point.y }; }
     else if (this.tool() === 'connect') this.connectionSourceId.set(null);
     (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
   }
   itemPointerDown(event: PointerEvent, item: CanvasItem): void {
-    if (event.button !== 0 || (event.target as HTMLElement).closest('button, input, a, [contenteditable="true"]')) return;
+    if (event.button !== 0 || (event.target as HTMLElement).closest('button, input, select, textarea, a, [contenteditable="true"]')) return;
     if (this.pendingType() || this.pendingAsset() || this.tool() === 'text') { event.stopPropagation(); this.pointerDown(event); return; }
     event.stopPropagation();
     if (this.beginTouch(event)) return;
@@ -348,7 +362,7 @@ export class CanvasPage implements AfterViewInit, OnDestroy {
     this.session={kind:'rebind',pointerId:event.pointerId,clientX:event.clientX,clientY:event.clientY,x:end.x,y:end.y,connectionId:connection.id,terminal};
     (event.currentTarget as Element).setPointerCapture(event.pointerId);
   }
-  routeHandle(connection: CanvasConnection): {x:number;y:number} { const {a,b,source,target}=this.connectionEnds(connection), horizontal=this.horizontalConnection(source,target); return horizontal?{x:(a.x+b.x)/2+(connection.routeOffset||0),y:(a.y+b.y)/2}:{x:(a.x+b.x)/2,y:(a.y+b.y)/2+(connection.routeOffset||0)}; }
+  routeHandle(connection: CanvasConnection): {x:number;y:number} { const routed = this.erRoutes().get(connection.id); if (routed) return routed.label; const {a,b,source,target}=this.connectionEnds(connection), horizontal=this.horizontalConnection(source,target); return horizontal?{x:(a.x+b.x)/2+(connection.routeOffset||0),y:(a.y+b.y)/2}:{x:(a.x+b.x)/2,y:(a.y+b.y)/2+(connection.routeOffset||0)}; }
   routeDown(event: PointerEvent, connection: CanvasConnection): void { event.preventDefault(); event.stopPropagation(); const {source,target}=this.connectionEnds(connection), horizontal=this.horizontalConnection(source,target); this.session={kind:'route',pointerId:event.pointerId,clientX:event.clientX,clientY:event.clientY,x:connection.routeOffset||0,y:horizontal?1:0,connectionId:connection.id,before:this.state()}; (event.currentTarget as Element).setPointerCapture(event.pointerId); }
   pointerMove(event: PointerEvent): void {
     if (this.pendingAsset()) this.assetPreview.set(this.point(event.clientX, event.clientY));
@@ -510,16 +524,41 @@ export class CanvasPage implements AfterViewInit, OnDestroy {
   editChecklistRow(index: number, event: Event): void { const item = this.selected(); if (item) this.update(item.id, { checklist: item.checklist?.map((entry, i) => i === index ? { ...entry, label: (event.target as HTMLInputElement).value } : entry) }); }
   addBudgetRow(): void { const item = this.selected(); if (item) this.update(item.id, { rows: [...(item.rows || []), { label: 'New item', value: 0 }] }); }
   editBudgetRow(index: number, key: 'label' | 'value', event: Event): void { const item = this.selected(); if (item) this.update(item.id, { rows: item.rows?.map((row, i) => i === index ? { ...row, [key]: key === 'value' ? Number((event.target as HTMLInputElement).value) : (event.target as HTMLInputElement).value } : row) }); }
-  duplicate(): void { if (!this.selectedIds().length) return; const selected = this.items().filter(item => this.selectedIds().includes(item.id)); const ids = new Map(selected.map(item => [item.id, canvasId()])); const groups = new Map(selected.filter(item => item.groupId).map(item => [item.groupId!, canvasId()])); const copies = selected.map(item => ({ ...structuredClone(item), id: ids.get(item.id)!, groupId: item.groupId ? groups.get(item.groupId) : undefined, parentId: item.parentId && ids.has(item.parentId) ? ids.get(item.parentId)! : item.parentId, x: item.x + 24, y: item.y + 24 })); this.snapshot(); this.items.update(items => [...items, ...copies]); this.selectedIds.set(copies.map(item => item.id)); }
-  groupSelected(): void { if (this.selectedIds().length < 2) return; const id = canvasId(), selected = new Set(this.selectedIds()); this.snapshot(); this.items.update(items => items.map(item => selected.has(item.id) ? { ...item, groupId: id } : item)); }
-  ungroupSelected(): void { const groups = new Set(this.items().filter(item => this.selectedIds().includes(item.id) && item.groupId).map(item => item.groupId)); if (!groups.size) return; this.snapshot(); this.items.update(items => items.map(item => item.groupId && groups.has(item.groupId) ? { ...item, groupId: undefined } : item)); }
+  duplicate(): void { this.insertCopies(this.items().filter(item => this.selectedIds().includes(item.id))); }
+  groupSelected(): void {
+    if (this.selectedIds().length < 2) return;
+    const id = canvasId(), selected = new Set(this.selectedIds());
+    this.snapshot();
+    this.items.update(items => items.map(item => selected.has(item.id) ? { ...item, groupId: id } : item));
+  }
+  ungroupSelected(): void {
+    const groups = new Set(this.items().filter(item => this.selectedIds().includes(item.id) && item.groupId).map(item => item.groupId));
+    if (!groups.size) return;
+    this.snapshot();
+    this.items.update(items => items.map(item => item.groupId && groups.has(item.groupId) ? { ...item, groupId: undefined } : item));
+  }
+  private insertCopies(selected: CanvasItem[]): CanvasItem[] {
+    if (!selected.length) return [];
+    const ids = new Map(selected.map(item => [item.id, canvasId()])), fieldIds = new Map(selected.flatMap(item => (item.erFields || []).map(field => [field.id, canvasId()] as const))), groups = new Map(selected.filter(item => item.groupId).map(item => [item.groupId!, canvasId()]));
+    const names = new Set(this.items().filter(item => item.type === 'er-entity').map(item => item.title.toLowerCase()));
+    const copies = selected.map(item => {
+      let title = item.title;
+      if (item.type === 'er-entity') { let number = 1; title = item.title + ' copy'; while (names.has(title.toLowerCase())) title = item.title + ' copy ' + (++number); names.add(title.toLowerCase()); }
+      return { ...structuredClone(item), id: ids.get(item.id)!, title, groupId: item.groupId ? groups.get(item.groupId) : undefined, parentId: item.parentId && ids.has(item.parentId) ? ids.get(item.parentId)! : item.parentId, x: item.x + 24, y: item.y + 24,
+        erFields: item.erFields?.map(field => ({ ...structuredClone(field), id: fieldIds.get(field.id)!, reference: field.reference ? { entityId: ids.get(field.reference.entityId) || field.reference.entityId, fieldId: ids.has(field.reference.entityId) ? fieldIds.get(field.reference.fieldId) || field.reference.fieldId : field.reference.fieldId } : undefined })) };
+    });
+    const relationships: CanvasConnection[] = this.connections().filter(connection => ids.has(connection.sourceId) && ids.has(connection.targetId) && !connection.sourceJunctionId && !connection.targetJunctionId).map(connection => ({ ...structuredClone(connection), id: canvasId(), sourceId: ids.get(connection.sourceId)!, targetId: ids.get(connection.targetId)!, sourceFieldId: connection.sourceFieldId ? fieldIds.get(connection.sourceFieldId) : undefined, targetFieldId: connection.targetFieldId ? fieldIds.get(connection.targetFieldId) : undefined }));
+    for (const copy of copies) for (const field of copy.erFields || []) if (field.reference && !relationships.some(connection => connection.targetId === copy.id && connection.targetFieldId === field.id)) relationships.push({ id: canvasId(), sourceId: field.reference.entityId, sourceFieldId: field.reference.fieldId, targetId: copy.id, targetFieldId: field.id, kind: 'elbow', direction: 'none', sourceCardinality: field.required ? '1' : '0..1', targetCardinality: field.unique ? '0..1' : '0..many' });
+    this.snapshot(); this.items.update(items => [...items, ...copies]); this.connections.update(entries => [...entries, ...relationships]); this.selectedIds.set(copies.map(item => item.id)); return copies;
+  }
+
   quickConnectedShape(source: CanvasItem): void {
     const now = new Date().toISOString();
-    const item: CanvasItem = { id: canvasId(), type: 'shape', shapeKind: source.shapeKind || 'rectangle', shapeFill: source.shapeFill || '#ffffff', shapeStroke: source.shapeStroke || '#6b7280', shapeStrokeWidth: source.shapeStrokeWidth || 1, parentId: source.parentId, x: source.x + source.width + 100, y: source.y, width: source.width, height: source.height, title: '', rotation: 0, zIndex: Math.max(1, ...this.items().map(entry => entry.zIndex || 1)) + 1, createdAt: now, updatedAt: now };
+    const item: CanvasItem = { id: canvasId(), type: 'shape', shapeKind: source.shapeKind || 'rectangle', shapeFill: source.shapeFill || '#ffffff', shapeStroke: source.shapeStroke || '#475569', shapeStrokeWidth: source.shapeStrokeWidth || 2, parentId: source.parentId, x: source.x + source.width + 100, y: source.y, width: source.width, height: source.height, title: '', shapeStrokeStyle: source.shapeStrokeStyle, textColor: source.textColor, rotation: 0, zIndex: Math.max(1, ...this.items().map(entry => entry.zIndex || 1)) + 1, createdAt: now, updatedAt: now };
     this.snapshot(); this.items.update(items => [...items, item]); this.connections.update(connections => [...connections, { id: canvasId(), sourceId: source.id, targetId: item.id, direction: 'forward', kind: this.connectorKind() }]); this.selectedIds.set([item.id]); queueMicrotask(() => this.startEditing(item.id));
   }
   removeSelected(): void { const ids = this.selectedIds(); if (!ids.length) return; this.snapshot(); const removed = new Set(ids); let changed = true; while (changed) { changed = false; for (const item of this.items()) if (item.parentId && removed.has(item.parentId) && !removed.has(item.id)) { removed.add(item.id); changed = true; } } this.items.update((items) => items.filter((item) => !removed.has(item.id))); this.removeConnectionGraph(new Set(this.connections().filter(c=>removed.has(c.sourceId)||removed.has(c.targetId)).map(c=>c.id))); this.selectedIds.set([]); }
-  removeSelectedConnection(): void { const id=this.selectedConnectionId(); if (!id) return; this.snapshot(); this.removeConnectionGraph(new Set([id])); this.selectedConnectionId.set(null); }
+  removeSelectedConnection(): void { const id=this.selectedConnectionId(); if (!id) return; this.snapshot(); const connection = this.connections().find(entry => entry.id === id); if (connection?.targetFieldId) this.items.update(items => items.map(item => item.id === connection.targetId ? { ...item, erFields: item.erFields?.map(field => field.id === connection.targetFieldId ? { ...field, key: 'none', reference: undefined } : field) } : item)); this.removeConnectionGraph(new Set([id])); this.selectedConnectionId.set(null); }
   private removeConnectionGraph(removed:Set<string>):void {let changed=true; while(changed){changed=false; for(const connection of this.connections()){const parents=[connection.sourceJunctionId,connection.targetJunctionId].map(id=>this.junctions().find(j=>j.id===id)?.parentConnectorId); if(!removed.has(connection.id)&&parents.some(id=>id&&removed.has(id))){removed.add(connection.id);changed=true;}}} this.connections.update(entries=>entries.filter(c=>!removed.has(c.id))); this.junctions.update(entries=>entries.filter(j=>!removed.has(j.parentConnectorId)));}
   private connectorTarget(point: {x:number;y:number}, sourceId: string): CanvasItem | undefined {
     return [...this.items()].reverse().find(item => item.id !== sourceId && item.type !== 'workspace' && item.type !== 'frame' && item.type !== 'zone' && item.type !== 'chart' && (containsShape(item, point) || nearestPerimeter(item, point).distance <= 16 / this.zoom()));
@@ -540,9 +579,12 @@ export class CanvasPage implements AfterViewInit, OnDestroy {
     const junctionA=sourceJunction?this.junctionPoint(sourceJunction):null, junctionB=targetJunction?this.junctionPoint(targetJunction):null;
     const a = junctionA || (connection.sourceBinding?.mode === 'precise' && connection.sourceBinding.anchor ? world(source, connection.sourceBinding.anchor) : orthogonal && !junctionB ? sidePoint(source,sourceSide) : perimeterPoint(source,junctionB || targetCenter));
     const b = junctionB || (connection.targetBinding?.mode === 'precise' && connection.targetBinding.anchor ? world(target, connection.targetBinding.anchor) : orthogonal && !junctionA ? sidePoint(target,targetSide) : perimeterPoint(target,junctionA || sourceCenter));
-    return { a, b, source, target };
+    const routed = this.erRoutes().get(connection.id);
+    return { a: routed?.points[0] || a, b: routed?.points.at(-1) || b, source, target };
   }
   connectionPath(connection: CanvasConnection): string {
+    const routed = this.erRoutes().get(connection.id);
+    if (routed) return routed.points.map((point, index) => `${index ? 'L' : 'M'} ${point.x} ${point.y}`).join(' ');
     const { a, b, source, target } = this.connectionEnds(connection);
     if (!connection.kind || connection.kind === 'straight') return `M ${a.x} ${a.y} L ${b.x} ${b.y}`;
     const horizontal = this.horizontalConnection(source,target);
@@ -569,8 +611,8 @@ export class CanvasPage implements AfterViewInit, OnDestroy {
     const viewport = this.viewport()?.nativeElement;
     const mobile = !!viewport && viewport.clientWidth <= 700;
     const visibleWidth = viewport ? viewport.clientWidth / this.zoom() : 390;
-    const width = Math.max(100, box?.width || (type === 'shape' ? 180 : type === 'zone' || type === 'frame' ? 420 : type === 'er-entity' ? 300 : type === 'budget' ? 390 : type === 'table' ? 390 : type === 'chart' ? 390 : type === 'image' ? 340 : type === 'list' ? 300 : type === 'task' ? 280 : type === 'link' ? 320 : type === 'text' ? 180 : 260));
-    const height = Math.max(40, box?.height || (type === 'shape' ? 110 : type === 'zone' || type === 'frame' ? 280 : type === 'er-entity' ? 170 : type === 'budget' ? 320 : type === 'table' ? 220 : type === 'chart' ? 270 : type === 'image' ? 230 : type === 'task' ? 78 : type === 'list' ? 150 : type === 'link' ? 115 : type === 'text' ? 46 : 170));
+    const width = Math.max(100, box?.width || (type === 'shape' ? (this.shapeKind() === 'circle' ? 160 : 200) : type === 'zone' || type === 'frame' ? 420 : type === 'er-entity' ? 300 : type === 'budget' ? 390 : type === 'table' ? 390 : type === 'chart' ? 390 : type === 'image' ? 340 : type === 'list' ? 300 : type === 'task' ? 280 : type === 'link' ? 320 : type === 'text' ? 180 : 260));
+    const height = Math.max(40, box?.height || (type === 'shape' ? (this.shapeKind() === 'circle' ? 160 : ['diamond', 'triangle', 'cylinder'].includes(this.shapeKind()) ? 150 : 120) : type === 'zone' || type === 'frame' ? 280 : type === 'er-entity' ? 170 : type === 'budget' ? 320 : type === 'table' ? 220 : type === 'chart' ? 270 : type === 'image' ? 230 : type === 'task' ? 78 : type === 'list' ? 150 : type === 'link' ? 115 : type === 'text' ? 46 : 170));
     const placedWidth = mobile && !box ? Math.min(width, visibleWidth - 32 / this.zoom()) : width;
     const left = -this.panX() / this.zoom() + 16 / this.zoom();
     const x = mobile && !box ? Math.max(left, Math.min(point.x - placedWidth / 2, left + visibleWidth - 32 / this.zoom() - placedWidth)) : point.x;
@@ -578,15 +620,15 @@ export class CanvasPage implements AfterViewInit, OnDestroy {
     const dataset = type === 'budget' ? this.datasetStore.create([{label:'Category',type:'text',key:'item'},{label:'Planned',type:'currency',key:'planned'},{label:'Actual',type:'currency',key:'actual'},{label:'Remaining',type:'calculated',key:'remaining'},{label:'Group',type:'category',key:'group'}]) : type === 'table' ? this.datasetStore.create([{label:'Column 1',type:'text'},{label:'Column 2',type:'text'}]) : undefined;
     const chartSource = type === 'chart' ? this.datasets().find(data => this.canChart(data)) : undefined;
     if (dataset && type === 'budget') this.datasetStore.setCalculation(dataset.id, dataset.columns.find(column => column.key === 'remaining')!.id, { left: 'planned', operator: '-', right: 'actual' });
-    const item: CanvasItem = { id: canvasId(), type, parentId: null, x, y: point.y, width: placedWidth, height, title: type === 'er-entity' ? 'New entity' : '', body: '', erFields: type === 'er-entity' ? [{ id: canvasId(), name: 'id', dataType: 'UUID', key: 'primary', required: true }] : undefined, datasetId: dataset?.id || chartSource?.id, chartConfig: type === 'chart' ? this.defaultChartConfig(chartSource) : undefined, budgetMode:type==='budget'?'simple':undefined, budgetCurrency:type==='budget'?'JOD':undefined, budgetPeriod:type==='budget'?'one-time':undefined, textAutoSize: type === 'text', accent: '#d4111c', shapeKind: type === 'shape' ? this.shapeKind() : undefined, shapeFill: type === 'shape' ? '#ffffff' : undefined, shapeStroke: type === 'shape' ? '#6b7280' : undefined, shapeStrokeWidth: type === 'shape' ? 1 : undefined, zoneType: type === 'zone' ? 'standard' : undefined, checklist: type === 'checklist' || type === 'list' ? [{ label: '', completed: false }] : undefined, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
+    const item: CanvasItem = { id: canvasId(), type, parentId: null, x, y: point.y, width: placedWidth, height, title: type === 'er-entity' ? 'New entity' : '', body: '', erFields: type === 'er-entity' ? [{ id: canvasId(), name: 'id', dataType: 'UUID', key: 'primary', required: true }] : undefined, datasetId: dataset?.id || chartSource?.id, chartConfig: type === 'chart' ? this.defaultChartConfig(chartSource) : undefined, budgetMode:type==='budget'?'simple':undefined, budgetCurrency:type==='budget'?'JOD':undefined, budgetPeriod:type==='budget'?'one-time':undefined, textAutoSize: type === 'text', accent: '#d4111c', shapeKind: type === 'shape' ? this.shapeKind() : undefined, shapeFill: type === 'shape' ? shapeThemes[this.shapeTheme()].fill : undefined, shapeStroke: type === 'shape' ? shapeThemes[this.shapeTheme()].stroke : undefined, textColor: type === 'shape' ? shapeThemes[this.shapeTheme()].text : undefined, shapeStrokeWidth: type === 'shape' ? 2 : undefined, zoneType: type === 'zone' ? 'standard' : undefined, checklist: type === 'checklist' || type === 'list' ? [{ label: '', completed: false }] : undefined, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
     this.items.update(items => [...items, item]); this.selectedIds.set([item.id]); this.selectedConnectionId.set(null); this.pendingType.set(null); this.paletteOpen.set(false); this.tool.set('select');
-    if (type === 'er-entity') this.inspectorOpen.set(true);
+    if (type === 'er-entity') { this.inspectorOpen.set(false); setTimeout(() => { const input = document.querySelector<HTMLInputElement>(`[data-node-id="${item.id}"] .er-name-input`); input?.focus(); input?.select(); }); }
     if (mobile && viewport) { const focusZoom = Math.min(1, (viewport.clientWidth - 32) / Math.max(1, placedWidth)); this.zoom.set(focusZoom); this.panX.set(viewport.clientWidth / 2 - (item.x + item.width / 2) * focusZoom); this.panY.set((viewport.clientHeight - 130) / 2 - (item.y + item.height / 2) * focusZoom); }
     if (['note', 'text', 'task', 'zone', 'frame', 'link', 'list', 'budget', 'table', 'shape'].includes(type)) queueMicrotask(() => this.startEditing(item.id));
   }
   selectImageForBlock(id: string): void { const item = this.items().find(entry => entry.id === id); if (!item || item.type !== 'image') return; this.selectedIds.set([id]); this.replaceId = id; this.imagePlacement = { x: item.x, y: item.y }; const input = this.fileInput()?.nativeElement; if (input) { input.accept = 'image/*'; input.click(); } }
-  canvasDoubleClick(event: MouseEvent): void { if ((event.target as HTMLElement).closest('[data-item], [data-ui]')) return; this.createAt('note', this.point(event.clientX, event.clientY)); }
-  startEditing(id: string, target?: EventTarget | null): void { const item = this.items().find(entry => entry.id === id); this.selectedIds.set([id]); this.richBefore = this.state(); this.richFocusId.set(item?.type === 'text' || (target instanceof HTMLElement && target.classList.contains('note-body')) ? id : null); this.editingId.set(id); if (this.richFocusId() === id) return; setTimeout(() => { const element = document.querySelector<HTMLElement>(`[data-edit-id="${id}"]`); element?.focus(); if (element?.isContentEditable) { const range = document.createRange(); range.selectNodeContents(element); range.collapse(false); const selection = window.getSelection(); selection?.removeAllRanges(); selection?.addRange(range); } }); }
+  canvasDoubleClick(event: MouseEvent): void { if (this.tool() !== 'select' || this.pendingType() || this.pendingAsset()) return; if ((event.target as HTMLElement).closest('[data-item], [data-ui]')) return; this.createAt('note', this.point(event.clientX, event.clientY)); }
+  startEditing(id: string, target?: EventTarget | null): void { const item = this.items().find(entry => entry.id === id); if (this.tool() === 'hand') return; if (item?.type === 'er-entity') { if (target instanceof HTMLElement && target.closest('input, select, button')) return; this.editErFields(item); return; } this.selectedIds.set([id]); this.richBefore = this.state(); this.richFocusId.set(item?.type === 'text' || (target instanceof HTMLElement && target.classList.contains('note-body')) ? id : null); this.editingId.set(id); if (this.richFocusId() === id) return; setTimeout(() => { const element = document.querySelector<HTMLElement>(`[data-edit-id="${id}"]`); element?.focus(); if (element?.isContentEditable) { const range = document.createRange(); range.selectNodeContents(element); range.collapse(false); const selection = window.getSelection(); selection?.removeAllRanges(); selection?.addRange(range); } }); }
   finishEditing(): void { if (this.richBefore) this.commit(this.richBefore); this.richBefore = null; this.richFocusId.set(null); this.editingId.set(null); }
   richContent(id: string): string { const item = this.items().find(entry => entry.id === id); const content = item?.bodyHtml || (item?.type === 'text' ? item.title : item?.body) || ''; if (item?.bodyHtml) return content; const escaped = content.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>'); return `<p>${escaped}</p>`; }
   richChanged(id: string, event: { html: string; text: string }): void { const item = this.items().find(entry => entry.id === id); if (!item) return; this.update(id, item.type === 'text' ? { bodyHtml: event.html, title: event.text } : { bodyHtml: event.html, body: event.text }); }
@@ -596,18 +638,91 @@ export class CanvasPage implements AfterViewInit, OnDestroy {
   taskTitleKey(event: KeyboardEvent, id: string): void { if (event.key === 'Enter' || event.key === 'Escape') { event.preventDefault(); (event.target as HTMLInputElement).blur(); } }
   taskTitleBlur(event: Event, id: string): void { const value = (event.target as HTMLInputElement).value.trim() || 'New task'; const item = this.items().find(entry => entry.id === id); if (item && item.title !== value) { if (!this.richBefore) this.snapshot(); this.update(id, { title: value }); } this.finishEditing(); }
   setStyle(id: string, patch: Partial<CanvasItem>): void { const item = this.items().find(entry => entry.id === id); if (!item) return; this.snapshot(); this.update(id, item.type === 'sketch' && patch.accent ? { ...patch, sketchStrokes: item.sketchStrokes?.map(stroke => ({ ...stroke, color: patch.accent! })) } : patch); }
-  addErField(item: CanvasItem): void { const fields = item.erFields || []; this.setStyle(item.id, { erFields: [...fields, { id: canvasId(), name: `field_${fields.length + 1}`, dataType: 'VARCHAR', key: 'none', required: false }], height: Math.max(item.height, 134 + (fields.length + 1) * 34) }); }
-  updateErField(item: CanvasItem, fieldId: string, patch: Partial<ErField>): void { this.setStyle(item.id, { erFields: (item.erFields || []).map(field => { if (field.id !== fieldId) return field; const next = { ...field, ...patch }; return { ...next, name: next.name.trim() || 'field', dataType: next.dataType.trim() || 'VARCHAR', required: next.key === 'primary' || next.required }; }) }); }
-  removeErField(item: CanvasItem, fieldId: string): void { this.setStyle(item.id, { erFields: (item.erFields || []).filter(field => field.id !== fieldId) }); }
+  addErField(item: CanvasItem): void {
+    const current = this.items().find(entry => entry.id === item.id); if (!current) return;
+    const fields = current.erFields || [], id = canvasId(); let number = fields.length + 1;
+    while (fields.some(field => field.name === `field_${number}`)) number++;
+    this.selectedIds.set([item.id]); this.selectedConnectionId.set(null);
+    this.setStyle(item.id, { erFields: [...fields, { id, name: `field_${number}`, dataType: 'VARCHAR', key: 'none', required: false }], height: Math.max(current.height, 134 + (fields.length + 1) * 38) });
+    setTimeout(() => { const input = document.querySelector<HTMLInputElement>(`${this.inspectorOpen() ? '.inspector ' : ''}[data-er-field="${id}"]`); input?.focus(); input?.select(); });
+  }
+  erFieldKey(event: KeyboardEvent, item: CanvasItem): void { if (event.key === 'Enter') { event.preventDefault(); (event.target as HTMLInputElement).blur(); this.addErField(item); } else if (event.key === 'Escape') { event.stopPropagation(); (event.target as HTMLInputElement).blur(); } }
+  erControlDown(event: PointerEvent, item: CanvasItem): void { event.stopPropagation(); if (this.tool() !== 'select') return; this.finishEditing(); this.selectedIds.set([item.id]); this.selectedConnectionId.set(null); }
+  openErField(item: CanvasItem, field: ErField): void {
+    this.setTool('select'); this.selectedIds.set([item.id]); this.inspectorOpen.set(false); this.erExpandedFieldId.set(field.id);
+    const viewport = this.viewport()?.nativeElement;
+    if (viewport) { const zoom = Math.min(1.2, (viewport.clientWidth - 40) / item.width); this.zoom.set(zoom); this.panX.set(viewport.clientWidth / 2 - (item.x + item.width / 2) * zoom); this.panY.set(70 - item.y * zoom); }
+    setTimeout(() => document.querySelector<HTMLInputElement>(`[data-er-field="${field.id}"]`)?.focus());
+  }
+  erTypeChoice(field: ErField): string { return field.key === 'foreign' ? 'REFERENCE' : erDataTypes.includes(field.dataType) ? field.dataType : 'CUSTOM'; }
+  setErType(item: CanvasItem, field: ErField, value: string): void {
+    const patch: Partial<ErField> = value === 'REFERENCE' ? { key: 'foreign', dataType: field.reference ? field.dataType : 'UUID' } : { dataType: value, reference: undefined, key: field.key === 'foreign' ? 'none' : field.key };
+    if (value !== 'ENUM' && value !== 'REFERENCE') patch.enumValues = undefined;
+    this.updateErField(item, field.id, patch);
+    if (['ENUM', 'REFERENCE', 'CUSTOM'].includes(value)) this.erExpandedFieldId.set(field.id);
+  }
+  erReferenceOptions(item: CanvasItem, field: ErField): { value: string; label: string }[] {
+    return this.erEntities().flatMap(entity => (entity.erFields || []).filter(other => (other.unique || other.key === 'primary' && (entity.erFields || []).filter(entry => entry.key === 'primary').length === 1) && other.id !== field.id).map(other => ({ value: `${entity.id}/${other.id}`, label: `${entity.title || 'Unnamed entity'}.${other.name} · ${other.dataType}` })));
+  }
+  erReferenceLabel(field: ErField): string { const entity = this.items().find(item => item.id === field.reference?.entityId), target = entity?.erFields?.find(other => other.id === field.reference?.fieldId); return entity && target ? `${entity.title}.${target.name}` : 'Missing reference'; }
+  setErReference(item: CanvasItem, field: ErField, value: string): void {
+    const [entityId, fieldId] = value.split('/'), entity = this.items().find(entry => entry.id === entityId), targetField = entity?.erFields?.find(entry => entry.id === fieldId);
+    if (!value) { this.updateErField(item, field.id, { reference: undefined }); return; }
+    if (!entity || !targetField || targetField.id === field.id || (targetField.key !== 'primary' && !targetField.unique)) return;
+    if (!targetField.unique && (entity.erFields || []).filter(entry => entry.key === 'primary').length > 1) return;
+    this.updateErField(item, field.id, { key: 'foreign', dataType: targetField.dataType, enumValues: targetField.enumValues, reference: { entityId, fieldId } });
+    this.connections.update(entries => [...entries.filter(entry => !(entry.targetId === item.id && entry.targetFieldId === field.id)), { id: canvasId(), sourceId: entityId, sourceFieldId: fieldId, targetId: item.id, targetFieldId: field.id, kind: 'elbow', direction: 'none', sourceCardinality: field.required ? '1' : '0..1', targetCardinality: field.unique ? '0..1' : '0..many' }]);
+  }
+  erFieldIssue(item: CanvasItem, field: ErField): string { return erFieldIssue(item, field, this.erEntities()); }
+  erEntityIssue(item: CanvasItem): string { if (!item.title.trim()) return 'Give this entity a name.'; if (this.erEntities().some(other => other.id !== item.id && other.title.trim().toLowerCase() === item.title.trim().toLowerCase())) return 'Another entity has this name.'; return item.erFields?.some(field => field.key === 'primary') ? '' : 'Add a primary key to identify each record.'; }
+  setErEnum(item: CanvasItem, field: ErField, event: Event): void { this.updateErField(item, field.id, { enumValues: enumValues((event.target as HTMLTextAreaElement).value) }); }
+  moveErField(item: CanvasItem, fieldId: string, direction: number): void {
+    const fields = [...(this.items().find(entry => entry.id === item.id)?.erFields || [])], index = fields.findIndex(field => field.id === fieldId), target = index + direction;
+    if (index < 0 || target < 0 || target >= fields.length) return;
+    [fields[index], fields[target]] = [fields[target], fields[index]]; this.setStyle(item.id, { erFields: fields });
+  }
+  exportErDiagram(): void {
+    const blob = new Blob([exportErDbml(this.items())], { type: 'text/plain;charset=utf-8' }), url = URL.createObjectURL(blob), link = document.createElement('a');
+    link.href = url; link.download = 'thread-schema.dbml'; link.click(); setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+  editErFields(item: CanvasItem): void { this.setTool('select'); this.selectedIds.set([item.id]); this.selectedConnectionId.set(null); this.inspectorOpen.set(true); }
+  connectErTarget(sourceId: string, targetId: string): void { if (!targetId || sourceId === targetId || !this.items().some(item => item.id === targetId && item.type === 'er-entity')) return; this.addConnection(sourceId, targetId); this.setTool('select'); }
+  arrangeErDiagram(): void {
+    this.finishEditing(); const positions = arrangeErEntities(this.visibleItems(), this.connections()); if (!positions.size) return;
+    this.snapshot(); this.items.update(items => items.map(item => positions.has(item.id) ? { ...item, ...positions.get(item.id)!, rotation: 0, updatedAt: new Date().toISOString() } : item));
+    this.connections.update(entries => entries.map(entry => positions.has(entry.sourceId) && positions.has(entry.targetId) ? { ...entry, kind: 'elbow', routeOffset: 0, sourceBinding: { mode: 'auto' }, targetBinding: { mode: 'auto' } } : entry));
+    this.selectedIds.set([...positions.keys()]); this.selectedConnectionId.set(null); this.inspectorOpen.set(false); this.setTool('select');
+    const arranged = this.items().filter(item => positions.has(item.id)), viewport = this.viewport()?.nativeElement;
+    if (viewport) { const left = Math.min(...arranged.map(item => item.x)), top = Math.min(...arranged.map(item => item.y)), width = Math.max(...arranged.map(item => item.x + item.width)) - left, height = Math.max(...arranged.map(item => item.y + item.height)) - top; const zoom = Math.max(.08, Math.min(1, (viewport.clientWidth - (viewport.clientWidth <= 700 ? 32 : 180)) / width, (viewport.clientHeight - 200) / height)); this.zoom.set(zoom); this.panX.set(viewport.clientWidth / 2 - (left + width / 2) * zoom); this.panY.set((viewport.clientHeight - 70) / 2 - (top + height / 2) * zoom); }
+  }
+  updateErField(item: CanvasItem, fieldId: string, patch: Partial<ErField>): void {
+    this.setStyle(item.id, { erFields: (this.items().find(entry => entry.id === item.id)?.erFields || []).map(field => { if (field.id !== fieldId) return field; const next = { ...field, ...patch }; return { ...next, reference: next.key === 'foreign' ? next.reference : undefined, name: next.name.trim() || 'field', dataType: next.dataType.trim() || 'VARCHAR', required: next.key === 'primary' || next.required }; }) });
+    const updated = this.items().find(entry => entry.id === item.id)?.erFields?.find(field => field.id === fieldId);
+    if (!updated?.reference) this.connections.update(entries => entries.filter(entry => !(entry.targetId === item.id && entry.targetFieldId === fieldId)));
+    else this.connections.update(entries => entries.map(entry => entry.targetId === item.id && entry.targetFieldId === fieldId ? { ...entry, sourceCardinality: updated.required ? '1' : '0..1', targetCardinality: updated.unique ? '0..1' : '0..many' } : entry));
+    if (updated) this.items.update(items => items.map(entity => ({ ...entity, erFields: entity.erFields?.map(field => field.reference?.entityId === item.id && field.reference.fieldId === fieldId ? { ...field, dataType: updated.dataType, enumValues: updated.enumValues } : field) })));
+  }
+  removeErField(item: CanvasItem, fieldId: string): void {
+    this.setStyle(item.id, { erFields: (this.items().find(entry => entry.id === item.id)?.erFields || []).filter(field => field.id !== fieldId) });
+    this.connections.update(entries => entries.filter(entry => !(entry.sourceId === item.id && entry.sourceFieldId === fieldId) && !(entry.targetId === item.id && entry.targetFieldId === fieldId)));
+  }
   beginErConnection(item: CanvasItem): void { this.setTool('connect'); this.connectionSourceId.set(item.id); this.selectedIds.set([item.id]); this.inspectorOpen.set(false); }
   cardinalityMarker(value: CanvasConnection['sourceCardinality']): string | null { return value ? `url(#er-${value === '1' ? 'one' : value === '0..1' ? 'optional-one' : value === 'many' ? 'many' : 'optional-many'})` : null; }
+  connectionFieldLabel(connection: CanvasConnection, full = false): string {
+    const source = this.items().find(item => item.id === connection.sourceId), target = this.items().find(item => item.id === connection.targetId);
+    const sourceField = source?.erFields?.find(field => field.id === connection.sourceFieldId), targetField = target?.erFields?.find(field => field.id === connection.targetFieldId);
+    if (sourceField && targetField) return `${full ? source?.title + '.' : ''}${sourceField.name} → ${full ? target?.title + '.' : ''}${targetField.name}`;
+    return full ? `${source?.title || 'Source'} → ${target?.title || 'Target'}` : '';
+  }
   addRelatedErEntity(source: CanvasItem): void {
     this.finishEditing(); this.pendingType.set(null);
     const now = new Date().toISOString();
     const foreignKey = `${source.title.trim().toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '') || 'entity'}_id`;
     const target: CanvasItem = { id: canvasId(), type: 'er-entity', parentId: source.parentId, x: source.x + source.width + 110, y: source.y, width: 280, height: 202, title: 'Related entity', erFields: [{ id: canvasId(), name: 'id', dataType: 'UUID', key: 'primary', required: true }, { id: canvasId(), name: foreignKey, dataType: source.erFields?.find(field => field.key === 'primary')?.dataType || 'UUID', key: 'foreign', required: true }], createdAt: now, updatedAt: now };
-    this.snapshot(); this.items.update(items => [...items, target]); this.connections.update(entries => [...entries, { id: canvasId(), sourceId: source.id, targetId: target.id, kind: 'elbow', direction: 'none', sourceCardinality: '1', targetCardinality: 'many' }]);
-    this.selectedIds.set([target.id]); this.selectedConnectionId.set(null); this.inspectorOpen.set(true); this.tool.set('select');
+    while (this.items().some(item => !['workspace', 'zone', 'frame'].includes(item.type) && target.x < item.x + item.width + 30 && target.x + target.width + 30 > item.x && target.y < item.y + item.height + 30 && target.y + target.height + 30 > item.y)) target.y += target.height + 70;
+    const primary = source.erFields?.find(field => field.key === 'primary'); if (primary) target.erFields![1].reference = { entityId: source.id, fieldId: primary.id };
+    this.snapshot(); this.items.update(items => [...items, target]); this.connections.update(entries => [...entries, { id: canvasId(), sourceId: source.id, sourceFieldId: primary?.id, targetFieldId: primary ? target.erFields![1].id : undefined, targetId: target.id, kind: 'elbow', direction: 'none', sourceCardinality: '1', targetCardinality: 'many' }]);
+    this.selectedIds.set([target.id]); this.selectedConnectionId.set(null); this.inspectorOpen.set(false); this.tool.set('select');
     const viewport = this.viewport()?.nativeElement;
     if (viewport) { this.panX.set(viewport.clientWidth / 2 - (target.x + target.width / 2) * this.zoom()); this.panY.set(viewport.clientHeight / 2 - (target.y + target.height / 2) * this.zoom()); }
   }
@@ -619,17 +734,26 @@ export class CanvasPage implements AfterViewInit, OnDestroy {
     const base = { type: 'er-entity' as const, parentId: null, width: 260, height: 202, rotation: 0, createdAt: now, updatedAt: now };
     const customer: CanvasItem = { ...base, id: canvasId(), x: center.x - 300, y: center.y - 100, title: 'Customer', erFields: [{ id: canvasId(), name: 'id', dataType: 'UUID', key: 'primary', required: true }, { id: canvasId(), name: 'email', dataType: 'VARCHAR', key: 'none', required: true }] };
     const order: CanvasItem = { ...base, id: canvasId(), x: center.x + 40, y: center.y - 100, title: 'Order', erFields: [{ id: canvasId(), name: 'id', dataType: 'UUID', key: 'primary', required: true }, { id: canvasId(), name: 'customer_id', dataType: 'UUID', key: 'foreign', required: true }] };
-    const relation: CanvasConnection = { id: canvasId(), sourceId: customer.id, targetId: order.id, label: 'places', sourceCardinality: '1', targetCardinality: 'many', kind: 'elbow', direction: 'none' };
+    order.erFields![1].reference = { entityId: customer.id, fieldId: customer.erFields![0].id };
+    const relation: CanvasConnection = { id: canvasId(), sourceId: customer.id, sourceFieldId: customer.erFields![0].id, targetFieldId: order.erFields![1].id, targetId: order.id, label: 'places', sourceCardinality: '1', targetCardinality: 'many', kind: 'elbow', direction: 'none' };
     this.snapshot(); this.items.update(items => [...items, customer, order]); this.connections.update(entries => [...entries, relation]);
-    this.selectedIds.set([customer.id]); this.selectedConnectionId.set(null); this.inspectorOpen.set(true); this.tool.set('select');
+    this.selectedIds.set([customer.id]); this.selectedConnectionId.set(null); this.inspectorOpen.set(false); this.tool.set('select');
     const viewport = this.viewport()?.nativeElement;
     if (viewport) { const zoom = Math.min(1, (viewport.clientWidth - 36) / 600, (viewport.clientHeight - 150) / 250); this.zoom.set(Math.max(.08, zoom)); this.panX.set(viewport.clientWidth / 2 - (center.x) * this.zoom()); this.panY.set((viewport.clientHeight - (viewport.clientWidth <= 700 ? 100 : 0)) / 2 - center.y * this.zoom()); }
   }
   setConnection(id: string, patch: Partial<CanvasConnection>): void { this.snapshot(); this.connections.update(entries => entries.map(entry => entry.id === id ? { ...entry, ...patch } : entry)); }
+  addParallelRelationship(connection: CanvasConnection): void {
+    const id = canvasId(); this.snapshot();
+    this.connections.update(entries => [...entries, { ...connection, id, label: '', sourceFieldId: undefined, targetFieldId: undefined, kind: 'elbow', routeOffset: 0, sourceBinding: { mode: 'auto' }, targetBinding: { mode: 'auto' }, sourceJunctionId: undefined, targetJunctionId: undefined }]);
+    this.selectedIds.set([]); this.selectedConnectionId.set(id);
+  }
   private addConnection(sourceId: string, targetId: string): void {
     const source = this.items().find(item => item.id === sourceId);
     const target = this.items().find(item => item.id === targetId);
     const isEr = source?.type === 'er-entity' && target?.type === 'er-entity';
+    if (!source || !target || sourceId === targetId) return;
+    const existing = isEr ? this.connections().find(entry => (entry.sourceId === sourceId && entry.targetId === targetId) || (entry.sourceId === targetId && entry.targetId === sourceId)) : undefined;
+    if (existing) { this.selectedIds.set([]); this.selectedConnectionId.set(existing.id); return; }
     const connection: CanvasConnection = { id: canvasId(), sourceId, targetId, sourceBinding: { mode: 'auto' }, targetBinding: { mode: 'auto' }, direction: isEr ? 'none' : 'forward', kind: isEr ? 'elbow' : this.connectorKind(), sourceCardinality: isEr ? '1' : undefined, targetCardinality: isEr ? 'many' : undefined };
     this.snapshot(); this.connections.update(entries => [...entries, connection]);
     this.selectedIds.set([]); this.selectedConnectionId.set(connection.id);
@@ -639,7 +763,7 @@ export class CanvasPage implements AfterViewInit, OnDestroy {
   setAlignment(id: string, event: Event): void { this.setStyle(id, { textAlign: (event.target as HTMLSelectElement).value as CanvasItem['textAlign'] }); }
   toggleBold(id: string): void { const item = this.items().find(entry => entry.id === id); if (item) this.setStyle(id, { fontWeight: (item.fontWeight || 600) >= 700 ? 400 : 700 }); }
   setProperty(id: string, key: 'x' | 'y' | 'width' | 'height', event: Event): void { const value = Number((event.target as HTMLInputElement).value); if (!Number.isFinite(value)) return; const item = this.items().find(entry => entry.id === id); const minimum = item?.type === 'er-entity' ? (key === 'width' ? 220 : key === 'height' ? 136 : 30) : 30; this.setStyle(id, { [key]: key === 'width' || key === 'height' ? Math.max(minimum, value) : value }); }
-  setString(id: string, key: 'due' | 'priority' | 'body', event: Event): void { this.setStyle(id, { [key]: (event.target as HTMLInputElement).value }); }
+  setString(id: string, key: 'title' | 'due' | 'priority' | 'body', event: Event): void { this.setStyle(id, { [key]: (event.target as HTMLInputElement).value }); }
   setTaskStatus(id: string, event: Event): void { this.setStyle(id, { completed: (event.target as HTMLSelectElement).value === 'done' }); }
   setOrdered(id: string, event: Event): void { this.setStyle(id, { ordered: (event.target as HTMLInputElement).checked }); }
   addSubtask(id: string): void { const item = this.items().find(entry => entry.id === id); if (!item) return; this.setStyle(id, { checklist: [...(item.checklist || []), { label: 'New subtask', completed: false }], height: Math.max(item.height, 155) }); }
@@ -688,7 +812,7 @@ export class CanvasPage implements AfterViewInit, OnDestroy {
   dataCellKey(event:KeyboardEvent,item:CanvasItem,rowId:string,key:string,fields:string[]):void { if(event.key==='Escape'){this.budgetKey(event,item,rowId);return;}if(event.key!=='Tab'&&event.key!=='Enter')return;event.preventDefault();const data=this.dataset(item);if(!data)return;const index=fields.indexOf(key),next=event.key==='Enter'?index+1:index+(event.shiftKey?-1:1);(event.target as HTMLInputElement).blur();if(fields[next])queueMicrotask(()=>this.startDataCellEdit(item.id,rowId,fields[next])); }
   setLinkUrl(id: string, event: Event): void { const url = (event.target as HTMLInputElement).value.trim(); this.setStyle(id, { url, title: this.items().find(entry => entry.id === id)?.title || url }); }
   copy(): void { const ids = new Set(this.selectedIds()); this.clipboard = structuredClone(this.items().filter(item => ids.has(item.id))); }
-  paste(): void { if (!this.clipboard.length) return; const groups = new Map(this.clipboard.filter(item => item.groupId).map(item => [item.groupId!, canvasId()])); const copies = this.clipboard.map(item => ({ ...structuredClone(item), id: canvasId(), groupId: item.groupId ? groups.get(item.groupId) : undefined, x: item.x + 24, y: item.y + 24 })); this.snapshot(); this.items.update(items => [...items, ...copies]); this.selectedIds.set(copies.map(item => item.id)); this.clipboard = structuredClone(copies); }
+  paste(): void { const copies = this.insertCopies(this.clipboard); if (copies.length) this.clipboard = structuredClone(copies); }
   async fileSelected(event: Event): Promise<void> { const input = event.target as HTMLInputElement; const files = input.files; if (files?.length) await this.importFiles(files, this.imagePlacement || this.centerPoint()); input.value = ''; input.accept = 'image/*,audio/*,.pdf,.txt,.doc,.docx'; this.imagePlacement = null; this.replaceId = null; }
   private centerPoint(): { x: number; y: number } { const rect = this.viewport()?.nativeElement.getBoundingClientRect(); return rect ? this.point(rect.left + rect.width / 2, rect.top + rect.height / 2) : { x: 0, y: 0 }; }
   private async importFiles(files: FileList | File[], point: { x: number; y: number }): Promise<void> { let index = 0; for (const file of Array.from(files)) { const source = await new Promise<string>((resolve, reject) => { const reader = new FileReader(); reader.onload = () => resolve(String(reader.result)); reader.onerror = () => reject(reader.error); reader.readAsDataURL(file); }); let width = 260, height = 130; const image = file.type.startsWith('image/'); if (image) { const size = await new Promise<{ width: number; height: number }>(resolve => { const img = new Image(); img.onload = () => resolve({ width: img.naturalWidth, height: img.naturalHeight }); img.onerror = () => resolve({ width: 320, height: 240 }); img.src = source; }); const scale = Math.min(1, 520 / size.width, 420 / size.height); width = size.width * scale; height = size.height * scale; } if (image && this.replaceId) { this.snapshot(); this.update(this.replaceId, { image: source, title: file.name, cropX: 0, cropY: 0, cropScale: 1 }); break; } const item: CanvasItem = { id: canvasId(), type: image ? 'image' : file.type.startsWith('audio/') ? 'voice' : 'file', parentId: null, x: point.x + 24 * index, y: point.y + 24 * index, width, height, title: file.name, image: image ? source : undefined, filename: file.name, url: image ? undefined : source, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() }; this.snapshot(); this.items.update(items => [...items, item]); this.selectedIds.set([item.id]); index++; } }

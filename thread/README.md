@@ -2,11 +2,17 @@
 
 ## Sticker assets
 
-The canvas sticker picker uses the original SVG stickers in `public/stickers/` and the Wevi PNG collection in `public/stickers/wevi/`. Wevi sticker names, categories, dimensions, and search terms are registered in `src/app/features/canvas/wevi-stickers.ts`. Keep each PNG's category folder and filename aligned with its registry ID (`category.name`).
+The canvas sticker picker uses the original SVG stickers in `public/stickers/` and the Wevi PNG collection in `public/stickers/wevi/`. Wevi sticker names, categories, dimensions, and search terms are registered in `src/app/features/canvas/wevi-stickers.ts`. The clean separated pack replaces the original generated images while preserving saved board URLs. Keep each PNG's category folder and filename aligned with its registry ID (`category.name`).
 
 ## ER diagrams
 
-Open **Add → ER diagram starter** for a Customer/Order example, or choose **ER entity** to start from scratch. Add fields on the entity card and edit their names, types, and key roles in Details. Use **Connect entity** to link two existing entities, or **+ Related entity** to create a new entity with a foreign key. Select a relationship to change its label and cardinality.
+Open **Add → ER diagram starter** for a Customer/Order example, or choose **ER entity** to start from scratch. Edit field names, types, and PK/FK roles directly on any entity card while using Select. Press Enter to add the next field. The type dropdown supports standard types, enums, foreign-key references, and custom types. Open the field?s ? menu for enum values, reference targets, required/unique constraints, defaults, notes, reordering, and removal. Choosing a reference creates a field-level relationship and synchronizes the foreign key?s type. Export DBML downloads the schema, enums, constraints, and references. Use **Connect entity** to link two existing entities, or **+ Related entity** to create a new entity with a foreign key. Choose a target from the connection menu or tap an entity. Select a relationship to change its label and cardinality. Automatic routes use separate ports and avoid cards; Arrange diagram spaces all ER entities into columns and resets routing. Select (V) edits and moves objects; Pan (H), Space, or two-finger gestures move the board.
+
+## Shapes
+
+The Shapes tool provides labeled previews for processes, decisions, start/end nodes, ellipses, databases, documents, input/output, and other common shapes. Choose a color theme before drawing, or change an existing shape?s type, theme, fill, border, and label in Details. Connector attachment uses the same geometry as the rendered outline.
+
+Design references: [DBML schema conventions](https://dbml.dbdiagram.io/docs/) and [draw.io flowchart shapes](https://www.drawio.com/docs/getting-started/basic-flowchart/).
 
 This project was generated using [Angular CLI](https://github.com/angular/angular-cli) version 22.2.0.
 

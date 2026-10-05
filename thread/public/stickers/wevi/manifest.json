@@ -1,0 +1,600 @@
+{
+  "pack": "Thread / Wevi ? clean separated originals",
+  "count": 66,
+  "stickers": [
+    {
+      "id": "wevi_actions.idea",
+      "label": "Idea",
+      "category": "Wevi Actions",
+      "file": "wevi_actions/idea.png",
+      "src": "/stickers/wevi/wevi_actions/idea.png",
+      "width": 297,
+      "height": 382
+    },
+    {
+      "id": "wevi_actions.wip",
+      "label": "WIP",
+      "category": "Wevi Actions",
+      "file": "wevi_actions/wip.png",
+      "src": "/stickers/wevi/wevi_actions/wip.png",
+      "width": 300,
+      "height": 300
+    },
+    {
+      "id": "wevi_actions.done",
+      "label": "Done",
+      "category": "Wevi Actions",
+      "file": "wevi_actions/done.png",
+      "src": "/stickers/wevi/wevi_actions/done.png",
+      "width": 316,
+      "height": 365
+    },
+    {
+      "id": "wevi_actions.wait",
+      "label": "Wait",
+      "category": "Wevi Actions",
+      "file": "wevi_actions/wait.png",
+      "src": "/stickers/wevi/wevi_actions/wait.png",
+      "width": 268,
+      "height": 359
+    },
+    {
+      "id": "wevi_actions.yes",
+      "label": "Yes",
+      "category": "Wevi Actions",
+      "file": "wevi_actions/yes.png",
+      "src": "/stickers/wevi/wevi_actions/yes.png",
+      "width": 275,
+      "height": 344
+    },
+    {
+      "id": "wevi_actions.nope",
+      "label": "Nope",
+      "category": "Wevi Actions",
+      "file": "wevi_actions/nope.png",
+      "src": "/stickers/wevi/wevi_actions/nope.png",
+      "width": 282,
+      "height": 331
+    },
+    {
+      "id": "wevi_actions.fix-this",
+      "label": "Fix This",
+      "category": "Wevi Actions",
+      "file": "wevi_actions/fix-this.png",
+      "src": "/stickers/wevi/wevi_actions/fix-this.png",
+      "width": 301,
+      "height": 332
+    },
+    {
+      "id": "wevi_actions.look-here",
+      "label": "Look Here",
+      "category": "Wevi Actions",
+      "file": "wevi_actions/look-here.png",
+      "src": "/stickers/wevi/wevi_actions/look-here.png",
+      "width": 290,
+      "height": 337
+    },
+    {
+      "id": "wevi_actions.important",
+      "label": "Important",
+      "category": "Wevi Actions",
+      "file": "wevi_actions/important.png",
+      "src": "/stickers/wevi/wevi_actions/important.png",
+      "width": 304,
+      "height": 315
+    },
+    {
+      "id": "wevi_actions.questions",
+      "label": "Questions",
+      "category": "Wevi Actions",
+      "file": "wevi_actions/questions.png",
+      "src": "/stickers/wevi/wevi_actions/questions.png",
+      "width": 244,
+      "height": 317
+    },
+    {
+      "id": "wevi_actions.plus-one",
+      "label": "+1",
+      "category": "Wevi Actions",
+      "file": "wevi_actions/plus-one.png",
+      "src": "/stickers/wevi/wevi_actions/plus-one.png",
+      "width": 276,
+      "height": 304
+    },
+    {
+      "id": "wevi_actions.lgtm",
+      "label": "LGTM",
+      "category": "Wevi Actions",
+      "file": "wevi_actions/lgtm.png",
+      "src": "/stickers/wevi/wevi_actions/lgtm.png",
+      "width": 280,
+      "height": 316
+    },
+    {
+      "id": "wevi_actions.brainstorm",
+      "label": "Brainstorm",
+      "category": "Wevi Actions",
+      "file": "wevi_actions/brainstorm.png",
+      "src": "/stickers/wevi/wevi_actions/brainstorm.png",
+      "width": 308,
+      "height": 306
+    },
+    {
+      "id": "wevi_actions.connect",
+      "label": "Connect",
+      "category": "Wevi Actions",
+      "file": "wevi_actions/connect.png",
+      "src": "/stickers/wevi/wevi_actions/connect.png",
+      "width": 317,
+      "height": 274
+    },
+    {
+      "id": "wevi_actions.sketch",
+      "label": "Sketch",
+      "category": "Wevi Actions",
+      "file": "wevi_actions/sketch.png",
+      "src": "/stickers/wevi/wevi_actions/sketch.png",
+      "width": 282,
+      "height": 328
+    },
+    {
+      "id": "wevi_actions.organize",
+      "label": "Organize",
+      "category": "Wevi Actions",
+      "file": "wevi_actions/organize.png",
+      "src": "/stickers/wevi/wevi_actions/organize.png",
+      "width": 286,
+      "height": 298
+    },
+    {
+      "id": "wevi_moments.wave",
+      "label": "Wevi Wave",
+      "category": "Wevi Moments",
+      "file": "wevi_moments/wave.png",
+      "src": "/stickers/wevi/wevi_moments/wave.png",
+      "width": 282,
+      "height": 287
+    },
+    {
+      "id": "wevi_moments.thinking",
+      "label": "Wevi Thinking",
+      "category": "Wevi Moments",
+      "file": "wevi_moments/thinking.png",
+      "src": "/stickers/wevi/wevi_moments/thinking.png",
+      "width": 256,
+      "height": 317
+    },
+    {
+      "id": "wevi_moments.pencil",
+      "label": "Wevi Pencil",
+      "category": "Wevi Moments",
+      "file": "wevi_moments/pencil.png",
+      "src": "/stickers/wevi/wevi_moments/pencil.png",
+      "width": 243,
+      "height": 286
+    },
+    {
+      "id": "wevi_moments.push-card",
+      "label": "Wevi Push Card",
+      "category": "Wevi Moments",
+      "file": "wevi_moments/push-card.png",
+      "src": "/stickers/wevi/wevi_moments/push-card.png",
+      "width": 369,
+      "height": 263
+    },
+    {
+      "id": "wevi_moments.sticky-note",
+      "label": "Wevi Sticky Note",
+      "category": "Wevi Moments",
+      "file": "wevi_moments/sticky-note.png",
+      "src": "/stickers/wevi/wevi_moments/sticky-note.png",
+      "width": 265,
+      "height": 298
+    },
+    {
+      "id": "wevi_moments.peek-note",
+      "label": "Wevi Peek Note",
+      "category": "Wevi Moments",
+      "file": "wevi_moments/peek-note.png",
+      "src": "/stickers/wevi/wevi_moments/peek-note.png",
+      "width": 278,
+      "height": 293
+    },
+    {
+      "id": "wevi_moments.tangled",
+      "label": "Wevi Tangled",
+      "category": "Wevi Moments",
+      "file": "wevi_moments/tangled.png",
+      "src": "/stickers/wevi/wevi_moments/tangled.png",
+      "width": 257,
+      "height": 329
+    },
+    {
+      "id": "wevi_moments.connect-nodes",
+      "label": "Wevi Connect Nodes",
+      "category": "Wevi Moments",
+      "file": "wevi_moments/connect-nodes.png",
+      "src": "/stickers/wevi/wevi_moments/connect-nodes.png",
+      "width": 337,
+      "height": 253
+    },
+    {
+      "id": "wevi_moments.laptop",
+      "label": "Wevi Laptop",
+      "category": "Wevi Moments",
+      "file": "wevi_moments/laptop.png",
+      "src": "/stickers/wevi/wevi_moments/laptop.png",
+      "width": 303,
+      "height": 266
+    },
+    {
+      "id": "wevi_moments.approved",
+      "label": "Wevi Approved",
+      "category": "Wevi Moments",
+      "file": "wevi_moments/approved.png",
+      "src": "/stickers/wevi/wevi_moments/approved.png",
+      "width": 287,
+      "height": 285
+    },
+    {
+      "id": "wevi_moments.sleep",
+      "label": "Wevi Sleep",
+      "category": "Wevi Moments",
+      "file": "wevi_moments/sleep.png",
+      "src": "/stickers/wevi/wevi_moments/sleep.png",
+      "width": 304,
+      "height": 291
+    },
+    {
+      "id": "wevi_moments.pull-nodes",
+      "label": "Wevi Pull Nodes",
+      "category": "Wevi Moments",
+      "file": "wevi_moments/pull-nodes.png",
+      "src": "/stickers/wevi/wevi_moments/pull-nodes.png",
+      "width": 325,
+      "height": 250
+    },
+    {
+      "id": "wevi_moments.thread-loop",
+      "label": "Thread Loop",
+      "category": "Wevi Moments",
+      "file": "wevi_moments/thread-loop.png",
+      "src": "/stickers/wevi/wevi_moments/thread-loop.png",
+      "width": 306,
+      "height": 254
+    },
+    {
+      "id": "wevi_moments.knot",
+      "label": "Thread Knot",
+      "category": "Wevi Moments",
+      "file": "wevi_moments/knot.png",
+      "src": "/stickers/wevi/wevi_moments/knot.png",
+      "width": 269,
+      "height": 213
+    },
+    {
+      "id": "wevi_moments.spool",
+      "label": "Thread Spool",
+      "category": "Wevi Moments",
+      "file": "wevi_moments/spool.png",
+      "src": "/stickers/wevi/wevi_moments/spool.png",
+      "width": 243,
+      "height": 236
+    },
+    {
+      "id": "wevi_moments.thread-wordmark",
+      "label": "Thread Wordmark",
+      "category": "Wevi Moments",
+      "file": "wevi_moments/thread-wordmark.png",
+      "src": "/stickers/wevi/wevi_moments/thread-wordmark.png",
+      "width": 356,
+      "height": 172
+    },
+    {
+      "id": "canvas_ui.cursor",
+      "label": "Cursor",
+      "category": "Canvas Icons",
+      "file": "canvas_ui/cursor.png",
+      "src": "/stickers/wevi/canvas_ui/cursor.png",
+      "width": 210,
+      "height": 272
+    },
+    {
+      "id": "canvas_ui.move",
+      "label": "Move",
+      "category": "Canvas Icons",
+      "file": "canvas_ui/move.png",
+      "src": "/stickers/wevi/canvas_ui/move.png",
+      "width": 266,
+      "height": 269
+    },
+    {
+      "id": "canvas_ui.resize",
+      "label": "Resize",
+      "category": "Canvas Icons",
+      "file": "canvas_ui/resize.png",
+      "src": "/stickers/wevi/canvas_ui/resize.png",
+      "width": 268,
+      "height": 274
+    },
+    {
+      "id": "canvas_ui.connector",
+      "label": "Connector",
+      "category": "Canvas Icons",
+      "file": "canvas_ui/connector.png",
+      "src": "/stickers/wevi/canvas_ui/connector.png",
+      "width": 311,
+      "height": 244
+    },
+    {
+      "id": "canvas_ui.wevi-card",
+      "label": "Wevi Card",
+      "category": "Canvas Icons",
+      "file": "canvas_ui/wevi-card.png",
+      "src": "/stickers/wevi/canvas_ui/wevi-card.png",
+      "width": 388,
+      "height": 290
+    },
+    {
+      "id": "canvas_ui.note",
+      "label": "Note",
+      "category": "Canvas Icons",
+      "file": "canvas_ui/note.png",
+      "src": "/stickers/wevi/canvas_ui/note.png",
+      "width": 262,
+      "height": 246
+    },
+    {
+      "id": "canvas_ui.pinned-note",
+      "label": "Pinned Note",
+      "category": "Canvas Icons",
+      "file": "canvas_ui/pinned-note.png",
+      "src": "/stickers/wevi/canvas_ui/pinned-note.png",
+      "width": 263,
+      "height": 315
+    },
+    {
+      "id": "canvas_ui.folded-page",
+      "label": "Folded Page",
+      "category": "Canvas Icons",
+      "file": "canvas_ui/folded-page.png",
+      "src": "/stickers/wevi/canvas_ui/folded-page.png",
+      "width": 236,
+      "height": 275
+    },
+    {
+      "id": "canvas_ui.arrow",
+      "label": "Arrow",
+      "category": "Canvas Icons",
+      "file": "canvas_ui/arrow.png",
+      "src": "/stickers/wevi/canvas_ui/arrow.png",
+      "width": 317,
+      "height": 190
+    },
+    {
+      "id": "canvas_ui.circle",
+      "label": "Hand-drawn Circle",
+      "category": "Canvas Icons",
+      "file": "canvas_ui/circle.png",
+      "src": "/stickers/wevi/canvas_ui/circle.png",
+      "width": 282,
+      "height": 225
+    },
+    {
+      "id": "canvas_ui.underline",
+      "label": "Underline",
+      "category": "Canvas Icons",
+      "file": "canvas_ui/underline.png",
+      "src": "/stickers/wevi/canvas_ui/underline.png",
+      "width": 269,
+      "height": 159
+    },
+    {
+      "id": "canvas_ui.tape",
+      "label": "Tape",
+      "category": "Canvas Icons",
+      "file": "canvas_ui/tape.png",
+      "src": "/stickers/wevi/canvas_ui/tape.png",
+      "width": 291,
+      "height": 192
+    },
+    {
+      "id": "canvas_ui.selection-box",
+      "label": "Selection Box",
+      "category": "Canvas Icons",
+      "file": "canvas_ui/selection-box.png",
+      "src": "/stickers/wevi/canvas_ui/selection-box.png",
+      "width": 296,
+      "height": 232
+    },
+    {
+      "id": "canvas_ui.add",
+      "label": "Add",
+      "category": "Canvas Icons",
+      "file": "canvas_ui/add.png",
+      "src": "/stickers/wevi/canvas_ui/add.png",
+      "width": 223,
+      "height": 220
+    },
+    {
+      "id": "canvas_ui.card-stack",
+      "label": "Card Stack",
+      "category": "Canvas Icons",
+      "file": "canvas_ui/card-stack.png",
+      "src": "/stickers/wevi/canvas_ui/card-stack.png",
+      "width": 332,
+      "height": 258
+    },
+    {
+      "id": "canvas_ui.comment",
+      "label": "Comment",
+      "category": "Canvas Icons",
+      "file": "canvas_ui/comment.png",
+      "src": "/stickers/wevi/canvas_ui/comment.png",
+      "width": 239,
+      "height": 216
+    },
+    {
+      "id": "canvas_ui.pin-card",
+      "label": "Wevi Pin Card",
+      "category": "Canvas Icons",
+      "file": "canvas_ui/pin-card.png",
+      "src": "/stickers/wevi/canvas_ui/pin-card.png",
+      "width": 506,
+      "height": 294
+    },
+    {
+      "id": "canvas_ui.present-card",
+      "label": "Wevi Present Card",
+      "category": "Canvas Icons",
+      "file": "canvas_ui/present-card.png",
+      "src": "/stickers/wevi/canvas_ui/present-card.png",
+      "width": 444,
+      "height": 275
+    },
+    {
+      "id": "thread_workflow.laptop",
+      "label": "Wevi Laptop",
+      "category": "Workflow",
+      "file": "thread_workflow/laptop.png",
+      "src": "/stickers/wevi/thread_workflow/laptop.png",
+      "width": 314,
+      "height": 280
+    },
+    {
+      "id": "thread_workflow.idea",
+      "label": "Think / Idea",
+      "category": "Workflow",
+      "file": "thread_workflow/idea.png",
+      "src": "/stickers/wevi/thread_workflow/idea.png",
+      "width": 236,
+      "height": 386
+    },
+    {
+      "id": "thread_workflow.node-map",
+      "label": "Node Map",
+      "category": "Workflow",
+      "file": "thread_workflow/node-map.png",
+      "src": "/stickers/wevi/thread_workflow/node-map.png",
+      "width": 342,
+      "height": 324
+    },
+    {
+      "id": "thread_workflow.cards",
+      "label": "Card Stack",
+      "category": "Workflow",
+      "file": "thread_workflow/cards.png",
+      "src": "/stickers/wevi/thread_workflow/cards.png",
+      "width": 316,
+      "height": 297
+    },
+    {
+      "id": "thread_workflow.start-here",
+      "label": "Start Here",
+      "category": "Workflow",
+      "file": "thread_workflow/start-here.png",
+      "src": "/stickers/wevi/thread_workflow/start-here.png",
+      "width": 307,
+      "height": 306
+    },
+    {
+      "id": "thread_workflow.checklist",
+      "label": "Checklist",
+      "category": "Workflow",
+      "file": "thread_workflow/checklist.png",
+      "src": "/stickers/wevi/thread_workflow/checklist.png",
+      "width": 270,
+      "height": 285
+    },
+    {
+      "id": "thread_workflow.connections",
+      "label": "Connections",
+      "category": "Workflow",
+      "file": "thread_workflow/connections.png",
+      "src": "/stickers/wevi/thread_workflow/connections.png",
+      "width": 291,
+      "height": 309
+    },
+    {
+      "id": "thread_workflow.carry-card",
+      "label": "Carry Card",
+      "category": "Workflow",
+      "file": "thread_workflow/carry-card.png",
+      "src": "/stickers/wevi/thread_workflow/carry-card.png",
+      "width": 317,
+      "height": 267
+    },
+    {
+      "id": "thread_workflow.board-done",
+      "label": "Board Done",
+      "category": "Workflow",
+      "file": "thread_workflow/board-done.png",
+      "src": "/stickers/wevi/thread_workflow/board-done.png",
+      "width": 400,
+      "height": 325
+    },
+    {
+      "id": "thread_workflow.brain-dump",
+      "label": "Brain Dump",
+      "category": "Workflow",
+      "file": "thread_workflow/brain-dump.png",
+      "src": "/stickers/wevi/thread_workflow/brain-dump.png",
+      "width": 272,
+      "height": 293
+    },
+    {
+      "id": "thread_workflow.network",
+      "label": "Network",
+      "category": "Workflow",
+      "file": "thread_workflow/network.png",
+      "src": "/stickers/wevi/thread_workflow/network.png",
+      "width": 268,
+      "height": 272
+    },
+    {
+      "id": "thread_workflow.stack",
+      "label": "Stack",
+      "category": "Workflow",
+      "file": "thread_workflow/stack.png",
+      "src": "/stickers/wevi/thread_workflow/stack.png",
+      "width": 257,
+      "height": 247
+    },
+    {
+      "id": "thread_workflow.start-arrow",
+      "label": "Start Arrow",
+      "category": "Workflow",
+      "file": "thread_workflow/start-arrow.png",
+      "src": "/stickers/wevi/thread_workflow/start-arrow.png",
+      "width": 331,
+      "height": 218
+    },
+    {
+      "id": "thread_workflow.focus-mode",
+      "label": "Focus Mode",
+      "category": "Workflow",
+      "file": "thread_workflow/focus-mode.png",
+      "src": "/stickers/wevi/thread_workflow/focus-mode.png",
+      "width": 274,
+      "height": 280
+    },
+    {
+      "id": "thread_workflow.tangle-to-flow",
+      "label": "Tangle to Flow",
+      "category": "Workflow",
+      "file": "thread_workflow/tangle-to-flow.png",
+      "src": "/stickers/wevi/thread_workflow/tangle-to-flow.png",
+      "width": 288,
+      "height": 172
+    },
+    {
+      "id": "thread_workflow.ship-it",
+      "label": "Ship It",
+      "category": "Workflow",
+      "file": "thread_workflow/ship-it.png",
+      "src": "/stickers/wevi/thread_workflow/ship-it.png",
+      "width": 276,
+      "height": 307
+    }
+  ]
+}

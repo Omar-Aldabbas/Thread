@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { CanvasItem } from '../canvas.model';
-import { perimeterPoint, sidePoint } from './connector-geometry';
+import { containsShape, nearestPerimeter, perimeterPoint, sidePoint } from './connector-geometry';
+import { shapeKinds } from '../shapes';
 
 const shape = (kind: CanvasItem['shapeKind']): CanvasItem => ({
   id: 'shape', type: 'shape', shapeKind: kind, x: 0, y: 0, width: 200, height: 100,
@@ -8,6 +9,12 @@ const shape = (kind: CanvasItem['shapeKind']): CanvasItem => ({
 });
 
 describe('connector attachment to shape geometry', () => {
+  for (const kind of shapeKinds) it(`keeps ${kind} connector ports on its outline`, () => {
+    const item = shape(kind), port = sidePoint(item, 'right');
+    expect(containsShape(item, { x: 100, y: 50 })).toBe(true);
+    expect(nearestPerimeter(item, port).distance).toBeLessThan(.01);
+    expect(Number.isFinite(port.x) && Number.isFinite(port.y)).toBe(true);
+  });
   it('attaches to the ellipse circumference rather than its bounding box', () => {
     const point = perimeterPoint(shape('circle'), { x: 250, y: 100 });
     const normalized = ((point.x - 100) / 96) ** 2 + ((point.y - 50) / 48) ** 2;

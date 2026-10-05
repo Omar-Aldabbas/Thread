@@ -1,22 +1,11 @@
 import { CanvasItem, ConnectorSide } from '../canvas.model';
+import { shapeOutline } from '../shapes';
 
 export interface Point { x: number; y: number }
 const center = (item: CanvasItem): Point => ({ x: item.x + item.width / 2, y: item.y + item.height / 2 });
 const clamp = (value: number, min: number, max: number): number => Math.max(min, Math.min(max, value));
 
-function outline(item: CanvasItem): Point[] {
-  const kind = item.shapeKind;
-  if (kind === 'diamond') return [{ x: .5, y: .02 }, { x: .98, y: .5 }, { x: .5, y: .98 }, { x: .02, y: .5 }];
-  if (kind === 'triangle') return [{ x: .5, y: .02 }, { x: .98, y: .98 }, { x: .02, y: .98 }];
-  if (kind === 'cloud') return [{x:.25,y:.78},{x:.13,y:.73},{x:.08,y:.63},{x:.13,y:.52},{x:.28,y:.45},{x:.32,y:.29},{x:.44,y:.2},{x:.6,y:.22},{x:.75,y:.39},{x:.88,y:.42},{x:.96,y:.53},{x:.94,y:.66},{x:.83,y:.76},{x:.75,y:.78}];
-  if (kind === 'rounded') {
-    const points: Point[] = [];
-    for (const [cx, cy, start] of [[.94,.06,-Math.PI/2],[.94,.94,0],[.06,.94,Math.PI/2],[.06,.06,Math.PI]] as const)
-      for (let i = 0; i <= 5; i++) points.push({ x: cx + .04 * Math.cos(start + i * Math.PI / 10), y: cy + .04 * Math.sin(start + i * Math.PI / 10) });
-    return points;
-  }
-  return [{x:.02,y:.02},{x:.98,y:.02},{x:.98,y:.98},{x:.02,y:.98}];
-}
+function outline(item: CanvasItem): Point[] { return shapeOutline(item.shapeKind); }
 
 function local(item: CanvasItem, point: Point): Point {
   const c = center(item), angle = -(item.rotation || 0) * Math.PI / 180;

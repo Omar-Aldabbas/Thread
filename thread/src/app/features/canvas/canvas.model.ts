@@ -19,7 +19,7 @@ export type ItemType =
   | 'voice'
   | 'budget'
   | 'er-entity';
-export interface ErField { id: string; name: string; dataType: string; key: 'primary' | 'foreign' | 'none'; required: boolean }
+export interface ErField { id: string; name: string; dataType: string; key: 'primary' | 'foreign' | 'none'; required: boolean; unique?: boolean; defaultValue?: string; enumValues?: string[]; reference?: { entityId: string; fieldId: string }; note?: string }
 export type DataColumnType = 'text' | 'number' | 'currency' | 'date' | 'category' | 'checkbox' | 'calculated';
 export interface ThreadDataColumn { id: string; key: string; label: string; type: DataColumnType; calculation?: { left: string; operator: '+' | '-' | '*' | '/' | '%'; right: string } }
 export interface ThreadDataRow { id: string; values: Record<string, string | number | null> }
@@ -29,7 +29,7 @@ export type BudgetMode = 'simple' | 'project';
 export interface ChartConfig { type: 'bar' | 'donut' | 'line' | 'comparison'; categoryField?: string; valueField?: string; series?: string[] }
 export type ZoneType = 'standard' | 'nested' | 'portal';
 export type SketchBrush = 'pen' | 'marker' | 'highlighter' | 'neon';
-export type ShapeKind = 'rectangle' | 'rounded' | 'circle' | 'diamond' | 'triangle' | 'cloud';
+export type ShapeKind = 'rectangle' | 'rounded' | 'circle' | 'diamond' | 'triangle' | 'cloud' | 'pill' | 'cylinder' | 'hexagon' | 'parallelogram' | 'document';
 export type ConnectorKind = 'straight' | 'elbow' | 'curved';
 export type ConnectorSide = 'top' | 'right' | 'bottom' | 'left';
 export interface ConnectorBinding {
@@ -91,6 +91,7 @@ export interface CanvasItem {
   shapeFill?: string;
   shapeStroke?: string;
   shapeStrokeWidth?: number;
+  shapeStrokeStyle?: 'solid' | 'dashed';
   groupId?: string;
   sketchAsset?: 'sticker' | 'gif';
   assetId?: string;
@@ -115,6 +116,8 @@ export interface CanvasConnection {
   label?: string;
   sourceCardinality?: '1' | '0..1' | 'many' | '0..many';
   targetCardinality?: '1' | '0..1' | 'many' | '0..many';
+  sourceFieldId?: string;
+  targetFieldId?: string;
   style?: 'solid' | 'dashed';
   direction?: 'none' | 'forward' | 'both';
   kind?: ConnectorKind;
