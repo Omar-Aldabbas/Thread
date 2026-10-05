@@ -212,6 +212,7 @@ export class SpacesPage {
   private panSession: PanSession | null = null;
 
   private dragSession: DragSession | null = null;
+  private touchTap: { pointerId: number; spaceId: string; x: number; y: number; moved: boolean } | null = null;
 
   constructor() {
     effect(() => {
@@ -409,6 +410,7 @@ export class SpacesPage {
     event.stopPropagation();
     if (event.pointerType === 'touch' && this.isMobile() && this.activeTool() === 'select') {
       this.selectSpace(space);
+      this.touchTap = { pointerId: event.pointerId, spaceId: space.id, x: event.clientX, y: event.clientY, moved: false };
       return;
     }
 
@@ -453,6 +455,7 @@ export class SpacesPage {
   }
 
   spacePointerMove(event: PointerEvent): void {
+    if (this.touchTap?.pointerId === event.pointerId && Math.hypot(event.clientX - this.touchTap.x, event.clientY - this.touchTap.y) > 8) this.touchTap.moved = true;
     if (this.dragSession) {
       this.moveSpace(event);
 
@@ -465,6 +468,8 @@ export class SpacesPage {
   }
 
   spacePointerUp(event: PointerEvent, space?: SpaceCard): void {
+    const tap = this.touchTap;
+    if (tap?.pointerId === event.pointerId) this.touchTap = null;
     if (this.dragSession) {
       this.endSpaceDrag(event);
 
@@ -474,7 +479,7 @@ export class SpacesPage {
     if (this.panSession) {
       this.stopPan(event);
     }
-    if (event.pointerType === 'touch' && space && this.isMobile() && this.activeTool() === 'select') this.openSpace(space);
+    if (event.type !== 'pointercancel' && event.pointerType === 'touch' && space && tap?.pointerId === event.pointerId && tap.spaceId === space.id && !tap.moved && this.isMobile() && this.activeTool() === 'select') this.openSpace(space);
   }
 
   openSettings(): void {

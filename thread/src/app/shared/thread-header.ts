@@ -23,11 +23,12 @@ import { PreferencesService } from './preferences.service';
     .brand-button { flex:none; padding:0; background:none; color:var(--color-text-primary); font-size:14px; font-weight:850; letter-spacing:-.045em; }
     .brand-button span { color:var(--color-primary); }
     .header-divider { flex:none; height:19px; width:1px; background:var(--color-border); }
-    .space-name { overflow:hidden; max-width:42vw; white-space:nowrap; text-overflow:ellipsis; font-size:13px; font-weight:600; }
+    .space-name { min-width:0; flex:0 1 auto; overflow:hidden; max-width:42vw; white-space:nowrap; text-overflow:ellipsis; font-size:13px; font-weight:600; }
     .header-actions { display:flex; align-items:center; gap:7px; min-width:0; margin-left:auto; }
     .profile-button { display:grid; place-items:center; flex:none; width:34px; height:34px; border:1px solid var(--color-border); border-radius:50%; background:var(--color-surface-muted); color:var(--color-text-primary); font-size:11px; font-weight:750; }
     .profile-button:hover,.profile-button:focus-visible { border-color:var(--color-primary); color:var(--color-primary); }
-    @media(max-width:700px) { .thread-header { height:52px; gap:10px; padding:0 12px; } .space-name { max-width:35vw; } .profile-button { width:38px; height:38px; } }
+    @media(max-width:960px) { .thread-header { gap:10px; padding-inline:12px; } }
+    @media(max-width:700px) { .thread-header { height:52px; gap:8px; padding:0 12px; } .space-name { flex:1; max-width:none; } .header-divider { display:none; } .header-actions { gap:3px; } .profile-button { width:38px; height:38px; } }
   `],
 })
 export class ThreadHeader {

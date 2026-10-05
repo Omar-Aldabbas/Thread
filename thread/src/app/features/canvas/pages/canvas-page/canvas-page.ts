@@ -1,7 +1,7 @@
 import { CommonModule, isPlatformBrowser } from '@angular/common';
 import { AfterViewInit, Component, ElementRef, HostListener, OnDestroy, PLATFORM_ID, computed, effect, inject, signal, viewChild } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
-import { BudgetCurrency, CanvasConnection, CanvasItem, CanvasJunction, ChartConfig, ConnectorKind, ConnectorSide, ItemType, ShapeKind, SketchBrush, SketchStroke, ThreadDataset, demoConnections, demoItems } from '../../canvas.model';
+import { BudgetCurrency, CanvasConnection, CanvasItem, CanvasJunction, ChartConfig, ConnectorKind, ConnectorSide, ErField, ItemType, ShapeKind, SketchBrush, SketchStroke, ThreadDataset, demoConnections, demoItems } from '../../canvas.model';
 import { DatasetStore } from '../../data/dataset-store';
 import { canvasId } from '../../canvas-id';
 import { ThreadChart } from '../../components/thread-chart';
@@ -75,6 +75,7 @@ export class CanvasPage implements AfterViewInit, OnDestroy {
   readonly inspectorOpen = signal(false);
   readonly connectionSourceId = signal<string | null>(null);
   readonly search = signal('');
+  readonly searchOpen = signal(false);
   readonly panX = signal(0);
   readonly panY = signal(0);
   readonly zoom = signal(1);
@@ -111,6 +112,7 @@ export class CanvasPage implements AfterViewInit, OnDestroy {
   readonly visibleItems = computed(() => this.items().filter((item) => !this.search() || `${item.title} ${item.body || ''}`.toLowerCase().includes(this.search().toLowerCase())));
   readonly visibleConnections = computed(() => this.connections().filter((connection) => this.visibleItems().some((item) => item.id === connection.sourceId) && this.visibleItems().some((item) => item.id === connection.targetId)));
   readonly selected = computed(() => this.items().find((item) => item.id === this.selectedIds()[0]) || null);
+  readonly selectedConnection = computed(() => this.connections().find(connection => connection.id === this.selectedConnectionId()) || null);
   readonly groupBounds = computed(() => { const selected = this.items().filter(item => this.selectedIds().includes(item.id)); if (selected.length < 2) return null; const corners = selected.flatMap(item => { const cx = item.x + item.width / 2, cy = item.y + item.height / 2, a = (item.rotation || 0) * Math.PI / 180; return [-1, 1].flatMap(sx => [-1, 1].map(sy => ({ x: cx + sx * item.width / 2 * Math.cos(a) - sy * item.height / 2 * Math.sin(a), y: cy + sx * item.width / 2 * Math.sin(a) + sy * item.height / 2 * Math.cos(a) }))); }); const x = Math.min(...corners.map(point => point.x)), y = Math.min(...corners.map(point => point.y)); return { x, y, width: Math.max(...corners.map(point => point.x)) - x, height: Math.max(...corners.map(point => point.y)) - y }; });
   readonly worldTransform = computed(() => `translate(${this.panX()}px, ${this.panY()}px) scale(${this.zoom()})`);
   readonly gridSize = computed(() => `${24 * this.zoom()}px ${24 * this.zoom()}px`);
@@ -226,9 +228,9 @@ export class CanvasPage implements AfterViewInit, OnDestroy {
   endDataEdit(): void { if (this.dataEditBefore) this.commit(this.dataEditBefore); this.dataEditBefore=null; }
   undo(): void { const state = this.history.pop(); if (!state) return; this.future.push(this.state()); this.items.set(state.items); this.connections.set(state.connections); this.junctions.set(state.junctions || []); this.datasetStore.replace(state.datasets || []); }
   redo(): void { const state = this.future.pop(); if (!state) return; this.history.push(this.state()); this.items.set(state.items); this.connections.set(state.connections); this.junctions.set(state.junctions || []); this.datasetStore.replace(state.datasets || []); }
-  setTool(tool: Tool): void { this.finishEditing(); this.tool.set(tool); this.paletteOpen.set(tool === 'add'); this.pendingType.set(tool === 'shape' ? 'shape' : null); if (tool !== 'sketch') this.sketchEraser.set(false); else this.selectedIds.set([]); this.pendingAsset.set(null); this.mediaPicker.set(null); this.connectionSourceId.set(null); this.connectionTargetId.set(null); }
-  chooseType(type: ItemType): void { if (type === 'gif' || type === 'sticker') { this.openMedia(type); return; } this.pendingType.set(type); this.paletteOpen.set(false); this.tool.set('select'); }
-  openMedia(kind: 'gif' | 'sticker'): void { this.paletteOpen.set(false); this.mediaPicker.set(kind); this.pendingAsset.set(null); }
+  setTool(tool: Tool): void { this.finishEditing(); this.tool.set(tool); this.paletteOpen.set(tool === 'add'); this.pendingType.set(tool === 'shape' ? 'shape' : null); if (tool !== 'select') { this.inspectorOpen.set(false); this.selectedConnectionId.set(null); } if (tool !== 'sketch') this.sketchEraser.set(false); else this.selectedIds.set([]); this.pendingAsset.set(null); this.mediaPicker.set(null); this.connectionSourceId.set(null); this.connectionTargetId.set(null); }
+  chooseType(type: ItemType): void { this.finishEditing(); this.inspectorOpen.set(false); this.selectedConnectionId.set(null); if (type === 'gif' || type === 'sticker') { this.openMedia(type); return; } this.pendingType.set(type); this.paletteOpen.set(false); this.tool.set('select'); }
+  openMedia(kind: 'gif' | 'sticker'): void { this.finishEditing(); this.inspectorOpen.set(false); this.selectedConnectionId.set(null); this.paletteOpen.set(false); this.pendingType.set(null); this.mediaPicker.set(kind); this.pendingAsset.set(null); }
   pickMedia(asset: PickedMedia): void { this.mediaPicker.set(null); this.pendingAsset.set(asset); this.assetPreview.set(this.centerPoint()); this.selectedIds.set([]); this.sketchEraser.set(false); this.tool.set('select'); }
   placeMedia(asset: PickedMedia, point: { x: number; y: number }): void {
     const scale = Math.min(1, 280 / asset.width, 220 / asset.height);
@@ -266,12 +268,23 @@ export class CanvasPage implements AfterViewInit, OnDestroy {
   @HostListener('window:blur') blur(): void { this.spaceHeld.set(false); this.session = null; this.isPanning.set(false); this.pointers.clear(); this.pinch = null; }
 
   private point(clientX: number, clientY: number): { x: number; y: number } { const rect = this.viewport()?.nativeElement.getBoundingClientRect(); return { x: (clientX - (rect?.left || 0) - this.panX()) / this.zoom(), y: (clientY - (rect?.top || 0) - this.panY()) / this.zoom() }; }
+  private beginTouch(event: PointerEvent): boolean {
+    if (event.pointerType !== 'touch') return false;
+    this.pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+    (event.currentTarget as Element).setPointerCapture(event.pointerId);
+    if (this.pointers.size < 2) return false;
+    if (this.session?.before) { this.items.set(this.session.before.items); this.connections.set(this.session.before.connections); this.junctions.set(this.session.before.junctions || []); this.datasetStore.replace(this.session.before.datasets || []); }
+    const [a, b] = [...this.pointers.values()];
+    this.pinch = { distance: Math.hypot(a.x - b.x, a.y - b.y), x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+    this.session = null; this.sketchPoints.set([]); this.marquee.set(null); this.placement.set(null); this.snapGuide.set(null); this.transformGuide.set(null); this.isPanning.set(false);
+    return true;
+  }
   pointerDown(event: PointerEvent): void {
     if (event.button !== 0 && event.button !== 1) return;
     if ((event.target as HTMLElement).closest('[data-ui]')) return;
     if ((event.target as HTMLElement).closest('[data-item]') && !this.pendingType() && !this.pendingAsset() && this.tool() !== 'text') return;
     if (this.pendingAsset()) { this.placeMedia(this.pendingAsset()!, this.point(event.clientX, event.clientY)); return; }
-    if (event.pointerType === 'touch') { this.pointers.set(event.pointerId, { x: event.clientX, y: event.clientY }); if (this.pointers.size === 2) { const [a, b] = [...this.pointers.values()]; this.pinch = { distance: Math.hypot(a.x - b.x, a.y - b.y), x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }; this.session = null; this.sketchPoints.set([]); return; } }
+    if (this.beginTouch(event)) return;
     if (this.session) return;
     const point = this.point(event.clientX, event.clientY);
     if (event.button === 1 || this.spaceHeld() || this.tool() === 'hand') { this.session = { kind: 'pan', pointerId: event.pointerId, clientX: event.clientX, clientY: event.clientY, x: this.panX(), y: this.panY() }; this.isPanning.set(true); }
@@ -286,6 +299,7 @@ export class CanvasPage implements AfterViewInit, OnDestroy {
     if (event.button !== 0 || (event.target as HTMLElement).closest('button, input, a, [contenteditable="true"]')) return;
     if (this.pendingType() || this.pendingAsset() || this.tool() === 'text') { event.stopPropagation(); this.pointerDown(event); return; }
     event.stopPropagation();
+    if (this.beginTouch(event)) return;
     this.selectedConnectionId.set(null);
     if (this.tool() === 'shape') return;
     if (item.type === 'sketch' && this.tool() === 'select') {
@@ -297,7 +311,7 @@ export class CanvasPage implements AfterViewInit, OnDestroy {
     }
     if (this.cropId() === item.id) { this.session = { kind: 'crop', pointerId: event.pointerId, clientX: event.clientX, clientY: event.clientY, x: item.cropX || 0, y: item.cropY || 0, itemId: item.id }; (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId); return; }
     if (this.spaceHeld() || this.tool() === 'hand') { this.session = { kind: 'pan', pointerId: event.pointerId, clientX: event.clientX, clientY: event.clientY, x: this.panX(), y: this.panY() }; this.isPanning.set(true); }
-    else if (this.tool() === 'connect') { if (item.type === 'chart') return; const source = this.connectionSourceId(); if (source && source !== item.id) { this.snapshot(); this.connections.update((connections) => [...connections, { id: canvasId(), sourceId: source, targetId: item.id, sourceBinding: { mode: 'auto' }, targetBinding: { mode: 'auto' }, direction: 'forward', kind: this.connectorKind() }]); this.setTool('select'); } else { this.connectionSourceId.set(item.id); this.selectedIds.set([item.id]); } return; }
+    else if (this.tool() === 'connect') { if (item.type === 'chart') return; const source = this.connectionSourceId(); if (source && source !== item.id) { this.addConnection(source, item.id); this.setTool('select'); } else { this.connectionSourceId.set(item.id); this.selectedIds.set([item.id]); } return; }
     else { this.finishEditing(); const current = this.selectedIds(); const members = item.groupId ? this.items().filter(entry => entry.groupId === item.groupId).map(entry => entry.id) : [item.id]; this.selectedIds.set(event.shiftKey ? (current.includes(item.id) ? current.filter(id => !members.includes(id)) : [...new Set([...current, ...members])]) : current.includes(item.id) ? current : members); if (event.shiftKey || this.tool() !== 'select' || item.locked) return; const moving = new Set(this.selectedIds()); let changed = true; while (changed) { changed = false; for (const child of this.items()) if (child.parentId && moving.has(child.parentId) && !moving.has(child.id)) { moving.add(child.id); changed = true; } } const origins = new Map(this.items().filter(entry => moving.has(entry.id)).map(entry => [entry.id, { x: entry.x, y: entry.y }])); this.session = { kind: 'move', pointerId: event.pointerId, clientX: event.clientX, clientY: event.clientY, x: item.x, y: item.y, itemId: item.id, origins, before: this.state() }; }
     (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
   }
@@ -325,7 +339,7 @@ export class CanvasPage implements AfterViewInit, OnDestroy {
   private getOrCreateJunction(candidate:{connectionId:string;ratio:number;x:number;y:number}):CanvasJunction { const existing=this.junctions().find(j=>j.parentConnectorId===candidate.connectionId&&Math.hypot(this.junctionPoint(j).x-candidate.x,this.junctionPoint(j).y-candidate.y)<12/this.zoom()); if(existing) return existing; const junction={id:canvasId(),parentConnectorId:candidate.connectionId,positionRatio:candidate.ratio}; this.junctions.update(entries=>[...entries,junction]); return junction; }
   connectionHover(event:PointerEvent,connection:CanvasConnection):void { if(this.session||this.editingId()||(this.tool()!=='select'&&this.tool()!=='connect')) return; const candidate=this.nearestOnConnection(connection,this.point(event.clientX,event.clientY)); this.junctionCandidate.set(candidate); }
   connectionLeave(connection:CanvasConnection):void { if(!this.session&&this.junctionCandidate()?.connectionId===connection.id) this.junctionCandidate.set(null); }
-  branchDown(event:PointerEvent,connection:CanvasConnection):void { if(this.tool()!=='select'&&this.tool()!=='connect') return; event.preventDefault(); event.stopPropagation(); const candidate=this.nearestOnConnection(connection,this.point(event.clientX,event.clientY)); this.junctionCandidate.set(candidate); this.session={kind:'branch',pointerId:event.pointerId,clientX:event.clientX,clientY:event.clientY,x:candidate.x,y:candidate.y,connectionId:connection.id,ratio:candidate.ratio}; this.connectionPreview.set({x1:candidate.x,y1:candidate.y,x2:candidate.x,y2:candidate.y}); (event.currentTarget as Element).setPointerCapture(event.pointerId); }
+  branchDown(event:PointerEvent,connection:CanvasConnection):void { if(this.tool()!=='select'&&this.tool()!=='connect') return; event.preventDefault(); event.stopPropagation(); this.finishEditing(); this.selectedIds.set([]); this.selectedConnectionId.set(connection.id); const candidate=this.nearestOnConnection(connection,this.point(event.clientX,event.clientY)); this.junctionCandidate.set(candidate); this.session={kind:'branch',pointerId:event.pointerId,clientX:event.clientX,clientY:event.clientY,x:candidate.x,y:candidate.y,connectionId:connection.id,ratio:candidate.ratio}; this.connectionPreview.set({x1:candidate.x,y1:candidate.y,x2:candidate.x,y2:candidate.y}); (event.currentTarget as Element).setPointerCapture(event.pointerId); }
   junctionDown(event:PointerEvent,junction:CanvasJunction):void { event.preventDefault(); event.stopPropagation(); const point=this.junctionPoint(junction); if(this.tool()==='connect'){this.session={kind:'branch',pointerId:event.pointerId,clientX:event.clientX,clientY:event.clientY,x:point.x,y:point.y,connectionId:junction.parentConnectorId,junctionId:junction.id}; this.connectionPreview.set({x1:point.x,y1:point.y,x2:point.x,y2:point.y});} else {this.session={kind:'junction-slide',pointerId:event.pointerId,clientX:event.clientX,clientY:event.clientY,x:point.x,y:point.y,junctionId:junction.id,connectionId:junction.parentConnectorId,before:this.state()};} (event.currentTarget as Element).setPointerCapture(event.pointerId); }
   endpoint(connection: CanvasConnection, terminal: 'source' | 'target'): {x:number;y:number} { const ends=this.connectionEnds(connection); return terminal === 'source' ? ends.a : ends.b; }
   rebindDown(event: PointerEvent, connection: CanvasConnection, terminal: 'source' | 'target'): void {
@@ -369,8 +383,8 @@ export class CanvasPage implements AfterViewInit, OnDestroy {
       const corner = session.corner || 'se', sx = corner.endsWith('e') ? 1 : -1, sy = corner.startsWith('s') ? 1 : -1;
       const angle = (original.rotation || 0) * Math.PI / 180, cos = Math.cos(angle), sin = Math.sin(angle);
       const localX = (dx * cos + dy * sin) / this.zoom(), localY = (-dx * sin + dy * cos) / this.zoom();
-      let width = Math.max(item.type === 'text' ? 50 : 40, original.width + sx * localX);
-      let height = Math.max(item.type === 'text' ? 34 : 40, original.height + sy * localY);
+      let width = Math.max(item.type === 'er-entity' ? 220 : item.type === 'text' ? 50 : 40, original.width + sx * localX);
+      let height = Math.max(item.type === 'er-entity' ? 136 : item.type === 'text' ? 34 : 40, original.height + sy * localY);
       if (['image', 'gif', 'sticker', 'sketch'].includes(item.type) && !event.shiftKey) {
         const ratio = original.width / original.height;
         if (Math.abs(localX / original.width) >= Math.abs(localY / original.height)) height = width / ratio;
@@ -404,8 +418,15 @@ export class CanvasPage implements AfterViewInit, OnDestroy {
     if (session.kind === 'erase') this.eraseSketchAt(this.point(event.clientX, event.clientY));
   }
   pointerUp(event: PointerEvent): void {
+    const wasPinching = !!this.pinch;
     this.pointers.delete(event.pointerId);
     if (this.pointers.size < 2) this.pinch = null;
+    if (wasPinching) {
+      const remaining = [...this.pointers.entries()][0];
+      this.session = remaining ? { kind: 'pan', pointerId: remaining[0], clientX: remaining[1].x, clientY: remaining[1].y, x: this.panX(), y: this.panY() } : null;
+      this.isPanning.set(!!remaining);
+      return;
+    }
     const session = this.session;
     if (session?.pointerId !== event.pointerId) return;
     this.transformGuide.set(null);
@@ -421,7 +442,7 @@ export class CanvasPage implements AfterViewInit, OnDestroy {
     if (session?.kind === 'connect' && session.itemId) {
       const point = this.point(event.clientX, event.clientY);
       const target = this.connectorTarget(point, session.itemId);
-      if (target) { this.snapshot(); this.connections.update(connections => [...connections, { id: canvasId(), sourceId: session.itemId!, targetId: target.id, sourceBinding: { mode: 'auto' }, targetBinding: { mode: 'auto' }, direction: 'forward', kind: this.connectorKind() }]); }
+      if (target) this.addConnection(session.itemId!, target.id);
       else { const join=this.joinCandidate(point); if(join){const parent=this.connections().find(c=>c.id===join.connectionId)!; this.snapshot(); const junction=this.getOrCreateJunction(join); this.connections.update(entries=>[...entries,{id:canvasId(),sourceId:session.itemId!,targetId:parent.targetId,targetJunctionId:junction.id,sourceBinding:{mode:'auto'},direction:'forward',kind:this.connectorKind()}]);} }
     }
     if(session?.kind==='branch' && session.connectionId && session.moved){const parent=this.connections().find(c=>c.id===session.connectionId), point=this.point(event.clientX,event.clientY); if(parent){const target=this.connectorTarget(point,parent.sourceId), join=target?null:this.joinCandidate(point,parent.id); if(target||join){this.snapshot(); const origin=session.junctionId?this.junctions().find(j=>j.id===session.junctionId):this.getOrCreateJunction({connectionId:parent.id,ratio:session.ratio!,x:session.x,y:session.y}); if(origin){const other=join?this.connections().find(c=>c.id===join.connectionId):null; const destination=join?this.getOrCreateJunction(join):null; this.connections.update(entries=>[...entries,{id:canvasId(),sourceId:parent.sourceId,sourceJunctionId:origin.id,targetId:target?.id||other!.targetId,targetJunctionId:destination?.id,direction:'forward',kind:this.connectorKind()}]);}}} }
@@ -471,9 +492,9 @@ export class CanvasPage implements AfterViewInit, OnDestroy {
     if (target.hasPointerCapture(event.pointerId)) target.releasePointerCapture(event.pointerId);
   }
   wheel(event: WheelEvent): void { event.preventDefault(); if (event.ctrlKey || event.metaKey) this.zoomAt(event.clientX, event.clientY, this.zoom() * (event.deltaY > 0 ? .9 : 1.1)); else { this.panX.update((x) => x - event.deltaX); this.panY.update((y) => y - event.deltaY); } }
-  zoomAt(clientX: number, clientY: number, value: number): void { const rect = this.viewport()?.nativeElement.getBoundingClientRect(); if (!rect) return; const point = this.point(clientX, clientY); const zoom = Math.min(3, Math.max(.25, value)); this.zoom.set(zoom); this.panX.set(clientX - rect.left - point.x * zoom); this.panY.set(clientY - rect.top - point.y * zoom); }
+  zoomAt(clientX: number, clientY: number, value: number): void { const rect = this.viewport()?.nativeElement.getBoundingClientRect(); if (!rect) return; const point = this.point(clientX, clientY); const zoom = Math.min(3, Math.max(.08, value)); this.zoom.set(zoom); this.panX.set(clientX - rect.left - point.x * zoom); this.panY.set(clientY - rect.top - point.y * zoom); }
   zoomBy(factor: number): void { const rect = this.viewport()?.nativeElement.getBoundingClientRect(); if (rect) this.zoomAt(rect.left + rect.width / 2, rect.top + rect.height / 2, this.zoom() * factor); }
-  fitView(): void { const rect = this.viewport()?.nativeElement.getBoundingClientRect(); const frames = this.visibleItems().filter((item) => item.type === 'workspace'); const targets = frames.length ? frames : this.visibleItems(); if (!rect || !targets.length) { this.panX.set(0); this.panY.set(0); this.zoom.set(1); return; } const minX = Math.min(...targets.map((item) => item.x)); const minY = Math.min(...targets.map((item) => item.y)); const maxX = Math.max(...targets.map((item) => item.x + item.width)); const maxY = Math.max(...targets.map((item) => item.y + item.height)); const zoom = Math.min(1.15, Math.max(.35, Math.min((rect.width - 170) / (maxX - minX), (rect.height - 150) / (maxY - minY)))); this.zoom.set(zoom); this.panX.set((rect.width - (maxX - minX) * zoom) / 2 - minX * zoom); this.panY.set((rect.height - (maxY - minY) * zoom) / 2 - minY * zoom); }
+  fitView(): void { const rect = this.viewport()?.nativeElement.getBoundingClientRect(); const frames = this.visibleItems().filter((item) => item.type === 'workspace'); const targets = frames.length ? frames : this.visibleItems(); if (!rect || !targets.length) { this.panX.set(0); this.panY.set(0); this.zoom.set(1); return; } const minX = Math.min(...targets.map((item) => item.x)); const minY = Math.min(...targets.map((item) => item.y)); const maxX = Math.max(...targets.map((item) => item.x + item.width)); const maxY = Math.max(...targets.map((item) => item.y + item.height)); const mobile = rect.width <= 700; const horizontalSpace = Math.max(80, rect.width - (mobile ? 28 : 170)); const verticalSpace = Math.max(80, rect.height - (mobile ? 170 : 150)); const zoom = Math.min(1.15, Math.max(.08, Math.min(horizontalSpace / Math.max(1, maxX - minX), verticalSpace / Math.max(1, maxY - minY)))); this.zoom.set(zoom); this.panX.set((rect.width - (maxX - minX) * zoom) / 2 - minX * zoom); this.panY.set((rect.height - (maxY - minY) * zoom) / 2 - minY * zoom); }
   enter(item: CanvasItem): void { if (item.type !== 'zone' && item.type !== 'workspace') return; this.navigate(item.zoneType === 'portal' && item.portalTargetId ? item.portalTargetId : item.id); }
   navigate(id: string | null): void { this.contextId.set(id); this.selectedIds.set([]); queueMicrotask(() => this.fitView()); }
   goToSpaces(): void { this.router.navigate(['/spaces']); }
@@ -539,16 +560,17 @@ export class CanvasPage implements AfterViewInit, OnDestroy {
     if (this.connectorKind() === 'curved') { const bend = Math.max(40, Math.abs(x2 - x1) * .45), direction = Math.sign(x2 - x1 || 1); return `M ${x1} ${y1} C ${x1 + direction * bend} ${y1}, ${x2 - direction * bend} ${y2}, ${x2} ${y2}`; }
     return `M ${x1} ${y1} L ${x2} ${y2}`;
   }
-  connectionLabelX(connection: CanvasConnection): number { const a = this.items().find((item) => item.id === connection.sourceId)!; const b = this.items().find((item) => item.id === connection.targetId)!; return (a.x + a.width + b.x) / 2; }
-  connectionLabelY(connection: CanvasConnection): number { const a = this.items().find((item) => item.id === connection.sourceId)!; const b = this.items().find((item) => item.id === connection.targetId)!; return (a.y + a.height / 2 + b.y + b.height / 2) / 2 - 12; }
+  connectionLabelX(connection: CanvasConnection): number { if (connection.kind === 'elbow') return this.routeHandle(connection).x; const { a, b } = this.connectionEnds(connection); return (a.x + b.x) / 2; }
+  connectionLabelY(connection: CanvasConnection): number { if (connection.kind === 'elbow') return this.routeHandle(connection).y; const { a, b } = this.connectionEnds(connection); return (a.y + b.y) / 2; }
   private reparent(id: string): void { const item = this.items().find(entry => entry.id === id); if (!item || item.type === 'zone' || item.type === 'workspace' || item.type === 'frame') return; const x = item.x + item.width / 2, y = item.y + item.height / 2; const zone = [...this.items()].reverse().find(entry => (entry.type === 'zone' || entry.type === 'frame') && entry.id !== id && x >= entry.x && x <= entry.x + entry.width && y >= entry.y && y <= entry.y + entry.height); if (zone) this.update(id, { parentId: zone.id }); else if (['zone', 'frame'].includes(this.items().find(entry => entry.id === item.parentId)?.type || '')) this.update(id, { parentId: null }); }
   createAt(type: ItemType, point: { x: number; y: number }, box?: { width: number; height: number }): void {
+    this.finishEditing();
     if (type === 'file' || type === 'voice') { this.replaceId = null; this.imagePlacement = point; this.fileInput()?.nativeElement.click(); return; }
     const viewport = this.viewport()?.nativeElement;
     const mobile = !!viewport && viewport.clientWidth <= 700;
     const visibleWidth = viewport ? viewport.clientWidth / this.zoom() : 390;
-    const width = Math.max(100, box?.width || (type === 'shape' ? 180 : type === 'zone' || type === 'frame' ? 420 : type === 'budget' ? 390 : type === 'table' ? 390 : type === 'chart' ? 390 : type === 'image' ? 340 : type === 'list' ? 300 : type === 'task' ? 280 : type === 'link' ? 320 : type === 'text' ? 180 : 260));
-    const height = Math.max(40, box?.height || (type === 'shape' ? 110 : type === 'zone' || type === 'frame' ? 280 : type === 'budget' ? 320 : type === 'table' ? 220 : type === 'chart' ? 270 : type === 'image' ? 230 : type === 'task' ? 78 : type === 'list' ? 150 : type === 'link' ? 115 : type === 'text' ? 46 : 170));
+    const width = Math.max(100, box?.width || (type === 'shape' ? 180 : type === 'zone' || type === 'frame' ? 420 : type === 'er-entity' ? 300 : type === 'budget' ? 390 : type === 'table' ? 390 : type === 'chart' ? 390 : type === 'image' ? 340 : type === 'list' ? 300 : type === 'task' ? 280 : type === 'link' ? 320 : type === 'text' ? 180 : 260));
+    const height = Math.max(40, box?.height || (type === 'shape' ? 110 : type === 'zone' || type === 'frame' ? 280 : type === 'er-entity' ? 170 : type === 'budget' ? 320 : type === 'table' ? 220 : type === 'chart' ? 270 : type === 'image' ? 230 : type === 'task' ? 78 : type === 'list' ? 150 : type === 'link' ? 115 : type === 'text' ? 46 : 170));
     const placedWidth = mobile && !box ? Math.min(width, visibleWidth - 32 / this.zoom()) : width;
     const left = -this.panX() / this.zoom() + 16 / this.zoom();
     const x = mobile && !box ? Math.max(left, Math.min(point.x - placedWidth / 2, left + visibleWidth - 32 / this.zoom() - placedWidth)) : point.x;
@@ -556,8 +578,10 @@ export class CanvasPage implements AfterViewInit, OnDestroy {
     const dataset = type === 'budget' ? this.datasetStore.create([{label:'Category',type:'text',key:'item'},{label:'Planned',type:'currency',key:'planned'},{label:'Actual',type:'currency',key:'actual'},{label:'Remaining',type:'calculated',key:'remaining'},{label:'Group',type:'category',key:'group'}]) : type === 'table' ? this.datasetStore.create([{label:'Column 1',type:'text'},{label:'Column 2',type:'text'}]) : undefined;
     const chartSource = type === 'chart' ? this.datasets().find(data => this.canChart(data)) : undefined;
     if (dataset && type === 'budget') this.datasetStore.setCalculation(dataset.id, dataset.columns.find(column => column.key === 'remaining')!.id, { left: 'planned', operator: '-', right: 'actual' });
-    const item: CanvasItem = { id: canvasId(), type, parentId: null, x, y: point.y, width: placedWidth, height, title: '', body: '', datasetId: dataset?.id || chartSource?.id, chartConfig: type === 'chart' ? this.defaultChartConfig(chartSource) : undefined, budgetMode:type==='budget'?'simple':undefined, budgetCurrency:type==='budget'?'JOD':undefined, budgetPeriod:type==='budget'?'one-time':undefined, textAutoSize: type === 'text', accent: '#d4111c', shapeKind: type === 'shape' ? this.shapeKind() : undefined, shapeFill: type === 'shape' ? '#ffffff' : undefined, shapeStroke: type === 'shape' ? '#6b7280' : undefined, shapeStrokeWidth: type === 'shape' ? 1 : undefined, zoneType: type === 'zone' ? 'standard' : undefined, checklist: type === 'checklist' || type === 'list' ? [{ label: '', completed: false }] : undefined, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
-    this.items.update(items => [...items, item]); this.selectedIds.set([item.id]); this.tool.set('select');
+    const item: CanvasItem = { id: canvasId(), type, parentId: null, x, y: point.y, width: placedWidth, height, title: type === 'er-entity' ? 'New entity' : '', body: '', erFields: type === 'er-entity' ? [{ id: canvasId(), name: 'id', dataType: 'UUID', key: 'primary', required: true }] : undefined, datasetId: dataset?.id || chartSource?.id, chartConfig: type === 'chart' ? this.defaultChartConfig(chartSource) : undefined, budgetMode:type==='budget'?'simple':undefined, budgetCurrency:type==='budget'?'JOD':undefined, budgetPeriod:type==='budget'?'one-time':undefined, textAutoSize: type === 'text', accent: '#d4111c', shapeKind: type === 'shape' ? this.shapeKind() : undefined, shapeFill: type === 'shape' ? '#ffffff' : undefined, shapeStroke: type === 'shape' ? '#6b7280' : undefined, shapeStrokeWidth: type === 'shape' ? 1 : undefined, zoneType: type === 'zone' ? 'standard' : undefined, checklist: type === 'checklist' || type === 'list' ? [{ label: '', completed: false }] : undefined, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
+    this.items.update(items => [...items, item]); this.selectedIds.set([item.id]); this.selectedConnectionId.set(null); this.pendingType.set(null); this.paletteOpen.set(false); this.tool.set('select');
+    if (type === 'er-entity') this.inspectorOpen.set(true);
+    if (mobile && viewport) { const focusZoom = Math.min(1, (viewport.clientWidth - 32) / Math.max(1, placedWidth)); this.zoom.set(focusZoom); this.panX.set(viewport.clientWidth / 2 - (item.x + item.width / 2) * focusZoom); this.panY.set((viewport.clientHeight - 130) / 2 - (item.y + item.height / 2) * focusZoom); }
     if (['note', 'text', 'task', 'zone', 'frame', 'link', 'list', 'budget', 'table', 'shape'].includes(type)) queueMicrotask(() => this.startEditing(item.id));
   }
   selectImageForBlock(id: string): void { const item = this.items().find(entry => entry.id === id); if (!item || item.type !== 'image') return; this.selectedIds.set([id]); this.replaceId = id; this.imagePlacement = { x: item.x, y: item.y }; const input = this.fileInput()?.nativeElement; if (input) { input.accept = 'image/*'; input.click(); } }
@@ -572,11 +596,49 @@ export class CanvasPage implements AfterViewInit, OnDestroy {
   taskTitleKey(event: KeyboardEvent, id: string): void { if (event.key === 'Enter' || event.key === 'Escape') { event.preventDefault(); (event.target as HTMLInputElement).blur(); } }
   taskTitleBlur(event: Event, id: string): void { const value = (event.target as HTMLInputElement).value.trim() || 'New task'; const item = this.items().find(entry => entry.id === id); if (item && item.title !== value) { if (!this.richBefore) this.snapshot(); this.update(id, { title: value }); } this.finishEditing(); }
   setStyle(id: string, patch: Partial<CanvasItem>): void { const item = this.items().find(entry => entry.id === id); if (!item) return; this.snapshot(); this.update(id, item.type === 'sketch' && patch.accent ? { ...patch, sketchStrokes: item.sketchStrokes?.map(stroke => ({ ...stroke, color: patch.accent! })) } : patch); }
+  addErField(item: CanvasItem): void { const fields = item.erFields || []; this.setStyle(item.id, { erFields: [...fields, { id: canvasId(), name: `field_${fields.length + 1}`, dataType: 'VARCHAR', key: 'none', required: false }], height: Math.max(item.height, 134 + (fields.length + 1) * 34) }); }
+  updateErField(item: CanvasItem, fieldId: string, patch: Partial<ErField>): void { this.setStyle(item.id, { erFields: (item.erFields || []).map(field => { if (field.id !== fieldId) return field; const next = { ...field, ...patch }; return { ...next, name: next.name.trim() || 'field', dataType: next.dataType.trim() || 'VARCHAR', required: next.key === 'primary' || next.required }; }) }); }
+  removeErField(item: CanvasItem, fieldId: string): void { this.setStyle(item.id, { erFields: (item.erFields || []).filter(field => field.id !== fieldId) }); }
+  beginErConnection(item: CanvasItem): void { this.setTool('connect'); this.connectionSourceId.set(item.id); this.selectedIds.set([item.id]); this.inspectorOpen.set(false); }
+  cardinalityMarker(value: CanvasConnection['sourceCardinality']): string | null { return value ? `url(#er-${value === '1' ? 'one' : value === '0..1' ? 'optional-one' : value === 'many' ? 'many' : 'optional-many'})` : null; }
+  addRelatedErEntity(source: CanvasItem): void {
+    this.finishEditing(); this.pendingType.set(null);
+    const now = new Date().toISOString();
+    const foreignKey = `${source.title.trim().toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '') || 'entity'}_id`;
+    const target: CanvasItem = { id: canvasId(), type: 'er-entity', parentId: source.parentId, x: source.x + source.width + 110, y: source.y, width: 280, height: 202, title: 'Related entity', erFields: [{ id: canvasId(), name: 'id', dataType: 'UUID', key: 'primary', required: true }, { id: canvasId(), name: foreignKey, dataType: source.erFields?.find(field => field.key === 'primary')?.dataType || 'UUID', key: 'foreign', required: true }], createdAt: now, updatedAt: now };
+    this.snapshot(); this.items.update(items => [...items, target]); this.connections.update(entries => [...entries, { id: canvasId(), sourceId: source.id, targetId: target.id, kind: 'elbow', direction: 'none', sourceCardinality: '1', targetCardinality: 'many' }]);
+    this.selectedIds.set([target.id]); this.selectedConnectionId.set(null); this.inspectorOpen.set(true); this.tool.set('select');
+    const viewport = this.viewport()?.nativeElement;
+    if (viewport) { this.panX.set(viewport.clientWidth / 2 - (target.x + target.width / 2) * this.zoom()); this.panY.set(viewport.clientHeight / 2 - (target.y + target.height / 2) * this.zoom()); }
+  }
+  createErStarter(): void {
+    this.finishEditing(); this.pendingType.set(null);
+    this.paletteOpen.set(false);
+    const center = this.centerPoint();
+    const now = new Date().toISOString();
+    const base = { type: 'er-entity' as const, parentId: null, width: 260, height: 202, rotation: 0, createdAt: now, updatedAt: now };
+    const customer: CanvasItem = { ...base, id: canvasId(), x: center.x - 300, y: center.y - 100, title: 'Customer', erFields: [{ id: canvasId(), name: 'id', dataType: 'UUID', key: 'primary', required: true }, { id: canvasId(), name: 'email', dataType: 'VARCHAR', key: 'none', required: true }] };
+    const order: CanvasItem = { ...base, id: canvasId(), x: center.x + 40, y: center.y - 100, title: 'Order', erFields: [{ id: canvasId(), name: 'id', dataType: 'UUID', key: 'primary', required: true }, { id: canvasId(), name: 'customer_id', dataType: 'UUID', key: 'foreign', required: true }] };
+    const relation: CanvasConnection = { id: canvasId(), sourceId: customer.id, targetId: order.id, label: 'places', sourceCardinality: '1', targetCardinality: 'many', kind: 'elbow', direction: 'none' };
+    this.snapshot(); this.items.update(items => [...items, customer, order]); this.connections.update(entries => [...entries, relation]);
+    this.selectedIds.set([customer.id]); this.selectedConnectionId.set(null); this.inspectorOpen.set(true); this.tool.set('select');
+    const viewport = this.viewport()?.nativeElement;
+    if (viewport) { const zoom = Math.min(1, (viewport.clientWidth - 36) / 600, (viewport.clientHeight - 150) / 250); this.zoom.set(Math.max(.08, zoom)); this.panX.set(viewport.clientWidth / 2 - (center.x) * this.zoom()); this.panY.set((viewport.clientHeight - (viewport.clientWidth <= 700 ? 100 : 0)) / 2 - center.y * this.zoom()); }
+  }
+  setConnection(id: string, patch: Partial<CanvasConnection>): void { this.snapshot(); this.connections.update(entries => entries.map(entry => entry.id === id ? { ...entry, ...patch } : entry)); }
+  private addConnection(sourceId: string, targetId: string): void {
+    const source = this.items().find(item => item.id === sourceId);
+    const target = this.items().find(item => item.id === targetId);
+    const isEr = source?.type === 'er-entity' && target?.type === 'er-entity';
+    const connection: CanvasConnection = { id: canvasId(), sourceId, targetId, sourceBinding: { mode: 'auto' }, targetBinding: { mode: 'auto' }, direction: isEr ? 'none' : 'forward', kind: isEr ? 'elbow' : this.connectorKind(), sourceCardinality: isEr ? '1' : undefined, targetCardinality: isEr ? 'many' : undefined };
+    this.snapshot(); this.connections.update(entries => [...entries, connection]);
+    this.selectedIds.set([]); this.selectedConnectionId.set(connection.id);
+  }
   setTextSize(id: string, event: Event): void { this.setStyle(id, { fontSize: Number((event.target as HTMLSelectElement).value) }); }
   setFontFamily(id: string, event: Event): void { this.setStyle(id, { fontFamily: (event.target as HTMLSelectElement).value as CanvasItem['fontFamily'] }); }
   setAlignment(id: string, event: Event): void { this.setStyle(id, { textAlign: (event.target as HTMLSelectElement).value as CanvasItem['textAlign'] }); }
   toggleBold(id: string): void { const item = this.items().find(entry => entry.id === id); if (item) this.setStyle(id, { fontWeight: (item.fontWeight || 600) >= 700 ? 400 : 700 }); }
-  setProperty(id: string, key: 'x' | 'y' | 'width' | 'height', event: Event): void { const value = Number((event.target as HTMLInputElement).value); if (Number.isFinite(value)) this.setStyle(id, { [key]: key === 'width' || key === 'height' ? Math.max(30, value) : value }); }
+  setProperty(id: string, key: 'x' | 'y' | 'width' | 'height', event: Event): void { const value = Number((event.target as HTMLInputElement).value); if (!Number.isFinite(value)) return; const item = this.items().find(entry => entry.id === id); const minimum = item?.type === 'er-entity' ? (key === 'width' ? 220 : key === 'height' ? 136 : 30) : 30; this.setStyle(id, { [key]: key === 'width' || key === 'height' ? Math.max(minimum, value) : value }); }
   setString(id: string, key: 'due' | 'priority' | 'body', event: Event): void { this.setStyle(id, { [key]: (event.target as HTMLInputElement).value }); }
   setTaskStatus(id: string, event: Event): void { this.setStyle(id, { completed: (event.target as HTMLSelectElement).value === 'done' }); }
   setOrdered(id: string, event: Event): void { this.setStyle(id, { ordered: (event.target as HTMLInputElement).checked }); }

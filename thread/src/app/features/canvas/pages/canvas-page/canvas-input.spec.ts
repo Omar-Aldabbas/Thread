@@ -1,3 +1,4 @@
+import '@angular/compiler';
 import { signal } from '@angular/core';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { canvasId } from '../../canvas-id';
@@ -9,12 +10,16 @@ function canvas() {
   const viewport = document.createElement('main');
   viewport.getBoundingClientRect = () => ({ left: 100, top: 40, right: 1100, bottom: 840, width: 1000, height: 800, x: 100, y: 40, toJSON: () => ({}) });
   Object.defineProperty(viewport, 'clientWidth', { value: 1000 });
+  Object.defineProperty(viewport, 'clientHeight', { value: 800 });
   viewport.setPointerCapture = vi.fn();
   viewport.hasPointerCapture = vi.fn().mockReturnValue(false);
   page.viewport = () => ({ nativeElement: viewport });
   page.panX = signal(20); page.panY = signal(-10); page.zoom = signal(2);
   page.tool = signal('select'); page.spaceHeld = signal(false); page.pendingType = signal(null); page.pendingAsset = signal(null);
   page.paletteOpen = signal(false); page.placement = signal(null); page.sketchPoints = signal([]);
+  page.editingId = signal(null); page.richFocusId = signal(null); page.cropId = signal(null);
+  page.inspectorOpen = signal(false); page.selectedConnectionId = signal(null);
+  page.connectionSourceId = signal(null); page.mediaPicker = signal(null); page.sketchEraser = signal(false);
   page.selectedIds = signal([]); page.items = signal([]); page.connections = signal([]);
   page.junctions = signal([]); page.datasetStore = new DatasetStore();
   page.datasets = page.datasetStore.datasets; page.shapeKind = signal('rectangle');
@@ -23,6 +28,7 @@ function canvas() {
   page.precisePreview = signal(null); page.junctionCandidate = signal(null); page.isPanning = signal(false);
   page.pointers = new Map(); page.history = []; page.future = [];
   page.startEditing = vi.fn();
+  page.selected = () => page.items().find((item: any) => item.id === page.selectedIds()[0]) || null;
   return { page, viewport };
 }
 
@@ -84,5 +90,66 @@ describe('canvas IDs on a LAN origin', () => {
     expect(page.items()).toHaveLength(1);
     expect(page.selectedIds()).toEqual([page.items()[0].id]);
     expect(page.datasetStore.get(page.items()[0].datasetId)).toBeDefined();
+  });
+});
+
+describe('ER diagram workflow', () => {
+  it('opens entity editing and clears an earlier placement tool', () => {
+    const { page } = canvas();
+    page.chooseType('shape');
+    page.createAt('er-entity', { x: 100, y: 100 });
+    expect(page.pendingType()).toBeNull();
+    expect(page.inspectorOpen()).toBe(true);
+    expect(page.items()[0].erFields[0]).toMatchObject({ name: 'id', key: 'primary', required: true });
+  });
+
+  it('creates a linked starter with a primary and foreign key', () => {
+    const { page } = canvas();
+    page.createErStarter();
+    expect(page.items().map((item: any) => item.title)).toEqual(['Customer', 'Order']);
+    expect(page.items()[1].erFields[1]).toMatchObject({ name: 'customer_id', key: 'foreign' });
+    expect(page.connections()[0]).toMatchObject({ sourceId: page.items()[0].id, targetId: page.items()[1].id, sourceCardinality: '1', targetCardinality: 'many', kind: 'elbow' });
+  });
+
+  it('keeps primary keys required and prevents blank field labels', () => {
+    const { page } = canvas();
+    page.createAt('er-entity', { x: 100, y: 100 });
+    const item = page.items()[0];
+    page.updateErField(item, item.erFields[0].id, { required: false, name: '  ', dataType: '  ' });
+    expect(page.items()[0].erFields[0]).toMatchObject({ required: true, name: 'field', dataType: 'VARCHAR' });
+  });
+
+  it('keeps the entity header and controls usable when resized smaller', () => {
+    const { page, viewport } = canvas();
+    page.createAt('er-entity', { x: 100, y: 100 });
+    const item = page.items()[0];
+    const event = pointer(viewport, 'mouse');
+    page.resizeDown(event, item);
+    page.pointerMove({ ...event, clientX: -1000, clientY: -1000 });
+    expect(page.items()[0]).toMatchObject({ width: 220, height: 136 });
+  });
+});
+
+describe('touch navigation over cards', () => {
+  it('starts pinch zoom over a card and cancels the accidental card drag', () => {
+    const { page, viewport } = canvas();
+    const node = document.createElement('article'); node.dataset['item'] = 'true'; viewport.append(node);
+    node.setPointerCapture = vi.fn(); node.hasPointerCapture = vi.fn().mockReturnValue(false);
+    const item = { id: 'note', type: 'note', title: 'Note', x: 0, y: 0, width: 260, height: 170 };
+    page.items.set([item]);
+    const first = { ...pointer(viewport, 'touch', 1), target: node, currentTarget: node } as PointerEvent;
+    page.itemPointerDown(first, item);
+    page.pointerMove({ ...first, clientX: 340 });
+    expect(page.items()[0].x).not.toBe(0);
+    const second = { ...pointer(viewport, 'touch', 2), clientX: 500 } as PointerEvent;
+    page.pointerDown(second);
+    expect(page.items()[0].x).toBe(0);
+    expect(page.session).toBeNull();
+    page.pointerMove({ ...second, clientX: 600 });
+    expect(page.zoom()).toBeGreaterThan(2);
+    page.pointerUp(second);
+    expect(page.session.kind).toBe('pan');
+    page.pointerUp(first);
+    expect(page.pointers.size).toBe(0);
   });
 });

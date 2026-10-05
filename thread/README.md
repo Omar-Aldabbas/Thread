@@ -1,5 +1,13 @@
 # Thread
 
+## Sticker assets
+
+The canvas sticker picker uses the original SVG stickers in `public/stickers/` and the Wevi PNG collection in `public/stickers/wevi/`. Wevi sticker names, categories, dimensions, and search terms are registered in `src/app/features/canvas/wevi-stickers.ts`. Keep each PNG's category folder and filename aligned with its registry ID (`category.name`).
+
+## ER diagrams
+
+Open **Add → ER diagram starter** for a Customer/Order example, or choose **ER entity** to start from scratch. Add fields on the entity card and edit their names, types, and key roles in Details. Use **Connect entity** to link two existing entities, or **+ Related entity** to create a new entity with a foreign key. Select a relationship to change its label and cardinality.
+
 This project was generated using [Angular CLI](https://github.com/angular/angular-cli) version 22.2.0.
 
 ## Development server

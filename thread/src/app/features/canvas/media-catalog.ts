@@ -1,3 +1,5 @@
+import { weviStickers } from './wevi-stickers';
+
 export interface GifResult {
   id: string;
   name: string;
@@ -9,7 +11,8 @@ export interface GifResult {
 }
 
 export type StickerCategory =
-  'Thread' | 'Doodles' | 'Arrows' | 'Shapes' | 'Tape' | 'Labels' | 'Nature';
+  'Thread' | 'Doodles' | 'Arrows' | 'Shapes' | 'Tape' | 'Labels' | 'Nature'
+  | 'Wevi Actions' | 'Wevi Moments' | 'Canvas Icons' | 'Workflow';
 export interface StickerAsset {
   id: string;
   name: string;
@@ -62,4 +65,5 @@ export const stickers: StickerAsset[] = [
   sticker('corner-arrow', 'Corner arrow', 'Arrows', ['arrow', 'corner', 'direction']),
   sticker('burst-circle', 'Burst circle', 'Shapes', ['burst', 'circle', 'highlight']),
   sticker('underline-swoosh', 'Underline swoosh', 'Doodles', ['underline', 'red', 'line']),
+  ...weviStickers,
 ];

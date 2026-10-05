@@ -17,7 +17,9 @@ export type ItemType =
   | 'shape'
   | 'frame'
   | 'voice'
-  | 'budget';
+  | 'budget'
+  | 'er-entity';
+export interface ErField { id: string; name: string; dataType: string; key: 'primary' | 'foreign' | 'none'; required: boolean }
 export type DataColumnType = 'text' | 'number' | 'currency' | 'date' | 'category' | 'checkbox' | 'calculated';
 export interface ThreadDataColumn { id: string; key: string; label: string; type: DataColumnType; calculation?: { left: string; operator: '+' | '-' | '*' | '/' | '%'; right: string } }
 export interface ThreadDataRow { id: string; values: Record<string, string | number | null> }
@@ -82,6 +84,7 @@ export interface CanvasItem {
   budgetPeriod?: 'one-time' | 'monthly';
   budgetMonth?: string;
   chartConfig?: ChartConfig;
+  erFields?: ErField[];
   strokes?: { x: number; y: number; pressure?: number }[][];
   sketchStrokes?: SketchStroke[];
   shapeKind?: ShapeKind;
@@ -110,6 +113,8 @@ export interface CanvasConnection {
   sourceId: string;
   targetId: string;
   label?: string;
+  sourceCardinality?: '1' | '0..1' | 'many' | '0..many';
+  targetCardinality?: '1' | '0..1' | 'many' | '0..many';
   style?: 'solid' | 'dashed';
   direction?: 'none' | 'forward' | 'both';
   kind?: ConnectorKind;
