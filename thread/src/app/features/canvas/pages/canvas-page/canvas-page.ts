@@ -652,7 +652,7 @@ export class CanvasPage implements AfterViewInit, OnDestroy {
   erControlDown(event: PointerEvent, item: CanvasItem): void { event.stopPropagation(); if (this.tool() !== 'select') return; this.finishEditing(); this.selectedIds.set([item.id]); this.selectedConnectionId.set(null); }
   openErField(item: CanvasItem, field: ErField): void {
     this.setTool('select'); this.selectedIds.set([item.id]); this.inspectorOpen.set(false); this.erExpandedFieldId.set(field.id);
-    setTimeout(() => document.querySelector<HTMLInputElement>('.er-settings-name')?.focus());
+    setTimeout(() => document.querySelector<HTMLInputElement>('.er-settings-name')?.focus({ preventScroll: true }));
   }
   erEditingField(item: CanvasItem): ErField | undefined { return item.type === 'er-entity' ? item.erFields?.find(field => field.id === this.erExpandedFieldId()) : undefined; }
   closeErField(): void { const id = this.erExpandedFieldId(); this.erExpandedFieldId.set(null); setTimeout(() => document.querySelector<HTMLInputElement>(`[data-er-field="${id}"]`)?.focus()); }

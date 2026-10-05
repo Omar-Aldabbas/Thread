@@ -179,6 +179,25 @@ describe('touch navigation over cards', () => {
     expect(page.erFieldIssue(page.items()[1], page.items()[1].erFields[1])).toContain('no longer exists');
   });
 
+  it('opens field settings without changing the canvas position or zoom', () => {
+    const { page } = canvas(); page.createAt('er-entity', { x: 120, y: 90 });
+    const item = page.items()[0], field = item.erFields[0];
+    const before = [page.panX(), page.panY(), page.zoom()];
+    page.openErField(item, field);
+    expect([page.panX(), page.panY(), page.zoom()]).toEqual(before);
+    expect(page.erEditingField(item)?.id).toBe(field.id);
+    expect(page.inspectorOpen()).toBe(false);
+  });
+
+  it('shows the referenced data type and removes both constraint and line when disconnected', () => {
+    const { page } = canvas(); page.createErStarter();
+    const child = page.items()[1], field = child.erFields[1];
+    expect(page.erTypeChoice(field)).toBe('UUID');
+    page.setErReference(child, field, '');
+    expect(page.items()[1].erFields[1]).toMatchObject({ key: 'none', reference: undefined });
+    expect(page.connections()).toHaveLength(0);
+  });
+
   it('switches between enums and references with editable field options', () => {
     const { page } = canvas(); page.createAt('er-entity', { x: 0, y: 0 }); page.addErField(page.items()[0]);
     const item = page.items()[0], field = item.erFields[1]; page.setErType(item, field, 'ENUM');

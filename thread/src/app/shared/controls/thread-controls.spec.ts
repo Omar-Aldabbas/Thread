@@ -56,6 +56,14 @@ describe('Thread dropdowns', () => {
     key(panel, 'Escape'); fixture.detectChanges();
     expect(document.activeElement).toBe(trigger); expect(trigger.getAttribute('aria-expanded')).toBe('false');
   });
+  it('keeps dropdown activation keys away from canvas shortcuts', async () => {
+    const { element } = await harness();
+    const trigger = element.querySelector<HTMLButtonElement>('[role=combobox]')!;
+    let escaped = 0; const listener = () => escaped++;
+    window.addEventListener('keydown', listener);
+    try { key(trigger, ' '); key(trigger, 'Enter'); expect(escaped).toBe(0); }
+    finally { window.removeEventListener('keydown', listener); }
+  });
   it('refreshes labels and options when the data changes', async () => {
     const { fixture, instance, element } = await harness();
     expect(fixture.debugElement.query(By.directive(ThreadSelect)).componentInstance.selectedValue()).toBe('UUID');

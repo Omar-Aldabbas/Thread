@@ -326,7 +326,6 @@ button { cursor:pointer; border:0; background:none; color:inherit; }
 .er-field input:focus,.er-inline-key:focus { outline:2px solid var(--color-primary); outline-offset:-2px; background:var(--color-surface); }
 .er-field .er-inline-type { font-family:ui-monospace,monospace; font-size:10px; color:var(--color-text-secondary); }
 .er-inline-key { padding:2px 0; font-size:10px; font-weight:750; }
-.er-inline-required { min-height:30px; color:var(--color-primary); font-weight:800; }
 .er-add-field { display:flex; align-items:center; justify-content:space-between; min-height:34px; }
 .er-add-field span { color:var(--color-text-muted); font-size:9px; font-weight:500; }
 .er-help { margin:0; color:var(--color-text-secondary); font-size:12px; line-height:1.6; }
@@ -363,18 +362,7 @@ button { cursor:pointer; border:0; background:none; color:inherit; }
 .er-field-options.has-issue { color:#b45309; }
 .er-field-summary { display:flex; flex-wrap:wrap; gap:4px 8px; padding:0 12px 7px 58px; color:var(--color-text-muted); font-size:9px; line-height:1.4; }
 .er-field-summary span { max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-.er-inline-options { display:grid; gap:10px; padding:12px; background:var(--color-surface-muted); border-top:1px solid var(--color-border-light); }
-.er-inline-options label { display:grid; gap:5px; color:var(--color-text-secondary); font-size:11px; font-weight:650; }
-.er-inline-options input:not([type=checkbox]),.er-inline-options thread-select,.er-inline-options textarea { width:100%; min-width:0; min-height:34px; padding:7px 8px; border:1px solid var(--color-border); border-radius:6px; outline:none; background:var(--color-surface); color:var(--color-text-primary); font-size:12px; }
-.er-inline-options textarea { resize:vertical; min-height:58px; }
-.er-inline-options input:focus,.er-inline-options thread-select:focus,.er-inline-options textarea:focus { border-color:var(--color-primary); }
-.er-constraint-toggles { display:flex; gap:20px; }
-.er-constraint-toggles label { display:flex; align-items:center; gap:7px; }
-.er-constraint-toggles input { width:16px; height:16px; accent-color:var(--color-primary); }
 .er-field-warning { margin:0; color:#92400e; font-size:11px; line-height:1.5; }
-.er-field-actions { display:flex; align-items:center; justify-content:space-between; gap:12px; }
-.er-field-actions button,.er-open-inline { min-height:32px; padding:5px 8px; border-radius:5px; color:var(--color-primary); background:var(--color-surface); font-size:11px; font-weight:650; }
-.er-field-actions .danger { background:transparent; color:#b91c1c; }
 .er-field-reorder { display:flex; gap:8px; }
 .er-field-reorder button { min-height:32px; padding:4px 8px; border:1px solid var(--color-border); border-radius:5px; font-size:10px; }
 .er-field-reorder button:disabled { opacity:.4; }

@@ -413,8 +413,8 @@
                       <span class="er-key" [class.primary]="field.key === 'primary'" [class.foreign]="field.key === 'foreign'" [title]="field.key === 'primary' ? 'Primary key' : field.key === 'foreign' ? 'Foreign key' : 'Regular field'">{{ field.key === 'primary' ? 'PK' : field.key === 'foreign' ? 'FK' : '' }}</span>
                       @if (tool() === 'select') {
                         <input class="er-inline-name" [attr.data-er-field]="field.id" [attr.aria-label]="'Field name in ' + item.title" [value]="field.name" (pointerdown)="erControlDown($event, item)" (change)="updateErField(item, field.id, { name: $any($event.target).value })" (keydown)="erFieldKey($event, item)" />
-                        <thread-select size="compact" class="er-inline-type" [disabled]="!!field.reference" [attr.aria-label]="'Data type for ' + field.name" [value]="erTypeChoice(field)" (pointerdown)="erControlDown($event, item)" (change)="setErType(item, field, $any($event.target).value)">@for (type of erDataTypes; track type) { <thread-option [value]="type" [label]="type"></thread-option> }<thread-option value="CUSTOM" label="Custom type"></thread-option></thread-select>
-                        <button class="er-field-options" [class.has-issue]="!!erFieldIssue(item, field)" [attr.aria-label]="'Edit ' + field.name + ' settings'" [attr.aria-expanded]="erExpandedFieldId() === field.id && selectedIds().includes(item.id)" (pointerdown)="erControlDown($event, item)" (click)="$event.stopPropagation(); openErField(item, field)">⋯</button>
+                        <thread-select size="compact" class="er-inline-type" [disabled]="!!field.reference" [attr.aria-label]="'Data type for ' + field.name" [value]="erTypeChoice(field)" (pointerdown)="erControlDown($event, item)" (change)="setErType(item, field, $any($event.target).value)">@for (type of erDataTypes; track type) { <thread-option [value]="type" [label]="type"></thread-option> }<thread-option value="CUSTOM" [label]="erTypeChoice(field) === 'CUSTOM' && field.dataType !== 'CUSTOM' ? field.dataType : 'Custom type'"></thread-option></thread-select>
+                        <button class="er-field-options" [class.has-issue]="!!erFieldIssue(item, field)" [attr.aria-label]="'Edit ' + field.name + ' settings'" [title]="'Field settings for ' + field.name" [attr.aria-expanded]="erExpandedFieldId() === field.id && selectedIds().includes(item.id)" (pointerdown)="erControlDown($event, item)" (click)="$event.stopPropagation(); openErField(item, field)">⋯</button>
                       } @else { <strong>{{ field.name }}</strong><span class="er-type">{{ field.dataType }}</span><span></span> }
                     </div>
                     @if (field.reference) { <div class="er-field-summary"><span>References {{ erReferenceLabel(field) }}</span></div> }
@@ -862,7 +862,7 @@
         }
       }
       <button (click)="duplicate()">Duplicate</button
-      ><button (click)="inspectorOpen.set(!inspectorOpen())">Details</button
+      ><button (click)="erExpandedFieldId.set(null); inspectorOpen.set(!inspectorOpen())">Details</button
       ><button (click)="removeSelected()">Delete</button>
     </div>
   }
@@ -883,7 +883,7 @@
           @if (!erReferenceOptions(item, field).length) { <button class="inspector-action" (click)="addRelatedErEntity(item)">+ Create a related entity</button> }
           <details><summary>Default value and note</summary><label>Default value<input [value]="field.defaultValue || ''" placeholder="For example 0 or now()" (change)="updateErField(item, field.id, { defaultValue: $any($event.target).value })" /></label><label>Note<input [value]="field.note || ''" placeholder="Describe this field" (change)="updateErField(item, field.id, { note: $any($event.target).value })" /></label></details>
           @if (erFieldIssue(item, field); as issue) { <p class="er-field-warning" role="status">{{ issue }}</p> }
-          <div class="er-field-reorder"><button [disabled]="item.erFields?.[0]?.id === field.id" (click)="moveErField(item, field.id, -1)">Move up</button><button [disabled]="item.erFields?.[item.erFields!.length - 1]?.id === field.id" (click)="moveErField(item, field.id, 1)">Move down</button></div>
+          <div class="er-field-reorder"><button [disabled]="item.erFields?.[0]?.id === field.id" (click)="moveErField(item, field.id, -1)">Move up</button><button [disabled]="item.erFields?.slice(-1)?.[0]?.id === field.id" (click)="moveErField(item, field.id, 1)">Move down</button></div>
         </div>
         <footer><button class="danger" (click)="removeErField(item, field.id); closeErField()">Delete field</button><button class="er-settings-done" (click)="closeErField()">Done</button></footer>
       </section>
