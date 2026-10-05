@@ -1,5 +1,9 @@
 # Thread
 
+## Thread controls
+
+Dropdowns, checkboxes, and color pickers use the reusable components in `src/app/shared/controls/thread-controls.ts`. Dropdown options are `thread-option` elements with a value and label; long menus include search. The controls support keyboard navigation, disabled states, accessible labels, and Thread theme tokens. Floating panels attach to the document body so canvas transforms and scrolling containers do not clip them. The color picker supports preset colors, hue/saturation/brightness, and validated hex values, committing a drag once on release. Existing change handlers continue to receive `event.target.value` or `event.target.checked`.
+
 ## Sticker assets
 
 The canvas sticker picker uses the original SVG stickers in `public/stickers/` and the Wevi PNG collection in `public/stickers/wevi/`. Wevi sticker names, categories, dimensions, and search terms are registered in `src/app/features/canvas/wevi-stickers.ts`. The clean separated pack replaces the original generated images while preserving saved board URLs. Keep each PNG's category folder and filename aligned with its registry ID (`category.name`).

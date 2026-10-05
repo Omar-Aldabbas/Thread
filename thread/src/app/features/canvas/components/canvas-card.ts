@@ -1,9 +1,11 @@
 import { Component, EventEmitter, Input, Output } from '@angular/core';
+import { ThreadCheckbox } from '../../../shared/controls/thread-controls';
 import { CanvasItem } from '../canvas.model';
 
 @Component({
   selector: 'app-canvas-card',
   standalone: true,
+  imports: [ThreadCheckbox],
   template: `
     <div
       class="h-full w-full overflow-hidden rounded-[6px] border border-[var(--color-border)] bg-[var(--color-surface)]"
@@ -58,13 +60,13 @@ import { CanvasItem } from '../canvas.model';
           }
           @if (item.type === 'task') {
             <div class="mt-auto flex items-center gap-2 pt-3 text-xs text-stone-500">
-              <input
-                type="checkbox"
+              <thread-checkbox
+
                 [checked]="item.completed"
                 (change)="toggleTask.emit()"
                 (pointerdown)="$event.stopPropagation()"
                 aria-label="Complete task"
-              />
+              ></thread-checkbox>
               {{ item.due || 'No due date' }}
             </div>
           }
@@ -72,13 +74,13 @@ import { CanvasItem } from '../canvas.model';
             <div class="mt-3 space-y-2 overflow-auto">
               @for (entry of item.checklist || []; track $index) {
                 <label class="flex items-start gap-2 text-[12px] text-stone-600"
-                  ><input
-                    type="checkbox"
+                  ><thread-checkbox
+
                     class="mt-[2px]"
                     [checked]="entry.completed"
                     (change)="toggleChecklist.emit($index)"
                     (pointerdown)="$event.stopPropagation()"
-                  /><span [class.line-through]="entry.completed">{{ entry.label }}</span></label
+                  ></thread-checkbox><span [class.line-through]="entry.completed">{{ entry.label }}</span></label
                 >
               }
             </div>

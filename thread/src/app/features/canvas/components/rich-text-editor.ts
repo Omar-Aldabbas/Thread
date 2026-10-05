@@ -14,12 +14,13 @@
 import { Editor } from '@tiptap/core';
 import StarterKit from '@tiptap/starter-kit';
 import { TextStyleKit } from '@tiptap/extension-text-style';
+import { ThreadSelect, ThreadOption, ThreadColor } from '../../../shared/controls/thread-controls';
 import { ScrollDirective } from '../../../shared/scroll.directive';
 
 @Component({
   selector: 'app-rich-text-editor',
   standalone: true,
-  imports: [ScrollDirective],
+  imports: [ScrollDirective, ThreadSelect, ThreadOption, ThreadColor],
   encapsulation: ViewEncapsulation.None,
   template: `
     <div #toolbar class="rich-toolbar" appScroll="x" scrollbar="hover" (pointerdown)="$event.stopPropagation()">
@@ -78,15 +79,15 @@ import { ScrollDirective } from '../../../shared/scroll.directive';
       >
         1. List
       </button>
-      <select aria-label="Text size" (change)="size($event)">
-        <option value="">Size</option>
-        <option value="14px">14</option>
-        <option value="16px">16</option>
-        <option value="20px">20</option>
-        <option value="24px">24</option>
-        <option value="32px">32</option>
-      </select>
-      <input type="color" aria-label="Text color" value="#111111" (change)="color($event)" />
+      <thread-select size="compact" aria-label="Text size" (change)="size($event)">
+        <thread-option value="" label="Size"></thread-option>
+        <thread-option value="14px" label="14"></thread-option>
+        <thread-option value="16px" label="16"></thread-option>
+        <thread-option value="20px" label="20"></thread-option>
+        <thread-option value="24px" label="24"></thread-option>
+        <thread-option value="32px" label="32"></thread-option>
+      </thread-select>
+      <thread-color  aria-label="Text color" value="#111111" (change)="color($event)" ></thread-color>
     </div>
     <div #mount class="rich-mount" appScroll="y" scrollbar="hover" (pointerdown)="$event.stopPropagation()"></div>
   `,
@@ -118,7 +119,7 @@ import { ScrollDirective } from '../../../shared/scroll.directive';
         background: var(--color-surface);
         box-shadow: var(--shadow-md);
       }
-      .rich-toolbar button {
+      .rich-toolbar > button {
         min-width: 27px;
         height: 26px;
         padding: 0 5px;
@@ -128,20 +129,21 @@ import { ScrollDirective } from '../../../shared/scroll.directive';
         font-size: 11px;
         cursor: pointer;
       }
-      .rich-toolbar button.active,
-      .rich-toolbar button:hover {
+      .rich-toolbar > button.active,
+      .rich-toolbar > button:hover {
         background: var(--color-primary-subtle);
         color: var(--color-primary);
       }
-      .rich-toolbar span {
+      .rich-toolbar > span {
         width: 1px;
         height: 18px;
         margin: 0 3px;
         background: var(--color-border);
       }
-      .rich-toolbar select {
-        height: 26px;
-        max-width: 50px;
+      .rich-toolbar thread-select {
+        flex: none;
+        width: 72px;
+        max-width: 72px;
         border: 0;
         background: transparent;
         color: var(--color-text-secondary);
@@ -188,12 +190,12 @@ import { ScrollDirective } from '../../../shared/scroll.directive';
           width: calc(100vw - 16px);
           justify-content: flex-start;
         }
-        .rich-toolbar button {
+        .rich-toolbar > button {
           min-width: 38px;
           height: 38px;
           font-size: 14px;
         }
-        .rich-toolbar select {
+        .rich-toolbar thread-select {
           height: 38px;
           font-size: 14px;
         }

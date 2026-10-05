@@ -14,6 +14,7 @@ import { PreferencesService } from '../../../../shared/preferences.service';
 import { MediaPicker, PickedMedia } from '../../components/media-picker';
 import { CanvasTransformOverlay } from '../../transform/canvas-transform-overlay';
 import { SketchRenderer } from '../../sketch/sketch-renderer';
+import { ThreadSelect, ThreadOption, ThreadCheckbox, ThreadColor } from '../../../../shared/controls/thread-controls';
 import { ThreadHeader } from '../../../../shared/thread-header';
 import { ScrollDirective } from '../../../../shared/scroll.directive';
 import { brushDiameter, distanceToStroke, strokeBounds, strokeOutlinePath } from '../../sketch/sketch-geometry';
@@ -22,7 +23,7 @@ type Tool = 'select' | 'hand' | 'text' | 'add' | 'connect' | 'sketch' | 'shape';
 type Session = { kind: 'pan' | 'move' | 'resize' | 'rotate' | 'marquee' | 'place' | 'crop' | 'connect' | 'rebind' | 'route' | 'branch' | 'junction-slide' | 'sketch' | 'erase'; pointerId: number; clientX: number; clientY: number; x: number; y: number; itemId?: string; connectionId?: string; junctionId?: string; ratio?: number; terminal?: 'source' | 'target'; side?: ConnectorSide; corner?: 'nw' | 'ne' | 'sw' | 'se'; before?: State; origins?: Map<string, { x: number; y: number }>; groupCenter?: { x: number; y: number }; groupIds?: string[]; moved?: boolean };
 type State = { items: CanvasItem[]; connections: CanvasConnection[]; junctions?: CanvasJunction[]; datasets?: ThreadDataset[] };
 
-@Component({ selector: 'app-canvas-page', standalone: true, providers: [DatasetStore], imports: [CommonModule, RichTextEditor, MediaPicker, SketchRenderer, ThreadHeader, ScrollDirective, ThreadChart], templateUrl: './canvas-page.html', styleUrl: './canvas-page.css' })
+@Component({ selector: 'app-canvas-page', standalone: true, providers: [DatasetStore], imports: [CommonModule, RichTextEditor, MediaPicker, SketchRenderer, ThreadHeader, ScrollDirective, ThreadChart, ThreadSelect, ThreadOption, ThreadCheckbox, ThreadColor], templateUrl: './canvas-page.html', styleUrl: './canvas-page.css' })
 export class CanvasPage implements AfterViewInit, OnDestroy {
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
@@ -39,7 +40,7 @@ export class CanvasPage implements AfterViewInit, OnDestroy {
   readonly erRoutes = computed(() => routeErConnections(this.items(), this.connections()));
   readonly erEntities = computed(() => this.items().filter(item => item.type === 'er-entity'));
   readonly erExpandedFieldId = signal<string | null>(null);
-  readonly erDataTypes = erDataTypes;
+  readonly erDataTypes = ['UUID', 'VARCHAR', 'TEXT', 'INTEGER', 'DECIMAL', 'BOOLEAN', 'DATE', 'TIMESTAMP', 'ENUM', ...erDataTypes.filter(type => !['UUID', 'VARCHAR', 'TEXT', 'INTEGER', 'DECIMAL', 'BOOLEAN', 'DATE', 'TIMESTAMP', 'ENUM'].includes(type))];
   readonly shapeKinds = shapeKinds;
   readonly shapeNames = shapeNames;
   readonly shapePaths = shapePaths;
@@ -611,8 +612,8 @@ export class CanvasPage implements AfterViewInit, OnDestroy {
     const viewport = this.viewport()?.nativeElement;
     const mobile = !!viewport && viewport.clientWidth <= 700;
     const visibleWidth = viewport ? viewport.clientWidth / this.zoom() : 390;
-    const width = Math.max(100, box?.width || (type === 'shape' ? (this.shapeKind() === 'circle' ? 160 : 200) : type === 'zone' || type === 'frame' ? 420 : type === 'er-entity' ? 300 : type === 'budget' ? 390 : type === 'table' ? 390 : type === 'chart' ? 390 : type === 'image' ? 340 : type === 'list' ? 300 : type === 'task' ? 280 : type === 'link' ? 320 : type === 'text' ? 180 : 260));
-    const height = Math.max(40, box?.height || (type === 'shape' ? (this.shapeKind() === 'circle' ? 160 : ['diamond', 'triangle', 'cylinder'].includes(this.shapeKind()) ? 150 : 120) : type === 'zone' || type === 'frame' ? 280 : type === 'er-entity' ? 170 : type === 'budget' ? 320 : type === 'table' ? 220 : type === 'chart' ? 270 : type === 'image' ? 230 : type === 'task' ? 78 : type === 'list' ? 150 : type === 'link' ? 115 : type === 'text' ? 46 : 170));
+    const width = Math.max(100, box?.width || (type === 'shape' ? (this.shapeKind() === 'circle' ? 160 : 200) : type === 'zone' || type === 'frame' ? 420 : type === 'er-entity' ? 360 : type === 'budget' ? 390 : type === 'table' ? 390 : type === 'chart' ? 390 : type === 'image' ? 340 : type === 'list' ? 300 : type === 'task' ? 280 : type === 'link' ? 320 : type === 'text' ? 180 : 260));
+    const height = Math.max(40, box?.height || (type === 'shape' ? (this.shapeKind() === 'circle' ? 160 : ['diamond', 'triangle', 'cylinder'].includes(this.shapeKind()) ? 150 : 120) : type === 'zone' || type === 'frame' ? 280 : type === 'er-entity' ? 210 : type === 'budget' ? 320 : type === 'table' ? 220 : type === 'chart' ? 270 : type === 'image' ? 230 : type === 'task' ? 78 : type === 'list' ? 150 : type === 'link' ? 115 : type === 'text' ? 46 : 170));
     const placedWidth = mobile && !box ? Math.min(width, visibleWidth - 32 / this.zoom()) : width;
     const left = -this.panX() / this.zoom() + 16 / this.zoom();
     const x = mobile && !box ? Math.max(left, Math.min(point.x - placedWidth / 2, left + visibleWidth - 32 / this.zoom() - placedWidth)) : point.x;
@@ -642,32 +643,35 @@ export class CanvasPage implements AfterViewInit, OnDestroy {
     const current = this.items().find(entry => entry.id === item.id); if (!current) return;
     const fields = current.erFields || [], id = canvasId(); let number = fields.length + 1;
     while (fields.some(field => field.name === `field_${number}`)) number++;
+    this.inspectorOpen.set(false); this.erExpandedFieldId.set(null);
     this.selectedIds.set([item.id]); this.selectedConnectionId.set(null);
-    this.setStyle(item.id, { erFields: [...fields, { id, name: `field_${number}`, dataType: 'VARCHAR', key: 'none', required: false }], height: Math.max(current.height, 134 + (fields.length + 1) * 38) });
+    this.setStyle(item.id, { erFields: [...fields, { id, name: `field_${number}`, dataType: 'VARCHAR', key: 'none', required: false }], height: Math.max(current.height, 150 + (fields.length + 1) * 44) });
     setTimeout(() => { const input = document.querySelector<HTMLInputElement>(`${this.inspectorOpen() ? '.inspector ' : ''}[data-er-field="${id}"]`); input?.focus(); input?.select(); });
   }
   erFieldKey(event: KeyboardEvent, item: CanvasItem): void { if (event.key === 'Enter') { event.preventDefault(); (event.target as HTMLInputElement).blur(); this.addErField(item); } else if (event.key === 'Escape') { event.stopPropagation(); (event.target as HTMLInputElement).blur(); } }
   erControlDown(event: PointerEvent, item: CanvasItem): void { event.stopPropagation(); if (this.tool() !== 'select') return; this.finishEditing(); this.selectedIds.set([item.id]); this.selectedConnectionId.set(null); }
   openErField(item: CanvasItem, field: ErField): void {
     this.setTool('select'); this.selectedIds.set([item.id]); this.inspectorOpen.set(false); this.erExpandedFieldId.set(field.id);
-    const viewport = this.viewport()?.nativeElement;
-    if (viewport) { const zoom = Math.min(1.2, (viewport.clientWidth - 40) / item.width); this.zoom.set(zoom); this.panX.set(viewport.clientWidth / 2 - (item.x + item.width / 2) * zoom); this.panY.set(70 - item.y * zoom); }
-    setTimeout(() => document.querySelector<HTMLInputElement>(`[data-er-field="${field.id}"]`)?.focus());
+    setTimeout(() => document.querySelector<HTMLInputElement>('.er-settings-name')?.focus());
   }
-  erTypeChoice(field: ErField): string { return field.key === 'foreign' ? 'REFERENCE' : erDataTypes.includes(field.dataType) ? field.dataType : 'CUSTOM'; }
+  erEditingField(item: CanvasItem): ErField | undefined { return item.type === 'er-entity' ? item.erFields?.find(field => field.id === this.erExpandedFieldId()) : undefined; }
+  closeErField(): void { const id = this.erExpandedFieldId(); this.erExpandedFieldId.set(null); setTimeout(() => document.querySelector<HTMLInputElement>(`[data-er-field="${id}"]`)?.focus()); }
+  erSettingsKey(event: KeyboardEvent): void { event.stopPropagation(); if (event.key === 'Escape') { event.preventDefault(); this.closeErField(); } }
+  erTypeChoice(field: ErField): string { return erDataTypes.includes(field.dataType) ? field.dataType : 'CUSTOM'; }
+  erTypeLabel(type: string): string { const labels: Record<string, string> = { UUID: 'UUID (identifier)', VARCHAR: 'VARCHAR (short text)', TEXT: 'TEXT (long text)', INTEGER: 'INTEGER (whole number)', BIGINT: 'BIGINT (large whole number)', SMALLINT: 'SMALLINT (small whole number)', DECIMAL: 'DECIMAL (exact number)', FLOAT: 'FLOAT (decimal number)', DOUBLE: 'DOUBLE (precise decimal number)', BOOLEAN: 'BOOLEAN (yes or no)', DATE: 'DATE (calendar date)', TIME: 'TIME (time of day)', TIMESTAMP: 'TIMESTAMP (date and time)', JSON: 'JSON (structured data)', BINARY: 'BINARY (file data)', ENUM: 'ENUM (allowed values)' }; return labels[type] || type; }
   setErType(item: CanvasItem, field: ErField, value: string): void {
     const patch: Partial<ErField> = value === 'REFERENCE' ? { key: 'foreign', dataType: field.reference ? field.dataType : 'UUID' } : { dataType: value, reference: undefined, key: field.key === 'foreign' ? 'none' : field.key };
     if (value !== 'ENUM' && value !== 'REFERENCE') patch.enumValues = undefined;
     this.updateErField(item, field.id, patch);
-    if (['ENUM', 'REFERENCE', 'CUSTOM'].includes(value)) this.erExpandedFieldId.set(field.id);
+    if (['ENUM', 'REFERENCE', 'CUSTOM'].includes(value)) this.openErField(item, field);
   }
   erReferenceOptions(item: CanvasItem, field: ErField): { value: string; label: string }[] {
-    return this.erEntities().flatMap(entity => (entity.erFields || []).filter(other => (other.unique || other.key === 'primary' && (entity.erFields || []).filter(entry => entry.key === 'primary').length === 1) && other.id !== field.id).map(other => ({ value: `${entity.id}/${other.id}`, label: `${entity.title || 'Unnamed entity'}.${other.name} · ${other.dataType}` })));
+    return this.erEntities().flatMap(entity => (entity.erFields || []).filter(other => (other.unique || other.key === 'primary' && (entity.erFields || []).filter(entry => entry.key === 'primary').length === 1) && other.id !== field.id).map(other => ({ value: `${entity.id}/${other.id}`, label: `${entity.title || 'Unnamed entity'}.${other.name} (${other.dataType})` })));
   }
   erReferenceLabel(field: ErField): string { const entity = this.items().find(item => item.id === field.reference?.entityId), target = entity?.erFields?.find(other => other.id === field.reference?.fieldId); return entity && target ? `${entity.title}.${target.name}` : 'Missing reference'; }
   setErReference(item: CanvasItem, field: ErField, value: string): void {
     const [entityId, fieldId] = value.split('/'), entity = this.items().find(entry => entry.id === entityId), targetField = entity?.erFields?.find(entry => entry.id === fieldId);
-    if (!value) { this.updateErField(item, field.id, { reference: undefined }); return; }
+    if (!value) { this.updateErField(item, field.id, { reference: undefined, key: field.key === 'foreign' ? 'none' : field.key }); return; }
     if (!entity || !targetField || targetField.id === field.id || (targetField.key !== 'primary' && !targetField.unique)) return;
     if (!targetField.unique && (entity.erFields || []).filter(entry => entry.key === 'primary').length > 1) return;
     this.updateErField(item, field.id, { key: 'foreign', dataType: targetField.dataType, enumValues: targetField.enumValues, reference: { entityId, fieldId } });

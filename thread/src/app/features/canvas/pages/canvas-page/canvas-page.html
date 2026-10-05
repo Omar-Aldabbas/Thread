@@ -272,13 +272,13 @@
             </div>
           } @else if (item.type === 'task') {
             <div class="task-content">
-              <input
-                type="checkbox"
+              <thread-checkbox
+
                 [checked]="item.completed"
                 (change)="toggleTask(item.id)"
                 (pointerdown)="$event.stopPropagation()"
                 aria-label="Complete task"
-              />
+              ></thread-checkbox>
               <div class="task-main" appScroll="y" scrollbar="hover">
                 @if (editingId() === item.id) {
                   <input
@@ -303,12 +303,12 @@
                   <div class="checklist">
                     @for (entry of item.checklist || []; track $index) {
                       <label
-                        ><input
-                          type="checkbox"
+                        ><thread-checkbox
+
                           [checked]="entry.completed"
                           (change)="toggleChecklist(item.id, $index)"
                           (pointerdown)="$event.stopPropagation()"
-                        />{{ entry.label }}</label
+                        ></thread-checkbox>{{ entry.label }}</label
                       >
                     }
                   </div>
@@ -354,7 +354,7 @@
                 <div class="budget-summary">
                   <div class="smart-head">
                     <div class="budget-heading"><div class="smart-title" [attr.contenteditable]="editingId() === item.id" [attr.data-edit-id]="editingId() === item.id ? item.id : null" (keydown)="inlineKey($event)" (blur)="inlineBlur($event, item.id, 'title')" [textContent]="item.title || (editingId() === item.id ? '' : 'Budget')"></div>@if (item.budgetPeriod === 'monthly' && data.activePeriod) { <div class="budget-period"><button (pointerdown)="$event.stopPropagation()" (click)="changeBudgetMonth(item,-1,false)" aria-label="Previous month">‹</button><span>{{ budgetMonthLabel(data) }}</span><details (pointerdown)="$event.stopPropagation()"><summary aria-label="Next month">›</summary><button (click)="changeBudgetMonth(item,1,true)">Next month · copy planned</button><button (click)="changeBudgetMonth(item,1,false)">Next month · start at zero</button></details></div> }</div>
-                    <select class="smart-currency" [value]="item.budgetCurrency || 'JOD'" (pointerdown)="$event.stopPropagation()" (change)="setBudgetCurrency(item,$event)" aria-label="Budget currency"><option>JOD</option><option>USD</option><option>EUR</option><option>GBP</option></select>
+                    <thread-select size="compact" class="smart-currency" [value]="item.budgetCurrency || 'JOD'" (pointerdown)="$event.stopPropagation()" (change)="setBudgetCurrency(item,$event)" aria-label="Budget currency"><thread-option label="JOD"></thread-option><thread-option label="USD"></thread-option><thread-option label="EUR"></thread-option><thread-option label="GBP"></thread-option></thread-select>
                   </div>
                   <div class="budget-summary-values">
                     <div><span>Planned</span><strong>{{ money(budgetValue(data,budgetField(data,'Planned'))) }}</strong></div>
@@ -386,7 +386,7 @@
                               </div>
                             }
                             <strong class="budget-remainder" [class.negative]="isNegative(row.values[budgetField(data,'Remaining')])">{{ money(row.values[budgetField(data,'Remaining')]) }}</strong>
-                            <details class="budget-row-options" (pointerdown)="$event.stopPropagation()"><summary aria-label="Category options">···</summary><label>Move to group<select [value]="group" (change)="setBudgetGroup(item,row.id,$event)"><option value="">Ungrouped</option>@for (choice of budgetGroups(data); track choice) { <option [value]="choice">{{ choice }}</option> }</select></label><button (click)="deleteBudgetEntry(item,row.id)">Delete category</button></details>
+                            <details class="budget-row-options" (pointerdown)="$event.stopPropagation()"><summary aria-label="Category options">···</summary><label>Move to group<thread-select [value]="group" (change)="setBudgetGroup(item,row.id,$event)"><thread-option value="" label="Ungrouped"></thread-option>@for (choice of budgetGroups(data); track choice) { <thread-option [value]="choice" label="{{ choice }}"></thread-option> }</thread-select></label><button (click)="deleteBudgetEntry(item,row.id)">Delete category</button></details>
                           </div>
                         }
                         @if (group && budgetRows(data,group).length) { <div class="budget-subtotal"><span>Subtotal</span><span>{{ money(budgetValue(data,budgetField(data,'Planned'),group)) }}</span><span>{{ money(budgetValue(data,budgetField(data,'Actual'),group)) }}</span><span>{{ money(budgetValue(data,budgetField(data,'Remaining'),group)) }}</span></div> }
@@ -397,46 +397,32 @@
                   @if (!data.rows.length && !budgetGroups(data).length) { <div class="smart-empty">No categories yet. Add one to start planning.</div> }
                 </div>
                 <div class="budget-footer"><button class="smart-add" (pointerdown)="$event.stopPropagation()" (click)="addBudgetEntry(item.id)">+ Category</button><button class="smart-add" (pointerdown)="$event.stopPropagation()" (click)="addBudgetGroup(item)">+ Group</button>
-                  <details class="smart-menu" (pointerdown)="$event.stopPropagation()"><summary aria-label="Budget actions">···</summary><button (click)="createLinkedView(item,'table')">Create Table</button><button (click)="createLinkedView(item,'chart','comparison')">Create Chart</button><label>Period <select [value]="item.budgetPeriod || 'one-time'" (change)="setBudgetPeriod(item,$event)"><option value="one-time">One-time</option><option value="monthly">Monthly</option></select></label><label>Target <input type="number" min="0" [value]="item.budgetTarget || ''" placeholder="Optional" (change)="setBudgetTarget(item,$event)" /></label></details>
+                  <details class="smart-menu" (pointerdown)="$event.stopPropagation()"><summary aria-label="Budget actions">···</summary><button (click)="createLinkedView(item,'table')">Create Table</button><button (click)="createLinkedView(item,'chart','comparison')">Create Chart</button><label>Period <thread-select [value]="item.budgetPeriod || 'one-time'" (change)="setBudgetPeriod(item,$event)"><thread-option value="one-time" label="One-time"></thread-option><thread-option value="monthly" label="Monthly"></thread-option></thread-select></label><label>Target <input type="number" min="0" [value]="item.budgetTarget || ''" placeholder="Optional" (change)="setBudgetTarget(item,$event)" /></label></details>
                 </div>
                 @if (item.budgetTarget) { <div class="budget-target"><span>{{ money(budgetUsed(item),item.budgetCurrency) }} of {{ money(item.budgetTarget,item.budgetCurrency) }} target</span><div class="budget-progress"><i [style.width.%]="usedPercent(item)"></i></div></div> }
               }
             </div>
           } @else if (item.type === 'er-entity') {
             <div class="er-entity-card">
-              <div class="er-entity-head"><span>ENTITY ? DRAG HEADER TO MOVE @if (erEntityIssue(item); as issue) { <b class="er-entity-warning" [title]="issue">!</b> }</span>@if (tool() === 'select') { <input class="er-name-input" aria-label="Entity name" placeholder="Entity name" [value]="item.title" (pointerdown)="erControlDown($event, item)" (change)="setString(item.id, 'title', $event)" (keydown)="$event.stopPropagation()" /> } @else { <strong>{{ item.title || 'New entity' }}</strong> }</div>
+              <div class="er-entity-head"><span>ENTITY @if (erEntityIssue(item); as issue) { <b class="er-entity-warning" [title]="issue">!</b> }</span>@if (tool() === 'select') { <input class="er-name-input" aria-label="Entity name" placeholder="Entity name" [value]="item.title" (pointerdown)="erControlDown($event, item)" (change)="setString(item.id, 'title', $event)" (keydown)="$event.stopPropagation()" /> } @else { <strong>{{ item.title || 'New entity' }}</strong> }</div>
+              <div class="er-table-heading" aria-hidden="true"><span>Key</span><span>Field name</span><span>Type</span><span></span></div>
               <div class="er-fields" appScroll="y" scrollbar="hover">
-                @for (field of item.erFields || []; track field.id; let fieldIndex = $index) {
-                  <div class="er-field-block">
+                @for (field of item.erFields || []; track field.id) {
+                  <div class="er-field-block" [class.is-editing]="erExpandedFieldId() === field.id && selectedIds().includes(item.id)">
                     <div class="er-field" [class.er-field-editing]="tool() === 'select'">
+                      <span class="er-key" [class.primary]="field.key === 'primary'" [class.foreign]="field.key === 'foreign'" [title]="field.key === 'primary' ? 'Primary key' : field.key === 'foreign' ? 'Foreign key' : 'Regular field'">{{ field.key === 'primary' ? 'PK' : field.key === 'foreign' ? 'FK' : '' }}</span>
                       @if (tool() === 'select') {
-                        <select class="er-inline-key" [attr.aria-label]="'Key role for ' + field.name" [value]="field.key" (pointerdown)="erControlDown($event, item)" (change)="updateErField(item, field.id, { key: $any($event.target).value }); erExpandedFieldId.set($any($event.target).value === 'foreign' ? field.id : erExpandedFieldId())"><option value="none">?</option><option value="primary">PK</option><option value="foreign">FK</option></select>
                         <input class="er-inline-name" [attr.data-er-field]="field.id" [attr.aria-label]="'Field name in ' + item.title" [value]="field.name" (pointerdown)="erControlDown($event, item)" (change)="updateErField(item, field.id, { name: $any($event.target).value })" (keydown)="erFieldKey($event, item)" />
-                        <select class="er-inline-type" [attr.aria-label]="'Data type for ' + field.name" [value]="erTypeChoice(field)" (pointerdown)="erControlDown($event, item)" (change)="setErType(item, field, $any($event.target).value)">@for (type of erDataTypes; track type) { <option [value]="type">{{ type }}</option> }<option value="REFERENCE">Reference (FK)</option><option value="CUSTOM">Custom type?</option></select>
-                        <button class="er-field-options" [class.has-issue]="!!erFieldIssue(item, field)" [attr.aria-label]="'Options for ' + field.name" [attr.aria-expanded]="erExpandedFieldId() === field.id" (pointerdown)="erControlDown($event, item)" (click)="$event.stopPropagation(); erExpandedFieldId.set(erExpandedFieldId() === field.id ? null : field.id)">?</button>
-                      } @else {
-                        <span class="er-key" [class.primary]="field.key === 'primary'" [class.foreign]="field.key === 'foreign'">{{ field.key === 'primary' ? 'PK' : field.key === 'foreign' ? 'FK' : '?' }}</span><strong>{{ field.name }}</strong><span class="er-type">{{ field.dataType }}</span>@if (field.required) { <span class="er-required" title="Required">*</span> }
-                      }
+                        <thread-select size="compact" class="er-inline-type" [disabled]="!!field.reference" [attr.aria-label]="'Data type for ' + field.name" [value]="erTypeChoice(field)" (pointerdown)="erControlDown($event, item)" (change)="setErType(item, field, $any($event.target).value)">@for (type of erDataTypes; track type) { <thread-option [value]="type" [label]="type"></thread-option> }<thread-option value="CUSTOM" label="Custom type"></thread-option></thread-select>
+                        <button class="er-field-options" [class.has-issue]="!!erFieldIssue(item, field)" [attr.aria-label]="'Edit ' + field.name + ' settings'" [attr.aria-expanded]="erExpandedFieldId() === field.id && selectedIds().includes(item.id)" (pointerdown)="erControlDown($event, item)" (click)="$event.stopPropagation(); openErField(item, field)">⋯</button>
+                      } @else { <strong>{{ field.name }}</strong><span class="er-type">{{ field.dataType }}</span><span></span> }
                     </div>
-                    @if (field.required || field.unique || field.reference || field.dataType === 'ENUM') { <div class="er-field-summary">@if (field.required) { <span>Required</span> } @if (field.unique) { <span>Unique</span> } @if (field.reference) { <span>? {{ erReferenceLabel(field) }}</span> } @if (field.dataType === 'ENUM') { <span>{{ field.enumValues?.join(' ? ') || 'Add enum values' }}</span> }</div> }
-                    @if (tool() === 'select' && erExpandedFieldId() === field.id) {
-                      <div class="er-inline-options" (pointerdown)="erControlDown($event, item)" (keydown)="$event.stopPropagation()">
-                        @if (erTypeChoice(field) === 'CUSTOM') { <label>Custom data type<input [value]="field.dataType === 'CUSTOM' ? '' : field.dataType" placeholder="e.g. VARCHAR(255)" (change)="updateErField(item, field.id, { dataType: $any($event.target).value })" /></label> }
-                        @if (field.key === 'foreign') { <label>References<select [value]="field.reference ? field.reference.entityId + '/' + field.reference.fieldId : ''" (change)="setErReference(item, field, $any($event.target).value)"><option value="">Choose primary or unique field?</option>@for (option of erReferenceOptions(item, field); track option.value) { <option [value]="option.value">{{ option.label }}</option> }</select></label> }
-                        @if (field.dataType === 'ENUM') { <label>Allowed values<textarea rows="2" [disabled]="!!field.reference" placeholder="draft, active, archived" [value]="field.enumValues?.join(', ') || ''" (change)="setErEnum(item, field, $event)"></textarea></label> }
-                        <div class="er-constraint-toggles"><label><input type="checkbox" [checked]="field.required" [disabled]="field.key === 'primary'" (change)="updateErField(item, field.id, { required: $any($event.target).checked })" /> Required</label><label><input type="checkbox" [checked]="field.unique" (change)="updateErField(item, field.id, { unique: $any($event.target).checked })" /> Unique</label></div>
-                        <label>Default value<input [value]="field.defaultValue || ''" placeholder="Optional ? e.g. 0 or now()" (change)="updateErField(item, field.id, { defaultValue: $any($event.target).value })" /></label>
-                        <label>Note<input [value]="field.note || ''" placeholder="Describe this field" (change)="updateErField(item, field.id, { note: $any($event.target).value })" /></label>
-                        @if (erFieldIssue(item, field); as issue) { <p class="er-field-warning" role="status">{{ issue }}</p> }
-                        <div class="er-field-reorder"><button [disabled]="fieldIndex === 0" (click)="moveErField(item, field.id, -1)" aria-label="Move field up">? Move up</button><button [disabled]="fieldIndex === (item.erFields?.length || 0) - 1" (click)="moveErField(item, field.id, 1)" aria-label="Move field down">? Move down</button></div>
-                        <div class="er-field-actions"><button (click)="$event.stopPropagation(); erExpandedFieldId.set(null)">Done</button><button class="danger" (click)="$event.stopPropagation(); removeErField(item, field.id)">Delete field</button></div>
-                      </div>
-                    }
+                    @if (field.reference) { <div class="er-field-summary"><span>References {{ erReferenceLabel(field) }}</span></div> }
                   </div>
-                }
-                @if (tool() === 'select') { <button class="er-add-field" type="button" (pointerdown)="erControlDown($event, item)" (click)="$event.stopPropagation(); addErField(item)">+ Add field <span>Enter ?</span></button> }
+                } @empty { <p class="er-empty">Add your first field to describe this entity.</p> }
+                @if (tool() === 'select') { <button class="er-add-field" type="button" (pointerdown)="erControlDown($event, item)" (click)="$event.stopPropagation(); addErField(item)">+ Add field</button> }
               </div>
-              <div class="er-entity-foot"><span>{{ item.erFields?.length || 0 }} fields ? Click a name to edit</span><button type="button" (pointerdown)="$event.stopPropagation()" (click)="$event.stopPropagation(); beginErConnection(item)">Connect ?</button></div>
+              <div class="er-entity-foot"><span>{{ item.erFields?.length || 0 }} fields</span><button type="button" (pointerdown)="$event.stopPropagation()" (click)="$event.stopPropagation(); addRelatedErEntity(item)">+ Related entity</button><button type="button" (pointerdown)="$event.stopPropagation()" (click)="$event.stopPropagation(); beginErConnection(item)">Connect</button></div>
             </div>
           } @else if (item.type === 'table') {
             <div class="table-content smart-block">
@@ -445,14 +431,14 @@
                 @if (tableFilter()?.itemId === item.id && (tableFilter()?.value || tableFilter()?.operator === 'empty')) { <div class="table-filter-chip">{{ tableFilter()?.key }} {{ tableFilter()?.operator }} {{ tableFilter()?.value }} <button (pointerdown)="$event.stopPropagation()" (click)="clearTableFilter()" aria-label="Clear filter">×</button></div> }
                 <div class="table-scroll" appScroll="both" scrollbar="auto"><table><colgroup>@for (column of tableViewColumns(item,data); track column.id) { <col [style.width.px]="item.tableColumnWidths?.[column.id] || 120" /> }<col style="width:30px" /></colgroup><thead><tr>
                   @for (column of tableViewColumns(item,data); track column.id) {
-                    <th draggable="true" (dragstart)="dragTableColumn(column.id,$event)" (dragover)="$event.preventDefault()" (drop)="dropTableColumn(item,data,column.id,$event)"><div class="table-column-head"><span>{{ column.label }}</span><details class="table-column-menu" (pointerdown)="$event.stopPropagation()"><summary [attr.aria-label]="column.label + ' options'">···</summary><label>Name<input [value]="column.label" (change)="setTableHeader(item,column.id,$event)" /></label><label>Type<select [value]="column.type" (change)="setTableColumnType(item,column.id,$event)"><option value="text">Text</option><option value="number">Number</option><option value="currency">Currency</option><option value="date">Date</option><option value="category">Select</option><option value="checkbox">Checkbox</option></select></label><button (click)="setTableSort(item,column.key,1)">Sort ascending</button><button (click)="setTableSort(item,column.key,-1)">Sort descending</button><button (click)="clearTableSort()">Clear sort</button><label>Filter<select [value]="tableFilter()?.key === column.key ? tableFilter()?.operator : 'contains'" (change)="setTableFilterOperator(item,column.key,$event)"><option value="contains">Contains</option><option value="is">Is</option><option value="not">Is not</option><option value="empty">Is empty</option><option value="gt">Greater than</option><option value="lt">Less than</option><option value="between">Between</option></select><input [value]="tableFilter()?.key === column.key ? tableFilter()?.value : ''" placeholder="Value" (input)="setTableFilter(item,column.key,$event)" />@if (tableFilter()?.key === column.key && tableFilter()?.operator === 'between') { <input [value]="tableFilter()?.second || ''" placeholder="And" (input)="setTableFilterSecond(item,column.key,$event)" /> }</label><button (click)="setTableGroup(item,column.key)">Group by this column</button><button (click)="clearTableGroup()">Clear grouping</button>@if (column.type === 'number' || column.type === 'currency' || column.type === 'calculated') { <label>Summarize<select [value]="tableSummary()[item.id + ':' + column.key] || 'sum'" (change)="setTableSummary(item,column.key,$event)"><option value="sum">Sum</option><option value="average">Average</option><option value="min">Min</option><option value="max">Max</option><option value="count">Count</option></select></label> }<button (click)="removeTableColumn(item,column.id)">Delete column</button></details></div><span class="table-resize" (pointerdown)="resizeTableColumn($event,item,column.id)" (dblclick)="fitTableColumn(item,data,column.id);$event.stopPropagation()"></span></th>
+                    <th draggable="true" (dragstart)="dragTableColumn(column.id,$event)" (dragover)="$event.preventDefault()" (drop)="dropTableColumn(item,data,column.id,$event)"><div class="table-column-head"><span>{{ column.label }}</span><details class="table-column-menu" (pointerdown)="$event.stopPropagation()"><summary [attr.aria-label]="column.label + ' options'">···</summary><label>Name<input [value]="column.label" (change)="setTableHeader(item,column.id,$event)" /></label><label>Type<thread-select [value]="column.type" (change)="setTableColumnType(item,column.id,$event)"><thread-option value="text" label="Text"></thread-option><thread-option value="number" label="Number"></thread-option><thread-option value="currency" label="Currency"></thread-option><thread-option value="date" label="Date"></thread-option><thread-option value="category" label="Select"></thread-option><thread-option value="checkbox" label="Checkbox"></thread-option></thread-select></label><button (click)="setTableSort(item,column.key,1)">Sort ascending</button><button (click)="setTableSort(item,column.key,-1)">Sort descending</button><button (click)="clearTableSort()">Clear sort</button><label>Filter<thread-select [value]="tableFilter()?.key === column.key ? tableFilter()?.operator : 'contains'" (change)="setTableFilterOperator(item,column.key,$event)"><thread-option value="contains" label="Contains"></thread-option><thread-option value="is" label="Is"></thread-option><thread-option value="not" label="Is not"></thread-option><thread-option value="empty" label="Is empty"></thread-option><thread-option value="gt" label="Greater than"></thread-option><thread-option value="lt" label="Less than"></thread-option><thread-option value="between" label="Between"></thread-option></thread-select><input [value]="tableFilter()?.key === column.key ? tableFilter()?.value : ''" placeholder="Value" (input)="setTableFilter(item,column.key,$event)" />@if (tableFilter()?.key === column.key && tableFilter()?.operator === 'between') { <input [value]="tableFilter()?.second || ''" placeholder="And" (input)="setTableFilterSecond(item,column.key,$event)" /> }</label><button (click)="setTableGroup(item,column.key)">Group by this column</button><button (click)="clearTableGroup()">Clear grouping</button>@if (column.type === 'number' || column.type === 'currency' || column.type === 'calculated') { <label>Summarize<thread-select [value]="tableSummary()[item.id + ':' + column.key] || 'sum'" (change)="setTableSummary(item,column.key,$event)"><thread-option value="sum" label="Sum"></thread-option><thread-option value="average" label="Average"></thread-option><thread-option value="min" label="Min"></thread-option><thread-option value="max" label="Max"></thread-option><thread-option value="count" label="Count"></thread-option></thread-select></label> }<button (click)="removeTableColumn(item,column.id)">Delete column</button></details></div><span class="table-resize" (pointerdown)="resizeTableColumn($event,item,column.id)" (dblclick)="fitTableColumn(item,data,column.id);$event.stopPropagation()"></span></th>
                   }
                   <th class="row-action"> </th>
                 </tr></thead><tbody>
                   @for (entry of tableGroupedRows(item,data); track entry.id; let rowIndex = $index) {
                     @if (entry.row; as row) { <tr>@for (column of tableViewColumns(item,data); track column.id) {
                       <td tabindex="0" [class.cell-selected]="selectedDataCell() === item.id + ':' + row.id + ':' + column.key" [attr.data-select-cell]="item.id + ':' + row.id + ':' + column.key" (pointerdown)="$event.stopPropagation()" (click)="selectTableCell(item,row.id,column.key)" (dblclick)="editTableCell(item,row.id,column.key)" (keydown)="tableCellKey($event,item,row.id,column.key)">
-                        @if (column.type === 'checkbox') { <input type="checkbox" [checked]="!!row.values[column.key]" [attr.aria-label]="'Row ' + (rowIndex + 1) + ', ' + column.label" (pointerdown)="$event.stopPropagation()" (change)="beginDataEdit();setTableCell(item,row.id,column.key,$event);endDataEdit()" />
+                        @if (column.type === 'checkbox') { <thread-checkbox  [checked]="!!row.values[column.key]" [attr.aria-label]="'Row ' + (rowIndex + 1) + ', ' + column.label" (pointerdown)="$event.stopPropagation()" (change)="beginDataEdit();setTableCell(item,row.id,column.key,$event);endDataEdit()" ></thread-checkbox>
                         } @else if (editingDataCell() === item.id + ':' + row.id + ':' + column.key) {
                           <input [attr.data-edit-cell]="item.id + ':' + row.id + ':' + column.key" [type]="column.type === 'number' || column.type === 'currency' ? 'number' : column.type === 'date' ? 'date' : 'text'" [value]="row.values[column.key] ?? ''" [attr.aria-label]="'Row ' + (rowIndex + 1) + ', ' + column.label" (pointerdown)="$event.stopPropagation()" (focus)="beginDataEdit()" (input)="setTableCell(item,row.id,column.key,$event)" (blur)="stopDataCellEdit()" (keydown)="tableEditKey($event,item,row.id,column.key)" />
                         } @else { <span [class.calculated-cell]="column.type === 'calculated'">{{ column.type === 'currency' || column.type === 'calculated' ? money(row.values[column.key]) : row.values[column.key] }}</span> }
@@ -461,8 +447,8 @@
                     } @else { <tr class="table-group-row"><td [attr.colspan]="data.columns.length + 1"><button (pointerdown)="$event.stopPropagation()" (click)="toggleTableGroup(item,entry.group || '')">{{ collapsedTableGroups().includes(item.id + ':' + entry.group) ? '▸' : '▾' }} {{ entry.group }} <span>{{ entry.count }} rows</span></button></td></tr> }
                   }
                 </tbody><tfoot><tr>@for (column of tableViewColumns(item,data); track column.id) { <td>@if (column.type === 'number' || column.type === 'currency' || column.type === 'calculated') { <span>{{ tableSummaryLabel(item,column.key) }} {{ money(tableSummaryValue(item,data,column.key)) }}</span> }</td> }<td></td></tr></tfoot></table>@if (!data.rows.length) { <div class="smart-empty">No rows yet. Add one below. @if (data.columns.length === 2) { <button (pointerdown)="$event.stopPropagation()" (click)="useCostEstimate(item)">Start a cost estimate</button> }</div> }</div>
-                <div class="table-actions"><button (pointerdown)="$event.stopPropagation()" (click)="addTableRow(item.id)">+ New row</button><details class="smart-menu" (pointerdown)="$event.stopPropagation()"><summary>+ Column</summary><label>Name <input #newColumnName placeholder="Column name" /></label><label>Type <select #newColumnType><option value="text">Text</option><option value="number">Number</option><option value="currency">Currency</option><option value="date">Date</option><option value="category">Select</option><option value="checkbox">Checkbox</option></select></label><button (click)="addTableColumn(item.id,newColumnName.value,newColumnType.value)">Create column</button></details>
-                <details class="smart-menu calculation-menu" (pointerdown)="$event.stopPropagation()"><summary>+ Calculation</summary><label>Name<input #calculationName placeholder="Total" /></label><label>First field<select #calculationLeft>@for (column of data.columns; track column.id) { @if (column.type === 'number' || column.type === 'currency') { <option [value]="column.key">{{ column.label }}</option> } }</select></label><label>Calculation<select #calculationOperator><option value="+">Add</option><option value="-">Subtract</option><option value="*">Multiply</option><option value="/">Divide</option><option value="%">Percentage</option></select></label><label>Second field<select #calculationRight>@for (column of data.columns; track column.id) { @if (column.type === 'number' || column.type === 'currency') { <option [value]="column.key">{{ column.label }}</option> } }</select></label><button (click)="addCalculatedColumn(item,calculationName.value,calculationLeft.value,calculationOperator.value,calculationRight.value)">Add calculation</button></details>
+                <div class="table-actions"><button (pointerdown)="$event.stopPropagation()" (click)="addTableRow(item.id)">+ New row</button><details class="smart-menu" (pointerdown)="$event.stopPropagation()"><summary>+ Column</summary><label>Name <input #newColumnName placeholder="Column name" /></label><label>Type <thread-select #newColumnType><thread-option value="text" label="Text"></thread-option><thread-option value="number" label="Number"></thread-option><thread-option value="currency" label="Currency"></thread-option><thread-option value="date" label="Date"></thread-option><thread-option value="category" label="Select"></thread-option><thread-option value="checkbox" label="Checkbox"></thread-option></thread-select></label><button (click)="addTableColumn(item.id,newColumnName.value,newColumnType.value)">Create column</button></details>
+                <details class="smart-menu calculation-menu" (pointerdown)="$event.stopPropagation()"><summary>+ Calculation</summary><label>Name<input #calculationName placeholder="Total" /></label><label>First field<thread-select #calculationLeft>@for (column of data.columns; track column.id) { @if (column.type === 'number' || column.type === 'currency') { <thread-option [value]="column.key" label="{{ column.label }}"></thread-option> } }</thread-select></label><label>Calculation<thread-select #calculationOperator><thread-option value="+" label="Add"></thread-option><thread-option value="-" label="Subtract"></thread-option><thread-option value="*" label="Multiply"></thread-option><thread-option value="/" label="Divide"></thread-option><thread-option value="%" label="Percentage"></thread-option></thread-select></label><label>Second field<thread-select #calculationRight>@for (column of data.columns; track column.id) { @if (column.type === 'number' || column.type === 'currency') { <thread-option [value]="column.key" label="{{ column.label }}"></thread-option> } }</thread-select></label><button (click)="addCalculatedColumn(item,calculationName.value,calculationLeft.value,calculationOperator.value,calculationRight.value)">Add calculation</button></details>
                 <details class="smart-menu" (pointerdown)="$event.stopPropagation()"><summary>···</summary>@if (canChart(data)) { <button (click)="createLinkedView(item,'chart')">Create Chart</button><button (click)="createLinkedView(item,'budget')">Create Budget</button> }</details></div>
               }
             </div>
@@ -473,8 +459,8 @@
                   <button (click)="setChartPreset(item,'comparison')">Planned vs Actual</button>
                   <button (click)="setChartPreset(item,'actual')">Actual by category</button>
                   <button (click)="setChartPreset(item,'distribution')">Distribution</button>
-                  <label>Source<select aria-label="Chart data source" [value]="chartSourceId(item)" (change)="linkChartSource(item,$event)"><option value="" disabled>Select data source</option>@for (source of dataSources(); track source.item.id) { @if (canChart(source.data)) { <option [value]="source.item.id">{{ source.item.title || (source.item.type === 'budget' ? 'Budget' : 'Table') }}</option> } }</select></label>
-                } @else { <label>Choose a Budget or Table<select aria-label="Chart data source" (change)="linkChartSource(item,$event)"><option value="">Choose source</option>@for (source of dataSources(); track source.item.id) { @if (canChart(source.data)) { <option [value]="source.item.id">{{ source.item.title || source.item.type }}</option> } }</select></label> }
+                  <label>Source<thread-select aria-label="Chart data source" [value]="chartSourceId(item)" (change)="linkChartSource(item,$event)"><thread-option value="" disabled label="Select data source"></thread-option>@for (source of dataSources(); track source.item.id) { @if (canChart(source.data)) { <thread-option [value]="source.item.id" label="{{ source.item.title || (source.item.type === 'budget' ? 'Budget' : 'Table') }}"></thread-option> } }</thread-select></label>
+                } @else { <label>Choose a Budget or Table<thread-select aria-label="Chart data source" (change)="linkChartSource(item,$event)"><thread-option value="" label="Choose source"></thread-option>@for (source of dataSources(); track source.item.id) { @if (canChart(source.data)) { <thread-option [value]="source.item.id" label="{{ source.item.title || source.item.type }}"></thread-option> } }</thread-select></label> }
               </details></div>
               <app-thread-chart [dataset]="dataset(item)" [config]="item.chartConfig" (pointSelect)="selectChartPoint(item,$event)" />
               @if (chartSelection()?.itemId === item.id) { <div class="chart-detail"><strong>{{ chartSelection()?.label }}</strong><span>Planned {{ money(chartSelectedValue(item,'Planned')) }}</span><span>Actual {{ money(chartSelectedValue(item,'Actual')) }}</span><div><button (pointerdown)="$event.stopPropagation()" (click)="focusLinkedView(item,'budget')">Open Budget</button><button (pointerdown)="$event.stopPropagation()" (click)="focusLinkedView(item,'table')">Open Table</button></div></div> }
@@ -751,9 +737,10 @@
         (click)="sketchEraser.set(true)"
         aria-label="Erase sketch marks"
       ><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m8 4-6 8 6 8h11a3 3 0 0 0 3-3V7a3 3 0 0 0-3-3H8Zm3 5 6 6m0-6-6 6"/></svg></button>
-      <select aria-label="Brush" [value]="brush()" (change)="brush.set($any($event.target).value)"><option value="pen">Pen</option><option value="marker">Marker</option><option value="highlighter">Highlighter</option><option value="neon">Neon</option></select>
+      <thread-select size="compact" aria-label="Brush" [value]="brush()" (change)="brush.set($any($event.target).value)"><thread-option value="pen" label="Pen"></thread-option><thread-option value="marker" label="Marker"></thread-option><thread-option value="highlighter" label="Highlighter"></thread-option><thread-option value="neon" label="Neon"></thread-option></thread-select>
       <label class="brush-gauge" [attr.aria-label]="'Brush size ' + brushWidth()"><span class="brush-gauge-dot" [style.width.px]="brushWidth() + 4" [style.height.px]="brushWidth() + 4"></span><input type="range" min="1" max="24" step="1" [value]="brushWidth()" (input)="brushWidth.set(+$any($event.target).value)" aria-label="Brush size" /><output>{{ brushWidth() }}</output></label>
       <div class="sketch-colors">@for (color of ['#111111','#d4111c','#ffffff','#e2b72d','#315b89','#35735b','#9b4dcc','#e27632']; track color) { <button [style.background]="color" [class.active]="sketchColor() === color" (click)="sketchColor.set(color)" [attr.aria-label]="'Draw with ' + color"></button> }</div>
+      <thread-color aria-label="Drawing color" [value]="sketchColor()" (change)="sketchColor.set($any($event.target).value)"></thread-color>
       <button (click)="undoSketchStroke()" aria-label="Undo stroke"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 8 4 12l4 4M4 12h10a6 6 0 0 1 0 12"/></svg></button>
       <button (click)="redoSketchStroke()" aria-label="Redo stroke"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m16 8 4 4-4 4m4-4H10a6 6 0 0 0 0 12"/></svg></button>
       }
@@ -762,7 +749,7 @@
           <button class="shape-choice" [class.active]="shapeKind() === kind" (click)="shapeKind.set(kind)" [attr.aria-label]="shapeNames[kind]" [title]="shapeNames[kind]"><svg viewBox="0 0 100 100" aria-hidden="true"><path [attr.d]="shapePaths[kind]" /></svg><small>{{ shapeNames[kind] }}</small></button>
         }
       }
-      @if (tool() === 'shape') { <select aria-label="Shape color theme" [value]="shapeTheme()" (change)="shapeTheme.set(+$any($event.target).value)">@for (theme of shapeThemes; track theme.name; let index = $index) { <option [value]="index">{{ theme.name }}</option> }</select> }
+      @if (tool() === 'shape') { <thread-select aria-label="Shape color theme" [value]="shapeTheme()" (change)="shapeTheme.set(+$any($event.target).value)">@for (theme of shapeThemes; track theme.name; let index = $index) { <thread-option [value]="index" label="{{ theme.name }}"></thread-option> }</thread-select> }
       @if (tool() === 'connect') {
         @for (kind of ['straight','elbow','curved']; track kind) {
           <button class="connector-kind" [class.active]="connectorKind() === kind" (click)="connectorKind.set($any(kind))">{{ kind }}</button>
@@ -779,7 +766,7 @@
       @if (connectionSourceEntity()?.type === 'er-entity') {
         <div class="er-connect-panel" data-ui>
           <label for="er-target">Connect {{ connectionSourceEntity()?.title }} to</label>
-          <select id="er-target" #erTarget (change)="connectionTargetId.set(erTarget.value)"><option value="">Choose an entity…</option>@for (entity of erEntities(); track entity.id) { @if (entity.id !== sourceId) { <option [value]="entity.id">{{ entity.title || 'Unnamed entity' }}</option> } }</select>
+          <thread-select id="er-target" #erTarget (change)="connectionTargetId.set(erTarget.value)"><thread-option value="" label="Choose an entity…"></thread-option>@for (entity of erEntities(); track entity.id) { @if (entity.id !== sourceId) { <thread-option [value]="entity.id" label="{{ entity.title || 'Unnamed entity' }}"></thread-option> } }</thread-select>
           <button [disabled]="!erTarget.value" (click)="connectErTarget(sourceId, erTarget.value)">Connect</button>
           <button (click)="setTool('select')">Cancel</button>
         </div>
@@ -801,43 +788,43 @@
         @if (selectedIds().length === 1 && item.type === 'task') { <button (click)="addTaskNear(item.id)">+ Task</button><button (click)="addSubtask(item.id)">+ Subtask</button> }
         @if (item.type === 'er-entity') { @if (selectedIds().length === 1) { <button (click)="editErFields(item)">Field details</button><button (click)="beginErConnection(item)">Connect</button><button (click)="addRelatedErEntity(item)">+ Related entity</button> } <button (click)="exportErDiagram()">Export DBML</button><button (click)="arrangeErDiagram()" title="Arrange ER entities in this view and automatically route relationships">Arrange diagram</button> }
         @if (selectedIds().length === 1 && (item.type === 'text' || item.type === 'note')) {
-          <select
+          <thread-select
             aria-label="Font family"
             [value]="item.fontFamily || 'sans'"
             (change)="setFontFamily(item.id, $event)"
           >
-            <option value="sans">Sans</option>
-            <option value="mono">Mono</option></select
-          ><select
+            <thread-option value="sans" label="Sans"></thread-option>
+            <thread-option value="mono" label="Mono"></thread-option></thread-select
+          ><thread-select
             aria-label="Text preset"
             [value]="item.fontSize || (item.type === 'text' ? 21 : 16)"
             (change)="setTextSize(item.id, $event)"
           >
-            <option value="12">Label</option>
-            <option value="14">Small</option>
-            <option value="16">Body</option>
-            <option value="18">Large</option>
-            <option value="20">Lead</option>
-            <option value="24">Heading</option>
-            <option value="32">Section</option>
-            <option value="40">Title</option>
-            <option value="48">Hero</option>
-            <option value="64">Display</option></select
-          ><button
+            <thread-option value="12" label="Label"></thread-option>
+            <thread-option value="14" label="Small"></thread-option>
+            <thread-option value="16" label="Body"></thread-option>
+            <thread-option value="18" label="Large"></thread-option>
+            <thread-option value="20" label="Lead"></thread-option>
+            <thread-option value="24" label="Heading"></thread-option>
+            <thread-option value="32" label="Section"></thread-option>
+            <thread-option value="40" label="Title"></thread-option>
+            <thread-option value="48" label="Hero"></thread-option>
+            <thread-option value="64" label="Display"></thread-option></thread-select><button
             (click)="toggleBold(item.id)"
             [class.active]="(item.fontWeight || 600) >= 700"
             aria-label="Bold"
           >
             <b>B</b></button
-          ><select
+          ><thread-select
             aria-label="Text alignment"
             [value]="item.textAlign || 'left'"
             (change)="setAlignment(item.id, $event)"
           >
-            <option value="left">Left</option>
-            <option value="center">Center</option>
-            <option value="right">Right</option>
-          </select>
+            <thread-option value="left" label="Left"></thread-option>
+            <thread-option value="center" label="Center"></thread-option>
+            <thread-option value="right" label="Right"></thread-option>
+          </thread-select>
+          <thread-color aria-label="Text color" [value]="item.textColor || '#111111'" (change)="setStyle(item.id, { textColor: $any($event.target).value })"></thread-color>
           <div class="swatches" aria-label="Text color">
             @for (
               color of [
@@ -860,6 +847,7 @@
             }
           </div>
           @if (item.type === 'note') {
+            <thread-color aria-label="Note background" [value]="item.background || '#fff3d6'" (change)="setStyle(item.id, { background: $any($event.target).value })"></thread-color>
             <div class="swatches" aria-label="Note background">
               @for (color of ['#ffffff', '#fff5d9', '#fcecee', '#eaf2ed', '#eaf0f8']; track color) {
                 <button
@@ -877,6 +865,29 @@
       ><button (click)="inspectorOpen.set(!inspectorOpen())">Details</button
       ><button (click)="removeSelected()">Delete</button>
     </div>
+  }
+  @if (selected(); as item) {
+    @if (tool() === 'select' && erEditingField(item); as field) {
+      <section class="er-settings" data-ui role="region" aria-label="Field settings" (pointerdown)="$event.stopPropagation()" (keydown)="erSettingsKey($event)">
+        <header><div><small>{{ item.title }}</small><h2>Field settings</h2></div><button type="button" aria-label="Close field settings" (click)="closeErField()">×</button></header>
+        <div class="er-settings-body" appScroll="y" scrollbar="auto">
+          <nav class="er-field-tabs" aria-label="Fields">@for (entry of item.erFields || []; track entry.id) { <button [class.active]="entry.id === field.id" [attr.aria-pressed]="entry.id === field.id" (click)="openErField(item, entry)">{{ entry.name }}</button> }</nav>
+          <label>Field name<input class="er-settings-name" [value]="field.name" (change)="updateErField(item, field.id, { name: $any($event.target).value })" /></label>
+          <label>Data type<thread-select [disabled]="!!field.reference" [value]="erTypeChoice(field)" (change)="setErType(item, field, $any($event.target).value)">@for (type of erDataTypes; track type) { <thread-option [value]="type" [label]="erTypeLabel(type)"></thread-option> }<thread-option value="CUSTOM" label="Custom SQL type"></thread-option></thread-select></label>
+          @if (field.reference) { <p class="er-help">The data type follows the referenced field automatically.</p> }
+          @if (erTypeChoice(field) === 'CUSTOM') { <label>SQL type<input [value]="field.dataType === 'CUSTOM' ? '' : field.dataType" placeholder="VARCHAR(255)" (change)="updateErField(item, field.id, { dataType: $any($event.target).value })" /></label> }
+          @if (field.dataType === 'ENUM') { <label>Allowed values<textarea rows="3" [disabled]="!!field.reference" placeholder="draft, active, archived" [value]="field.enumValues?.join(', ') || ''" (change)="setErEnum(item, field, $event)"></textarea></label><p class="er-help">Separate values with commas or new lines.</p> }
+          <fieldset><legend>Rules</legend><label class="er-rule"><thread-checkbox [checked]="field.key === 'primary'" (change)="updateErField(item, field.id, { key: $any($event.target).checked ? 'primary' : 'none' })"></thread-checkbox><span>Primary key<small>Identifies each record. Always required.</small></span></label><label class="er-rule"><thread-checkbox [checked]="field.required" [disabled]="field.key === 'primary'" (change)="updateErField(item, field.id, { required: $any($event.target).checked })"></thread-checkbox><span>Required<small>Cannot be empty.</small></span></label><label class="er-rule"><thread-checkbox [checked]="field.unique" (change)="updateErField(item, field.id, { unique: $any($event.target).checked })"></thread-checkbox><span>Unique<small>Each value can appear only once.</small></span></label></fieldset>
+          <label>Relationship<thread-select [disabled]="field.key === 'primary'" [value]="field.reference ? field.reference.entityId + '/' + field.reference.fieldId : ''" (change)="setErReference(item, field, $any($event.target).value)"><thread-option value="" label="No relationship"></thread-option>@for (option of erReferenceOptions(item, field); track option.value) { <thread-option [value]="option.value" [label]="option.label"></thread-option> }</thread-select></label>
+          <p class="er-help">Choose another entity's primary or unique field. Thread adds the foreign key and connection for you.</p>
+          @if (!erReferenceOptions(item, field).length) { <button class="inspector-action" (click)="addRelatedErEntity(item)">+ Create a related entity</button> }
+          <details><summary>Default value and note</summary><label>Default value<input [value]="field.defaultValue || ''" placeholder="For example 0 or now()" (change)="updateErField(item, field.id, { defaultValue: $any($event.target).value })" /></label><label>Note<input [value]="field.note || ''" placeholder="Describe this field" (change)="updateErField(item, field.id, { note: $any($event.target).value })" /></label></details>
+          @if (erFieldIssue(item, field); as issue) { <p class="er-field-warning" role="status">{{ issue }}</p> }
+          <div class="er-field-reorder"><button [disabled]="item.erFields?.[0]?.id === field.id" (click)="moveErField(item, field.id, -1)">Move up</button><button [disabled]="item.erFields?.[item.erFields!.length - 1]?.id === field.id" (click)="moveErField(item, field.id, 1)">Move down</button></div>
+        </div>
+        <footer><button class="danger" (click)="removeErField(item, field.id); closeErField()">Delete field</button><button class="er-settings-done" (click)="closeErField()">Done</button></footer>
+      </section>
+    }
   }
   @if (selected() && inspectorOpen()) {
     <aside class="inspector" appScroll="y" scrollbar="auto" data-ui>
@@ -917,28 +928,28 @@
           }
           @if (item.type === 'task') {
             <label
-              >Status<select
+              >Status<thread-select
                 [value]="item.completed ? 'done' : 'open'"
                 (change)="setTaskStatus(item.id, $event)"
               >
-                <option value="open">Open</option>
-                <option value="done">Done</option>
-              </select></label
+                <thread-option value="open" label="Open"></thread-option>
+                <thread-option value="done" label="Done"></thread-option>
+              </thread-select></label
             ><label
               >Due date<input
                 type="date"
                 [value]="item.due || ''"
                 (change)="setString(item.id, 'due', $event)" /></label
             ><label
-              >Priority<select
+              >Priority<thread-select
                 [value]="item.priority || ''"
                 (change)="setString(item.id, 'priority', $event)"
               >
-                <option value="">None</option>
-                <option>Low</option>
-                <option>Medium</option>
-                <option>High</option>
-              </select></label
+                <thread-option value="" label="None"></thread-option>
+                <thread-option label="Low"></thread-option>
+                <thread-option label="Medium"></thread-option>
+                <thread-option label="High"></thread-option>
+              </thread-select></label
             ><label
               >Notes<textarea
                 [value]="item.body || ''"
@@ -955,11 +966,11 @@
           }
           @if (item.type === 'list') {
             <label
-              ><input
-                type="checkbox"
+              ><thread-checkbox
+
                 [checked]="item.ordered || false"
                 (change)="setOrdered(item.id, $event)"
-              />
+              ></thread-checkbox>
               Ordered list</label
             >
           }
@@ -968,31 +979,24 @@
             ><button class="inspector-action" (click)="replaceImage()">Replace image</button>
           }
           @if (item.type === 'image' || item.type === 'gif' || item.type === 'sticker') { <div class="inspector-grid"><button class="inspector-action" (click)="flip(item.id, 'x')">Flip horizontal</button><button class="inspector-action" (click)="flip(item.id, 'y')">Flip vertical</button></div> }
-          @if (item.type === 'sketch') { <label class="accent-control">Stroke color<input type="color" [value]="item.accent || '#d4111c'" (change)="setStyle(item.id, {accent: $any($event.target).value})" /></label> }
+          @if (item.type === 'sketch') { <label class="accent-control">Stroke color<thread-color  [value]="item.accent || '#d4111c'" (change)="setStyle(item.id, {accent: $any($event.target).value})" ></thread-color></label> }
           @if (item.type === 'shape') {
-            <label>Shape<select [value]="item.shapeKind || 'rectangle'" (change)="setStyle(item.id, { shapeKind: $any($event.target).value })">@for (kind of shapeKinds; track kind) { <option [value]="kind">{{ shapeNames[kind] }}</option> }</select></label>
+            <label>Shape<thread-select [value]="item.shapeKind || 'rectangle'" (change)="setStyle(item.id, { shapeKind: $any($event.target).value })">@for (kind of shapeKinds; track kind) { <thread-option [value]="kind" label="{{ shapeNames[kind] }}"></thread-option> }</thread-select></label>
             <div class="shape-theme-options">@for (theme of shapeThemes; track theme.name; let index = $index) { <button [style.background]="theme.fill" [style.border-color]="theme.stroke" [style.color]="theme.text" (click)="applyShapeTheme(item, index)">{{ theme.name }}</button> }</div>
-            <label>Border style<select [value]="item.shapeStrokeStyle || 'solid'" (change)="setStyle(item.id, { shapeStrokeStyle: $any($event.target).value })"><option value="solid">Solid</option><option value="dashed">Dashed</option></select></label>
+            <label>Border style<thread-select [value]="item.shapeStrokeStyle || 'solid'" (change)="setStyle(item.id, { shapeStrokeStyle: $any($event.target).value })"><thread-option value="solid" label="Solid"></thread-option><thread-option value="dashed" label="Dashed"></thread-option></thread-select></label>
             <label>Label<input [value]="item.title" (change)="setString(item.id, 'title', $event)" /></label>
-            <div class="inspector-grid"><label>Label size<input type="number" min="10" max="64" [value]="item.fontSize || 16" (change)="setTextSize(item.id, $event)" /></label><label>Label color<input type="color" [value]="item.textColor || '#1e293b'" (change)="setStyle(item.id, { textColor: $any($event.target).value })" /></label></div>
-            <label>Fill<input type="color" [value]="item.shapeFill || '#ffffff'" (change)="setStyle(item.id, {shapeFill: $any($event.target).value})" /></label>
-            <label>Outline<input type="color" [value]="item.shapeStroke || '#6b7280'" (change)="setStyle(item.id, {shapeStroke: $any($event.target).value})" /></label>
+            <div class="inspector-grid"><label>Label size<input type="number" min="10" max="64" [value]="item.fontSize || 16" (change)="setTextSize(item.id, $event)" /></label><label>Label color<thread-color  [value]="item.textColor || '#1e293b'" (change)="setStyle(item.id, { textColor: $any($event.target).value })" ></thread-color></label></div>
+            <label>Fill<thread-color  [value]="item.shapeFill || '#ffffff'" (change)="setStyle(item.id, {shapeFill: $any($event.target).value})" ></thread-color></label>
+            <label>Outline<thread-color  [value]="item.shapeStroke || '#6b7280'" (change)="setStyle(item.id, {shapeStroke: $any($event.target).value})" ></thread-color></label>
             <label>Outline weight<input type="range" min="1" max="8" [value]="item.shapeStrokeWidth || 2" (change)="setStyle(item.id, {shapeStrokeWidth: +$any($event.target).value})" /></label>
           }
           @if (item.type === 'er-entity') {
-            <p class="er-help">Edit names and types directly on the card. Press Enter to add another field. Use the type menu for enums and references. Open ? for constraints, defaults, notes, and field order.</p>
+            <p class="er-help">Click a field name to rename it. Open field settings to add keys, relationships, or allowed values.</p>
             <label>Entity name<input [value]="item.title" (change)="setStyle(item.id, { title: $any($event.target).value })" /></label>
             <div class="er-inspector-heading">Fields <span>{{ item.erFields?.length || 0 }}</span></div>
-            @for (field of item.erFields || []; track field.id) {
-              <div class="er-field-editor">
-                <button class="er-open-inline" (click)="openErField(item, field)">Edit this field on canvas ?</button>
-                <div class="inspector-grid"><label>Field name<input [attr.data-er-field]="field.id" [value]="field.name" (change)="updateErField(item, field.id, { name: $any($event.target).value })" (keydown)="erFieldKey($event, item)" /></label><label>Data type<select [value]="erTypeChoice(field)" (change)="setErType(item, field, $any($event.target).value)">@for (type of erDataTypes; track type) { <option [value]="type">{{ type }}</option> }<option value="REFERENCE">Reference (FK)</option><option value="CUSTOM">Custom type?</option></select></label></div>
-                <div class="inspector-grid"><label>Key<select [value]="field.key" (change)="updateErField(item, field.id, { key: $any($event.target).value })"><option value="none">None</option><option value="primary">Primary key</option><option value="foreign">Foreign key</option></select></label><label class="er-required-toggle"><input type="checkbox" [checked]="field.required" [disabled]="field.key === 'primary'" (change)="updateErField(item, field.id, { required: $any($event.target).checked })" /> Required</label></div>
-                <button class="er-remove-field" (click)="removeErField(item, field.id)" [attr.aria-label]="'Remove ' + field.name">Remove field</button>
-              </div>
-            }
+            @for (field of item.erFields || []; track field.id) { <button class="inspector-action" (click)="openErField(item, field)">{{ field.name }} <span class="er-type">{{ field.dataType }}</span></button> }
             <button class="inspector-action" (click)="addErField(item)">+ Add field</button>
-            <button class="inspector-action" (click)="addRelatedErEntity(item)">+ Related entity with foreign key</button>
+            <button class="inspector-action" (click)="addRelatedErEntity(item)">+ Related entity</button>
             <button class="inspector-action" (click)="arrangeErDiagram()">Arrange diagram</button>
           }
           @if (item.type === 'link') {
@@ -1024,8 +1028,8 @@
         <div class="inspector-body">
           <p class="er-help">{{ connectionFieldLabel(connection, true) }}</p>
           <label>Relationship label<input [value]="connection.label || ''" placeholder="e.g. places" (change)="setConnection(connection.id, { label: $any($event.target).value })" /></label>
-          <div class="inspector-grid"><label>From<select [value]="connection.sourceCardinality || '1'" (change)="setConnection(connection.id, { sourceCardinality: $any($event.target).value })"><option value="1">One</option><option value="0..1">Zero or one</option><option value="many">Many</option><option value="0..many">Zero or many</option></select></label><label>To<select [value]="connection.targetCardinality || 'many'" (change)="setConnection(connection.id, { targetCardinality: $any($event.target).value })"><option value="1">One</option><option value="0..1">Zero or one</option><option value="many">Many</option><option value="0..many">Zero or many</option></select></label></div>
-          <label>Line<select [value]="connection.kind || 'straight'" (change)="setConnection(connection.id, { kind: $any($event.target).value })"><option value="straight">Straight</option><option value="elbow">Elbow</option><option value="curved">Curved</option></select></label>
+          <div class="inspector-grid"><label>From<thread-select [value]="connection.sourceCardinality || '1'" (change)="setConnection(connection.id, { sourceCardinality: $any($event.target).value })"><thread-option value="1" label="One"></thread-option><thread-option value="0..1" label="Zero or one"></thread-option><thread-option value="many" label="Many"></thread-option><thread-option value="0..many" label="Zero or many"></thread-option></thread-select></label><label>To<thread-select [value]="connection.targetCardinality || 'many'" (change)="setConnection(connection.id, { targetCardinality: $any($event.target).value })"><thread-option value="1" label="One"></thread-option><thread-option value="0..1" label="Zero or one"></thread-option><thread-option value="many" label="Many"></thread-option><thread-option value="0..many" label="Zero or many"></thread-option></thread-select></label></div>
+          <label>Line<thread-select [value]="connection.kind || 'straight'" (change)="setConnection(connection.id, { kind: $any($event.target).value })"><thread-option value="straight" label="Straight"></thread-option><thread-option value="elbow" label="Elbow"></thread-option><thread-option value="curved" label="Curved"></thread-option></thread-select></label>
           <button class="inspector-action" (click)="setConnection(connection.id, { kind: 'elbow', routeOffset: 0, sourceBinding: { mode: 'auto' }, targetBinding: { mode: 'auto' } })">Reset to automatic routing</button>
           @if (connection.sourceCardinality && connection.targetCardinality) { <button class="inspector-action" (click)="addParallelRelationship(connection)">+ Another relationship between these entities</button> }
           <button class="inspector-action danger" (click)="removeSelectedConnection()">Delete relationship</button>
