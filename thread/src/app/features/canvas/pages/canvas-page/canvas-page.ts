@@ -1,4 +1,5 @@
 import { CommonModule, isPlatformBrowser } from '@angular/common';
+import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
 import { AfterViewInit, Component, ElementRef, HostListener, OnDestroy, PLATFORM_ID, computed, effect, inject, signal, viewChild } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { BudgetCurrency, CanvasConnection, CanvasItem, CanvasJunction, ChartConfig, ConnectorKind, ConnectorSide, ErField, ItemType, ShapeKind, SketchBrush, SketchStroke, ThreadDataset, demoConnections, demoItems } from '../../canvas.model';
@@ -29,6 +30,7 @@ type State = { items: CanvasItem[]; connections: CanvasConnection[]; junctions?:
 export class CanvasPage implements AfterViewInit, OnDestroy {
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
+  private readonly sanitizer = inject(DomSanitizer);
   readonly datasetStore = inject(DatasetStore);
   readonly datasets = this.datasetStore.datasets;
   readonly preferences = inject(PreferencesService);
@@ -54,6 +56,23 @@ export class CanvasPage implements AfterViewInit, OnDestroy {
   readonly tool = signal<Tool>('select');
   readonly spaceHeld = signal(false);
   readonly paletteOpen = signal(false);
+  readonly activityOpen = signal(false);
+  readonly timerSeconds = signal(25 * 60);
+  readonly timerMinutes = signal(25);
+  readonly timerRunning = signal(false);
+  readonly musicPlaying = signal(false);
+  readonly musicTrack = signal<'keys' | 'rain'>('keys');
+  readonly musicVolume = signal(.45);
+  readonly isRecording = signal(false);
+  readonly recordingSeconds = signal(0);
+  readonly recordingPaused = signal(false);
+  readonly spotifyLink = signal('');
+  readonly spotifyEmbed = signal<SafeResourceUrl | null>(null);
+  readonly spotifyEmbedHeight = signal(152);
+  readonly selectedBoardAudioId = signal('');
+  readonly boardAudioItems = computed(() => this.items().filter(item => item.type === 'voice' && !!item.url));
+  readonly voicePlayback = signal<Record<string, { current: number; duration: number; playing: boolean }>>({});
+  readonly activityError = signal('');
   readonly pendingType = signal<ItemType | null>(null);
   readonly editingId = signal<string | null>(null);
   readonly richFocusId = signal<string | null>(null);
@@ -118,6 +137,18 @@ export class CanvasPage implements AfterViewInit, OnDestroy {
   private transformBefore: State | null = null;
   private transformStart: CanvasItem | null = null;
   private transformFrame = 0;
+  private timerInterval: ReturnType<typeof setInterval> | null = null;
+  private timerDeadline = 0;
+  private musicContext: AudioContext | null = null;
+  private musicGain: GainNode | null = null;
+  private musicInterval: ReturnType<typeof setInterval> | null = null;
+  private musicStep = 0;
+  private recorder: MediaRecorder | null = null;
+  private recordingStream: MediaStream | null = null;
+  private recordingChunks: Blob[] = [];
+  private recordingStartedAt = 0;
+  private recordingElapsedMs = 0;
+  private recordingInterval: ReturnType<typeof setInterval> | null = null;
   readonly transformGuide = signal<{ label: string; x: number; y: number } | null>(null);
   readonly snapGuide = signal<{ x?: number; y?: number } | null>(null);
 
@@ -147,7 +178,7 @@ export class CanvasPage implements AfterViewInit, OnDestroy {
   ngAfterViewInit(): void {
     setTimeout(() => { this.fitView(); this.queueTransformSync(); const entryTool = this.route.snapshot.queryParamMap.get('tool'); if (entryTool === 'task') this.chooseType('task'); else if (entryTool === 'text' || entryTool === 'sketch' || entryTool === 'connect') this.setTool(entryTool); });
   }
-  ngOnDestroy(): void { if (this.transformFrame) cancelAnimationFrame(this.transformFrame); this.transformOverlay?.destroy(); }
+  ngOnDestroy(): void { if (this.transformFrame) cancelAnimationFrame(this.transformFrame); this.transformOverlay?.destroy(); this.pauseTimer(); this.stopMusic(); this.stopVoiceRecording(false); }
   private queueTransformSync(): void { if (!this.browser || this.transformFrame) return; this.transformFrame = requestAnimationFrame(() => { this.transformFrame = 0; const viewport = this.viewport()?.nativeElement; if (!viewport || !this.transformOverlay) return; const ids = this.selectedIds(); const targets = ids.map(id => viewport.querySelector<HTMLElement>(`[data-node-id="${id}"]`)).filter((value): value is HTMLElement => !!value); const others = [...viewport.querySelectorAll<HTMLElement>('[data-node-id]')].filter(element => !ids.includes(element.dataset['nodeId'] || '')); const item = this.selected(); this.transformOverlay.update(targets, others, !!item && ['image', 'gif', 'sticker', 'sketch'].includes(item.type)); }); }
   private beginTransform(): void { this.transformStart = this.selected(); this.transformBefore = this.state(); }
   private resizeTransform(width: number, height: number, direction: number[]): void {
@@ -205,7 +236,7 @@ export class CanvasPage implements AfterViewInit, OnDestroy {
       }
       return { ...item, datasetId:id, rows:undefined, tableColumns:undefined, tableRows:undefined };
     });
-    const connections = validConnections(items, state.connections);
+    const connections = validConnections(items, state.connections, state.junctions || []);
     if (this.browser && connections.length !== (Array.isArray(state.connections) ? state.connections.length : 0)) {
       try {
         const backupKey = `${this.storageKey}-connector-backup`;
@@ -254,8 +285,112 @@ export class CanvasPage implements AfterViewInit, OnDestroy {
   endDataEdit(): void { if (this.dataEditBefore) this.commit(this.dataEditBefore); this.dataEditBefore=null; }
   undo(): void { const state = this.history.pop(); if (!state) return; this.future.push(this.state()); this.items.set(state.items); this.connections.set(state.connections); this.junctions.set(state.junctions || []); this.datasetStore.replace(state.datasets || []); }
   redo(): void { const state = this.future.pop(); if (!state) return; this.history.push(this.state()); this.items.set(state.items); this.connections.set(state.connections); this.junctions.set(state.junctions || []); this.datasetStore.replace(state.datasets || []); }
-  setTool(tool: Tool): void { this.finishEditing(); this.tool.set(tool); this.paletteOpen.set(tool === 'add'); this.pendingType.set(tool === 'shape' ? 'shape' : null); if (tool !== 'select') { this.inspectorOpen.set(false); this.selectedConnectionId.set(null); } if (tool !== 'sketch') this.sketchEraser.set(false); else this.selectedIds.set([]); this.pendingAsset.set(null); this.mediaPicker.set(null); this.connectionSourceId.set(null); this.connectionTargetId.set(null); }
+  setTool(tool: Tool): void { this.cancelConnectorGesture(); this.finishEditing(); this.tool.set(tool); this.paletteOpen.set(tool === 'add'); this.pendingType.set(tool === 'shape' ? 'shape' : null); if (tool !== 'select') { this.inspectorOpen.set(false); this.selectedConnectionId.set(null); } if (tool !== 'sketch') this.sketchEraser.set(false); else this.selectedIds.set([]); this.pendingAsset.set(null); this.mediaPicker.set(null); this.connectionSourceId.set(null); this.connectionTargetId.set(null); }
   chooseType(type: ItemType): void { this.finishEditing(); this.inspectorOpen.set(false); this.selectedConnectionId.set(null); if (type === 'gif' || type === 'sticker') { this.openMedia(type); return; } this.pendingType.set(type); this.paletteOpen.set(false); this.tool.set('select'); }
+  formatTimer(): string { const seconds = this.timerSeconds(); return `${Math.floor(seconds / 60).toString().padStart(2, '0')}:${(seconds % 60).toString().padStart(2, '0')}`; }
+  setTimerMinutes(minutes: number): void { if (this.timerRunning()) this.pauseTimer(); this.timerMinutes.set(minutes); this.timerSeconds.set(minutes * 60); }
+  toggleTimer(): void {
+    if (this.timerRunning()) { this.pauseTimer(); return; }
+    if (!this.timerSeconds()) this.timerSeconds.set(this.timerMinutes() * 60);
+    this.timerDeadline = Date.now() + this.timerSeconds() * 1000;
+    this.timerRunning.set(true);
+    this.timerInterval = setInterval(() => {
+      const remaining = Math.max(0, Math.ceil((this.timerDeadline - Date.now()) / 1000));
+      this.timerSeconds.set(remaining);
+      if (!remaining) this.pauseTimer();
+    }, 250);
+  }
+  pauseTimer(): void { if (this.timerInterval) clearInterval(this.timerInterval); this.timerInterval = null; this.timerRunning.set(false); }
+  resetTimer(): void { this.pauseTimer(); this.timerSeconds.set(this.timerMinutes() * 60); }
+  async toggleMusic(): Promise<void> {
+    this.activityError.set('');
+    if (this.musicPlaying()) { this.stopMusic(); return; }
+    try {
+      const context = new AudioContext(), gain = context.createGain();
+      gain.gain.value = this.musicVolume(); gain.connect(context.destination);
+      this.musicContext = context; this.musicGain = gain; this.musicPlaying.set(true);
+      await context.resume();
+      if (this.musicTrack() === 'rain') this.startRainSound(context, gain);
+      else { this.musicStep = 0; this.playSoftFocusNote(); this.musicInterval = setInterval(() => this.playSoftFocusNote(), 850); }
+    } catch { this.stopMusic(); this.activityError.set('Audio playback is not available in this browser.'); }
+  }
+  setMusicTrack(track: 'keys' | 'rain'): void { if (track === this.musicTrack()) return; const wasPlaying = this.musicPlaying(); this.stopMusic(); this.musicTrack.set(track); if (wasPlaying) void this.toggleMusic(); }
+  setMusicVolume(event: Event): void { const value = Number((event.target as HTMLInputElement).value); this.musicVolume.set(value); if (this.musicGain && this.musicContext) this.musicGain.gain.setTargetAtTime(value, this.musicContext.currentTime, .08); }
+  private playSoftFocusNote(): void {
+    const context = this.musicContext, output = this.musicGain; if (!context || !output) return;
+    const melody = [196, 247, 294, 370, 330, 294, 247, 220];
+    const now = context.currentTime, oscillator = context.createOscillator(), filter = context.createBiquadFilter(), envelope = context.createGain();
+    oscillator.type = 'triangle'; oscillator.frequency.value = melody[this.musicStep++ % melody.length];
+    filter.type = 'lowpass'; filter.frequency.value = 1150;
+    envelope.gain.setValueAtTime(.001, now); envelope.gain.exponentialRampToValueAtTime(.18, now + .08); envelope.gain.exponentialRampToValueAtTime(.001, now + 1.55);
+    oscillator.connect(filter); filter.connect(envelope); envelope.connect(output); oscillator.start(now); oscillator.stop(now + 1.6);
+  }
+  private startRainSound(context: AudioContext, output: GainNode): void {
+    const buffer = context.createBuffer(1, context.sampleRate * 3, context.sampleRate), channel = buffer.getChannelData(0);
+    for (let index = 0; index < channel.length; index++) channel[index] = (Math.random() * 2 - 1) * .22;
+    const source = context.createBufferSource(), filter = context.createBiquadFilter(), gain = context.createGain();
+    source.buffer = buffer; source.loop = true; filter.type = 'lowpass'; filter.frequency.value = 680; gain.gain.value = .3;
+    source.connect(filter); filter.connect(gain); gain.connect(output); source.start();
+  }
+  private stopMusic(): void { if (this.musicInterval) clearInterval(this.musicInterval); this.musicInterval = null; const context = this.musicContext; this.musicContext = null; this.musicGain = null; this.musicPlaying.set(false); if (context && context.state !== 'closed') void context.close(); }
+  async toggleVoiceRecording(): Promise<void> {
+    if (this.isRecording()) return;
+    this.activityError.set('');
+    if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === 'undefined') { this.activityError.set('Voice recording is not supported in this browser.'); return; }
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const supported = ['audio/webm;codecs=opus', 'audio/mp4', 'audio/webm'].find(type => MediaRecorder.isTypeSupported(type));
+      const recorder = new MediaRecorder(stream, supported ? { mimeType: supported, audioBitsPerSecond: 48000 } : undefined);
+      this.recordingStream = stream; this.recorder = recorder; this.recordingChunks = []; this.recordingStartedAt = Date.now(); this.recordingElapsedMs = 0; this.recordingSeconds.set(0); this.recordingPaused.set(false); this.isRecording.set(true); this.paletteOpen.set(false);
+      recorder.ondataavailable = event => { if (event.data.size) this.recordingChunks.push(event.data); };
+      recorder.onerror = () => { this.activityError.set('Recording stopped unexpectedly. Check your microphone and try again.'); this.stopVoiceRecording(false); };
+      recorder.onstop = () => {
+        const elapsed = this.recordingElapsedMs + (this.recordingPaused() ? 0 : Date.now() - this.recordingStartedAt);
+        const seconds = Math.max(1, Math.round(elapsed / 1000)), chunks = this.recordingChunks.splice(0);
+        this.recordingStream?.getTracks().forEach(track => track.stop()); this.recordingStream = null; this.recorder = null;
+        if (!chunks.length) return;
+        const type = recorder.mimeType || chunks[0].type || 'audio/webm', file = new File([new Blob(chunks, { type })], `Voice note ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}.${type.includes('mp4') ? 'm4a' : 'webm'}`, { type });
+        void this.importFiles([file], this.centerPoint(), this.formatDuration(seconds)).catch(() => this.activityError.set('The recording could not be added to this board.'));
+      };
+      recorder.start(250);
+      this.recordingInterval = setInterval(() => { const elapsed = this.recordingElapsedMs + (this.recordingPaused() ? 0 : Date.now() - this.recordingStartedAt); this.recordingSeconds.set(Math.floor(elapsed / 1000)); if (elapsed >= 180_000) this.stopVoiceRecording(true); }, 250);
+    } catch { this.activityError.set('Microphone access was blocked. Allow microphone access and try again.'); this.isRecording.set(false); this.recordingStream?.getTracks().forEach(track => track.stop()); this.recordingStream = null; }
+  }
+  formatDuration(seconds: number): string { return `${Math.floor(seconds / 60)}:${(seconds % 60).toString().padStart(2, '0')}`; }
+  toggleVoicePause(): void {
+    const recorder = this.recorder;
+    if (!recorder || !this.isRecording()) return;
+    if (recorder.state === 'recording') { this.recordingElapsedMs += Date.now() - this.recordingStartedAt; recorder.pause(); this.recordingPaused.set(true); }
+    else if (recorder.state === 'paused') { this.recordingStartedAt = Date.now(); recorder.resume(); this.recordingPaused.set(false); }
+  }
+  stopVoiceRecording(save: boolean): void {
+    if (this.recordingInterval) clearInterval(this.recordingInterval); this.recordingInterval = null;
+    const recorder = this.recorder;
+    if (recorder && recorder.state !== 'inactive') { if (!save) recorder.onstop = null; recorder.stop(); }
+    else { this.recordingStream?.getTracks().forEach(track => track.stop()); this.recordingStream = null; this.recorder = null; }
+    this.isRecording.set(false);
+    this.recordingPaused.set(false);
+  }
+  openMediaFiles(): void { this.finishEditing(); this.paletteOpen.set(false); this.pendingType.set(null); this.replaceId = null; this.imagePlacement = this.centerPoint(); const input = this.fileInput()?.nativeElement; if (input) { input.accept = 'image/*,audio/*,video/*,.pdf,.txt,.doc,.docx'; input.click(); } }
+  loadSpotifyEmbed(): void {
+    const value = this.spotifyLink().trim();
+    const uri = value.match(/^spotify:(track|playlist|album|artist|episode|show):([A-Za-z0-9]+)$/i);
+    let match = uri;
+    if (!match) { try { const url = new URL(value); if (url.hostname !== 'open.spotify.com') throw new Error(); match = url.pathname.match(/^\/(track|playlist|album|artist|episode|show)\/([A-Za-z0-9]+)/i); } catch { match = null; } }
+    if (!match) { this.activityError.set('Paste a Spotify track, playlist, album, or show link.'); return; }
+    const kind = match[1].toLowerCase(), id = match[2];
+    this.spotifyEmbedHeight.set(['playlist', 'album', 'artist', 'show'].includes(kind) ? 352 : 152);
+    this.spotifyEmbed.set(this.sanitizer.bypassSecurityTrustResourceUrl(`https://open.spotify.com/embed/${kind}/${id}?utm_source=thread&theme=0`));
+    this.activityError.set('');
+  }
+  setBoardAudio(event: Event): void { this.selectedBoardAudioId.set((event.target as HTMLSelectElement).value); }
+  selectedBoardAudioUrl(): string | null { return this.boardAudioItems().find(item => item.id === this.selectedBoardAudioId())?.url || null; }
+  voiceAudioElement(id: string): HTMLAudioElement | null { return document.querySelector<HTMLAudioElement>(`audio[data-voice-id="${CSS.escape(id)}"]`); }
+  toggleVoicePlayback(id: string): void { const audio = this.voiceAudioElement(id); if (!audio) return; if (audio.paused) void audio.play().catch(() => undefined); else audio.pause(); }
+  syncVoicePlayback(id: string, audio: HTMLAudioElement): void { this.voicePlayback.update(state => ({ ...state, [id]: { current: Number.isFinite(audio.currentTime) ? audio.currentTime : 0, duration: Number.isFinite(audio.duration) ? audio.duration : 0, playing: !audio.paused } })); }
+  seekVoice(id: string, event: Event): void { const audio = this.voiceAudioElement(id), input = event.target as HTMLInputElement; if (!audio || !audio.duration) return; audio.currentTime = Number(input.value); this.syncVoicePlayback(id, audio); }
+  voiceTime(id: string, duration = false): string { const state = this.voicePlayback()[id]; return this.formatDuration(Math.floor(duration ? state?.duration || 0 : state?.current || 0)); }
+  voiceProgress(id: string): number { const state = this.voicePlayback()[id]; return state?.duration ? state.current / state.duration * 100 : 0; }
   openMedia(kind: 'gif' | 'sticker'): void { this.finishEditing(); this.inspectorOpen.set(false); this.selectedConnectionId.set(null); this.paletteOpen.set(false); this.pendingType.set(null); this.mediaPicker.set(kind); this.pendingAsset.set(null); }
   pickMedia(asset: PickedMedia): void { this.mediaPicker.set(null); this.pendingAsset.set(asset); this.assetPreview.set(this.centerPoint()); this.selectedIds.set([]); this.sketchEraser.set(false); this.tool.set('select'); }
   placeMedia(asset: PickedMedia, point: { x: number; y: number }): void {
@@ -284,24 +419,29 @@ export class CanvasPage implements AfterViewInit, OnDestroy {
     if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'd') { event.preventDefault(); this.duplicate(); return; }
     if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'g') { event.preventDefault(); event.shiftKey ? this.ungroupSelected() : this.groupSelected(); return; }
     if (event.key === 'Delete' || event.key === 'Backspace') { if (this.selectedConnectionId()) this.removeSelectedConnection(); else this.removeSelected(); return; }
-    if (event.key === 'Escape') { if (this.session?.kind === 'connect' || this.session?.kind === 'rebind') { this.session = null; this.clearConnectionDraft(); return; } if (this.cropId()) this.finishCrop(false); else if (this.editingId()) this.finishEditing(); else if (this.pendingAsset()) this.pendingAsset.set(null); else if (this.mediaPicker()) this.mediaPicker.set(null); else if (this.pendingType()) this.pendingType.set(null); else if (this.paletteOpen()) this.paletteOpen.set(false); else this.selectedIds.set([]); this.connectionSourceId.set(null); return; }
+    if (event.key === 'Escape') { if (this.cancelConnectorGesture()) return; if (this.cropId()) this.finishCrop(false); else if (this.editingId()) this.finishEditing(); else if (this.pendingAsset()) this.pendingAsset.set(null); else if (this.mediaPicker()) this.mediaPicker.set(null); else if (this.pendingType()) this.pendingType.set(null); else if (this.paletteOpen()) this.paletteOpen.set(false); else this.selectedIds.set([]); this.connectionSourceId.set(null); return; }
     if (event.key === 'Enter' && this.cropId()) { this.finishCrop(true); return; }
     if (event.key === 'Enter' && this.selected()?.type === 'shape') { event.preventDefault(); this.startEditing(this.selected()!.id); return; }
     const keys: Record<string, Tool> = { v: 'select', h: 'hand', t: 'text', n: 'add', c: 'connect', s: 'shape', p: 'sketch' };
     if (keys[event.key.toLowerCase()]) this.setTool(keys[event.key.toLowerCase()]);
   }
   @HostListener('window:keyup', ['$event']) keyUp(event: KeyboardEvent): void { if (event.code === 'Space') this.spaceHeld.set(false); }
-  @HostListener('window:blur') blur(): void { this.spaceHeld.set(false); this.session = null; this.isPanning.set(false); this.pointers.clear(); this.pinch = null; this.clearConnectionDraft(); }
+  @HostListener('window:blur') blur(): void { this.spaceHeld.set(false); this.cancelConnectorGesture(); this.session = null; this.isPanning.set(false); this.pointers.clear(); this.pinch = null; this.clearConnectionDraft(); }
 
   private point(clientX: number, clientY: number): { x: number; y: number } { const rect = this.viewport()?.nativeElement.getBoundingClientRect(); return { x: (clientX - (rect?.left || 0) - this.panX()) / this.zoom(), y: (clientY - (rect?.top || 0) - this.panY()) / this.zoom() }; }
   isConnectable(item: CanvasItem): boolean { return isConnectableItem(item); }
   private clearConnectionDraft(): void { this.connectionPreview.set(null); this.connectionTargetId.set(null); this.precisePreview.set(null); this.junctionCandidate.set(null); }
+  private cancelConnectorGesture(): boolean {
+    if (!this.session || !['connect', 'rebind', 'branch', 'route', 'junction-slide'].includes(this.session.kind)) return false;
+    if (this.session.before) { this.items.set(this.session.before.items); this.connections.set(this.session.before.connections); this.junctions.set(this.session.before.junctions || []); this.datasetStore.replace(this.session.before.datasets || []); }
+    this.session = null; this.clearConnectionDraft(); return true;
+  }
   private closestSide(item: CanvasItem, point: { x: number; y: number }): ConnectorSide {
     return connectorSides.reduce((best, side) => Math.hypot(sidePoint(item, side).x - point.x, sidePoint(item, side).y - point.y) < Math.hypot(sidePoint(item, best).x - point.x, sidePoint(item, best).y - point.y) ? side : best, 'right' as ConnectorSide);
   }
   private beginTouch(event: PointerEvent): boolean {
     if (event.pointerType !== 'touch') return false;
-    if (this.session?.kind === 'connect' || this.session?.kind === 'rebind') return false;
+    if (this.session && ['connect', 'rebind', 'branch', 'route', 'junction-slide'].includes(this.session.kind)) return false;
     this.pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
     (event.currentTarget as Element).setPointerCapture(event.pointerId);
     if (this.pointers.size < 2) return false;
@@ -351,28 +491,84 @@ export class CanvasPage implements AfterViewInit, OnDestroy {
   rotateDown(event: PointerEvent, item: CanvasItem): void { event.stopPropagation(); const point = this.point(event.clientX, event.clientY); const angle = Math.atan2(point.y - item.y - item.height / 2, point.x - item.x - item.width / 2); this.session = { kind: 'rotate', pointerId: event.pointerId, clientX: event.clientX, clientY: event.clientY, x: angle, y: item.rotation || 0, itemId: item.id, before: this.state() }; (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId); }
   rotateGroupDown(event: PointerEvent): void { event.stopPropagation(); const bounds = this.groupBounds(); if (!bounds) return; const center = { x: bounds.x + bounds.width / 2, y: bounds.y + bounds.height / 2 }, point = this.point(event.clientX, event.clientY); this.session = { kind: 'rotate', pointerId: event.pointerId, clientX: event.clientX, clientY: event.clientY, x: Math.atan2(point.y - center.y, point.x - center.x), y: 0, groupCenter: center, groupIds: [...this.selectedIds()], before: this.state() }; (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId); }
   connectDown(event: PointerEvent, item: CanvasItem, side: ConnectorSide = 'right'): void { if (!isConnectableItem(item)) return; event.preventDefault(); event.stopPropagation(); const anchor = sidePoint(item, side); this.session = { kind: 'connect', pointerId: event.pointerId, clientX: event.clientX, clientY: event.clientY, x: anchor.x, y: anchor.y, itemId: item.id, side }; this.connectionPreview.set({ x1: anchor.x, y1: anchor.y, x2: anchor.x, y2: anchor.y }); (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId); }
-  selectConnection(event: PointerEvent, connection: CanvasConnection): void { if (this.tool() !== 'select' && this.tool() !== 'connect') return; event.stopPropagation(); this.selectedIds.set([]); this.selectedConnectionId.set(connection.id); }
+  selectConnection(event: PointerEvent, connection: CanvasConnection): void { if (this.tool() !== 'select' && this.tool() !== 'connect') return; event.stopPropagation(); this.selectedIds.set([]); this.selectedConnectionId.set(connection.id); this.inspectorOpen.set(false); }
+  private linePoints(connection: CanvasConnection): {x:number;y:number}[] {
+    return [...this.connectionPath(connection).matchAll(/[ML]\s*(-?[\d.]+)\s+(-?[\d.]+)/g)]
+      .map(match => ({ x: Number(match[1]), y: Number(match[2]) }));
+  }
+  private connectorRoutePoints(connection: CanvasConnection): {x:number;y:number}[] {
+    const routed = this.erRoutes().get(connection.id);
+    if (!routed || !connection.routeOffset || routed.points.length < 3) return routed?.points.map(point => ({ ...point })) || this.linePoints(connection);
+    const points = routed.points.map(point => ({ ...point }));
+    let segment = 1, longest = -1;
+    for (let index = 1; index < points.length; index++) {
+      const length = Math.hypot(points[index].x - points[index - 1].x, points[index].y - points[index - 1].y);
+      if (length > longest) { longest = length; segment = index; }
+    }
+    const a = points[segment - 1], b = points[segment];
+    const axis = connection.routeAxis || (Math.abs(a.x - b.x) < Math.abs(a.y - b.y) ? 'x' : 'y');
+    const delta = connection.routeOffset;
+    if (axis === 'x') {
+      if (segment > 1) points[segment - 1].x += delta;
+      if (segment < points.length - 1) points[segment].x += delta;
+    } else {
+      if (segment > 1) points[segment - 1].y += delta;
+      if (segment < points.length - 1) points[segment].y += delta;
+    }
+    return points;
+  }
   private pathPoint(connection: CanvasConnection, ratio: number): {x:number;y:number} {
-    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-    path.setAttribute('d', this.connectionPath(connection));
-    const point = path.getPointAtLength(path.getTotalLength() * Math.max(0, Math.min(1, ratio)));
-    return { x: point.x, y: point.y };
+    const points = this.linePoints(connection);
+    if (!points.length) return { x: 0, y: 0 };
+    const lengths = points.slice(1).map((point, index) => Math.hypot(point.x - points[index].x, point.y - points[index].y));
+    let remaining = lengths.reduce((sum, length) => sum + length, 0) * Math.max(0, Math.min(1, ratio));
+    for (let index = 0; index < lengths.length; index++) {
+      if (remaining <= lengths[index] || index === lengths.length - 1) {
+        const t = lengths[index] ? Math.min(1, remaining / lengths[index]) : 0;
+        return { x: points[index].x + (points[index + 1].x - points[index].x) * t, y: points[index].y + (points[index + 1].y - points[index].y) * t };
+      }
+      remaining -= lengths[index];
+    }
+    return points[0];
   }
   junctionPoint(junction: CanvasJunction): {x:number;y:number} { const parent=this.connections().find(entry=>entry.id===junction.parentConnectorId); return parent?this.pathPoint(parent,junction.positionRatio):{x:0,y:0}; }
   private nearestOnConnection(connection: CanvasConnection, point: {x:number;y:number}): {connectionId:string;ratio:number;x:number;y:number;distance:number} {
-    const path=document.createElementNS('http://www.w3.org/2000/svg','path'); path.setAttribute('d',this.connectionPath(connection));
-    const length=path.getTotalLength(); let best={connectionId:connection.id,ratio:0,x:0,y:0,distance:Infinity};
-    const steps=Math.max(24,Math.ceil(length/8));
-    for(let i=0;i<=steps;i++){ const ratio=i/steps, p=path.getPointAtLength(length*ratio), distance=Math.hypot(point.x-p.x,point.y-p.y); if(distance<best.distance) best={connectionId:connection.id,ratio,x:p.x,y:p.y,distance}; }
+    const points = this.linePoints(connection);
+    const lengths = points.slice(1).map((next, index) => Math.hypot(next.x - points[index].x, next.y - points[index].y));
+    const total = lengths.reduce((sum, length) => sum + length, 0) || 1;
+    let traveled = 0, best = { connectionId: connection.id, ratio: 0, x: points[0]?.x || 0, y: points[0]?.y || 0, distance: Infinity };
+    for (let index = 0; index < lengths.length; index++) {
+      const a = points[index], b = points[index + 1], dx = b.x - a.x, dy = b.y - a.y;
+      const t = Math.max(0, Math.min(1, ((point.x - a.x) * dx + (point.y - a.y) * dy) / (lengths[index] ** 2 || 1)));
+      const x = a.x + dx * t, y = a.y + dy * t, distance = Math.hypot(point.x - x, point.y - y);
+      if (distance < best.distance) best = { connectionId: connection.id, ratio: (traveled + lengths[index] * t) / total, x, y, distance };
+      traveled += lengths[index];
+    }
     return best;
   }
-  private joinCandidate(point:{x:number;y:number}, excludeId?:string) { let best:ReturnType<CanvasPage['nearestOnConnection']>|null=null; for(const connection of this.visibleConnections()) { if(connection.id===excludeId || this.dependsOn(connection.id,excludeId)) continue; const candidate=this.nearestOnConnection(connection,point); if(candidate.distance<14/this.zoom() && (!best||candidate.distance<best.distance)) best=candidate; } return best; }
+  private joinCandidate(point:{x:number;y:number}, excludeId?:string) { let best:ReturnType<CanvasPage['nearestOnConnection']>|null=null; for(const connection of this.visibleConnections()) { if(connection.id===excludeId || connection.kind==='curved' || this.dependsOn(connection.id,excludeId)) continue; const candidate=this.nearestOnConnection(connection,point); if(candidate.distance<14/this.zoom() && (!best||candidate.distance<best.distance)) best=candidate; } return best; }
   private dependsOn(id:string,ancestor?:string,seen=new Set<string>()):boolean { if(!ancestor||seen.has(id)) return false; if(id===ancestor) return true; seen.add(id); const connection=this.connections().find(entry=>entry.id===id); return !!connection && [connection.sourceJunctionId,connection.targetJunctionId].some(jid=>{const parent=this.junctions().find(j=>j.id===jid)?.parentConnectorId; return !!parent&&this.dependsOn(parent,ancestor,seen);}); }
   private getOrCreateJunction(candidate:{connectionId:string;ratio:number;x:number;y:number}):CanvasJunction { const existing=this.junctions().find(j=>j.parentConnectorId===candidate.connectionId&&Math.hypot(this.junctionPoint(j).x-candidate.x,this.junctionPoint(j).y-candidate.y)<12/this.zoom()); if(existing) return existing; const junction={id:canvasId(),parentConnectorId:candidate.connectionId,positionRatio:candidate.ratio}; this.junctions.update(entries=>[...entries,junction]); return junction; }
   connectionHover(event:PointerEvent,connection:CanvasConnection):void { if(this.session||this.editingId()||(this.tool()!=='select'&&this.tool()!=='connect')) return; const candidate=this.nearestOnConnection(connection,this.point(event.clientX,event.clientY)); this.junctionCandidate.set(candidate); }
   connectionLeave(connection:CanvasConnection):void { if(!this.session&&this.junctionCandidate()?.connectionId===connection.id) this.junctionCandidate.set(null); }
-  branchDown(event:PointerEvent,connection:CanvasConnection):void { if(this.tool()!=='select'&&this.tool()!=='connect') return; event.preventDefault(); event.stopPropagation(); this.finishEditing(); this.selectedIds.set([]); this.selectedConnectionId.set(connection.id); const candidate=this.nearestOnConnection(connection,this.point(event.clientX,event.clientY)); this.junctionCandidate.set(candidate); this.session={kind:'branch',pointerId:event.pointerId,clientX:event.clientX,clientY:event.clientY,x:candidate.x,y:candidate.y,connectionId:connection.id,ratio:candidate.ratio}; this.connectionPreview.set({x1:candidate.x,y1:candidate.y,x2:candidate.x,y2:candidate.y}); (event.currentTarget as Element).setPointerCapture(event.pointerId); }
-  junctionDown(event:PointerEvent,junction:CanvasJunction):void { event.preventDefault(); event.stopPropagation(); const point=this.junctionPoint(junction); if(this.tool()==='connect'){this.session={kind:'branch',pointerId:event.pointerId,clientX:event.clientX,clientY:event.clientY,x:point.x,y:point.y,connectionId:junction.parentConnectorId,junctionId:junction.id}; this.connectionPreview.set({x1:point.x,y1:point.y,x2:point.x,y2:point.y});} else {this.session={kind:'junction-slide',pointerId:event.pointerId,clientX:event.clientX,clientY:event.clientY,x:point.x,y:point.y,junctionId:junction.id,connectionId:junction.parentConnectorId,before:this.state()};} (event.currentTarget as Element).setPointerCapture(event.pointerId); }
+  canBranch(connection: CanvasConnection): boolean { return !connection.sourceFieldId && !connection.targetFieldId && connection.kind !== 'curved'; }
+  branchDown(event:PointerEvent,connection:CanvasConnection):void {
+    if ((this.tool() !== 'select' && this.tool() !== 'connect') || !this.canBranch(connection)) return;
+    event.preventDefault(); event.stopPropagation(); this.finishEditing(); this.selectedIds.set([]); this.selectedConnectionId.set(connection.id); this.inspectorOpen.set(false);
+    const candidate=this.nearestOnConnection(connection,this.point(event.clientX,event.clientY));
+    this.session={kind:'branch',pointerId:event.pointerId,clientX:event.clientX,clientY:event.clientY,x:candidate.x,y:candidate.y,connectionId:connection.id,ratio:candidate.ratio};
+    this.connectionPreview.set({x1:candidate.x,y1:candidate.y,x2:candidate.x,y2:candidate.y});
+    (event.currentTarget as Element).setPointerCapture(event.pointerId);
+  }
+  junctionDown(event:PointerEvent,junction:CanvasJunction):void {
+    const parent = this.connections().find(connection => connection.id === junction.parentConnectorId);
+    if (!parent || !this.canBranch(parent)) return;
+    event.preventDefault(); event.stopPropagation(); this.selectedIds.set([]); this.selectedConnectionId.set(parent.id); this.inspectorOpen.set(false);
+    const point=this.junctionPoint(junction);
+    if (event.shiftKey) this.session={kind:'junction-slide',pointerId:event.pointerId,clientX:event.clientX,clientY:event.clientY,x:point.x,y:point.y,junctionId:junction.id,connectionId:parent.id,before:this.state()};
+    else { this.session={kind:'branch',pointerId:event.pointerId,clientX:event.clientX,clientY:event.clientY,x:point.x,y:point.y,connectionId:parent.id,junctionId:junction.id,ratio:junction.positionRatio}; this.connectionPreview.set({x1:point.x,y1:point.y,x2:point.x,y2:point.y}); }
+    (event.currentTarget as Element).setPointerCapture(event.pointerId);
+  }
   endpoint(connection: CanvasConnection, terminal: 'source' | 'target'): {x:number;y:number} { const ends=this.connectionEnds(connection); return terminal === 'source' ? ends.a : ends.b; }
   rebindDown(event: PointerEvent, connection: CanvasConnection, terminal: 'source' | 'target'): void {
     event.preventDefault(); event.stopPropagation(); this.selectedIds.set([]); this.selectedConnectionId.set(connection.id);
@@ -381,7 +577,7 @@ export class CanvasPage implements AfterViewInit, OnDestroy {
     (event.currentTarget as Element).setPointerCapture(event.pointerId);
   }
   routeHandle(connection: CanvasConnection): {x:number;y:number} {
-    const routed = this.erRoutes().get(connection.id); if (routed) return routed.label;
+    const routed = this.erRoutes().get(connection.id); if (routed) { const points=this.connectorRoutePoints(connection); let best=-1,label=routed.label; for(let index=1;index<points.length;index++){const a=points[index-1],b=points[index],length=Math.hypot(b.x-a.x,b.y-a.y);if(length>best){best=length;label={x:(a.x+b.x)/2,y:(a.y+b.y)/2};}} return label; }
     if ((!connection.kind || connection.kind === 'elbow') && !connection.routeOffset) {
       const matches = [...this.connectionPath(connection).matchAll(/[ML]\s*(-?[\d.]+)\s+(-?[\d.]+)/g)];
       const points = matches.map(match => ({ x: Number(match[1]), y: Number(match[2]) }));
@@ -395,7 +591,33 @@ export class CanvasPage implements AfterViewInit, OnDestroy {
     const {a,b,source,target}=this.connectionEnds(connection), horizontal=this.horizontalConnection(source,target);
     return horizontal?{x:(a.x+b.x)/2+(connection.routeOffset||0),y:(a.y+b.y)/2}:{x:(a.x+b.x)/2,y:(a.y+b.y)/2+(connection.routeOffset||0)};
   }
-  routeDown(event: PointerEvent, connection: CanvasConnection): void { event.preventDefault(); event.stopPropagation(); const {source,target}=this.connectionEnds(connection), horizontal=this.horizontalConnection(source,target); this.session={kind:'route',pointerId:event.pointerId,clientX:event.clientX,clientY:event.clientY,x:connection.routeOffset||0,y:horizontal?1:0,connectionId:connection.id,before:this.state()}; (event.currentTarget as Element).setPointerCapture(event.pointerId); }
+  branchControlPoint(connection: CanvasConnection): { x: number; y: number } { const point = this.routeHandle(connection); return { x: point.x + 27 / this.zoom(), y: point.y - 27 / this.zoom() }; }
+  routeDown(event: PointerEvent, connection: CanvasConnection): void {
+    if (this.tool() !== 'select') return;
+    event.preventDefault(); event.stopPropagation(); this.finishEditing(); this.selectedIds.set([]); this.selectedConnectionId.set(connection.id); this.inspectorOpen.set(false);
+    const point = this.point(event.clientX, event.clientY), points = this.linePoints(connection), ends = this.connectionEnds(connection);
+    let best = Infinity, axis: 'x' | 'y' = connection.routeAxis || (this.horizontalConnection(ends.source, ends.target) ? 'x' : 'y'), lane = axis === 'x' ? (ends.a.x + ends.b.x) / 2 : (ends.a.y + ends.b.y) / 2;
+    for (let index = 1; index < points.length; index++) {
+      const a = points[index - 1], b = points[index], dx = b.x - a.x, dy = b.y - a.y;
+      const t = Math.max(0, Math.min(1, ((point.x - a.x) * dx + (point.y - a.y) * dy) / (dx * dx + dy * dy || 1)));
+      const distance = Math.hypot(point.x - a.x - dx * t, point.y - a.y - dy * t);
+      if (distance < best && Math.abs(dx) + Math.abs(dy) > 1) { best = distance; axis = Math.abs(dx) < Math.abs(dy) ? 'x' : 'y'; lane = axis === 'x' ? a.x : a.y; }
+    }
+    if (this.erRoutes().has(connection.id)) {
+      const routePoints = this.erRoutes().get(connection.id)!.points;
+      let segmentIndex = 1, segmentLength = -1;
+      for (let index = 1; index < routePoints.length; index++) {
+        const a = routePoints[index - 1], b = routePoints[index], length = Math.hypot(b.x - a.x, b.y - a.y);
+        if (length > segmentLength) { segmentLength = length; segmentIndex = index; }
+      }
+      const a = routePoints[segmentIndex - 1], b = routePoints[segmentIndex];
+      axis = Math.abs(a.x - b.x) < Math.abs(a.y - b.y) ? 'x' : 'y';
+      lane = axis === 'x' ? a.x : a.y;
+    }
+    const midpoint = axis === 'x' ? (ends.a.x + ends.b.x) / 2 : (ends.a.y + ends.b.y) / 2;
+    this.session={kind:'route',pointerId:event.pointerId,clientX:event.clientX,clientY:event.clientY,x:lane-midpoint,y:axis==='x'?1:0,connectionId:connection.id,before:this.state()};
+    (event.currentTarget as Element).setPointerCapture(event.pointerId);
+  }
   pointerMove(event: PointerEvent): void {
     if (this.pendingAsset()) this.assetPreview.set(this.point(event.clientX, event.clientY));
     if (this.pointers.has(event.pointerId)) { this.pointers.set(event.pointerId, { x: event.clientX, y: event.clientY }); if (this.pointers.size === 2 && this.pinch) { const [a, b] = [...this.pointers.values()]; const distance = Math.hypot(a.x - b.x, a.y - b.y), x = (a.x + b.x) / 2, y = (a.y + b.y) / 2; this.panX.update(v => v + x - this.pinch!.x); this.panY.update(v => v + y - this.pinch!.y); this.zoomAt(x, y, this.zoom() * distance / Math.max(1, this.pinch.distance)); this.pinch = { distance, x, y }; return; } }
@@ -456,8 +678,20 @@ export class CanvasPage implements AfterViewInit, OnDestroy {
     if (session.kind === 'marquee') { const point = this.point(event.clientX, event.clientY); this.marquee.set({ x: Math.min(session.x, point.x), y: Math.min(session.y, point.y), width: Math.abs(point.x - session.x), height: Math.abs(point.y - session.y) }); }
     if (session.kind === 'place' && (this.pendingType() === 'zone' || this.pendingType() === 'shape')) { const point = this.point(event.clientX, event.clientY); this.placement.set({ x: Math.min(session.x, point.x), y: Math.min(session.y, point.y), width: Math.abs(point.x - session.x), height: Math.abs(point.y - session.y) }); }
     if (session.kind === 'crop' && session.itemId) this.update(session.itemId, { cropX: session.x + dx / this.zoom(), cropY: session.y + dy / this.zoom() });
-    if (session.kind === 'connect') { const point = this.point(event.clientX, event.clientY); const target = this.connectorTarget(point, session.itemId || ''); const end = target ? sidePoint(target, this.closestSide(target, point)) : point; this.connectionTargetId.set(target?.id || null); this.precisePreview.set(target ? end : null); this.connectionPreview.set({ x1: session.x, y1: session.y, x2: end.x, y2: end.y }); }
-    if (session.kind === 'route' && session.connectionId) this.connections.update(entries=>entries.map(entry=>entry.id===session.connectionId?{...entry,routeOffset:session.x+(session.y?dx:dy)/this.zoom()}:entry));
+    if (session.kind === 'connect') { const point = this.point(event.clientX, event.clientY); const target = this.connectorTarget(point, session.itemId || ''); const lineJoin = !target ? this.joinCandidate(point) : null; const end = target ? sidePoint(target, this.closestSide(target, point)) : lineJoin ? { x: lineJoin.x, y: lineJoin.y } : point; this.junctionCandidate.set(lineJoin); this.connectionTargetId.set(target?.id || null); this.precisePreview.set(target ? end : lineJoin ? end : null); this.connectionPreview.set({ x1: session.x, y1: session.y, x2: end.x, y2: end.y }); }
+    if (session.kind === 'branch' && session.connectionId) {
+      const parent = this.connections().find(connection => connection.id === session.connectionId);
+      if (parent) {
+        const point = this.point(event.clientX, event.clientY);
+        const candidate = this.connectorTarget(point, parent.sourceId);
+        const target = candidate?.id === parent.targetId ? undefined : candidate;
+        const end = target ? sidePoint(target, this.closestSide(target, point)) : point;
+        this.connectionTargetId.set(target?.id || null);
+        this.precisePreview.set(target ? end : null);
+        this.connectionPreview.set({ x1: session.x, y1: session.y, x2: end.x, y2: end.y });
+      }
+    }
+    if (session.kind === 'route' && session.connectionId && session.moved) this.connections.update(entries=>entries.map(entry=>entry.id===session.connectionId?{...entry,routeAxis:session.y?'x':'y',routeOffset:session.x+(session.y?dx:dy)/this.zoom()}:entry));
     if (session.kind === 'rebind' && session.connectionId) { const connection=this.connections().find(entry=>entry.id===session.connectionId); if (connection) { const point=this.point(event.clientX,event.clientY), other=this.endpoint(connection,session.terminal==='source'?'target':'source'), target=this.connectorTarget(point,session.terminal==='source'?connection.targetId:connection.sourceId), end=target?sidePoint(target,this.closestSide(target,point)):point; this.connectionTargetId.set(target?.id||null); this.precisePreview.set(target?end:null); this.connectionPreview.set({x1:other.x,y1:other.y,x2:end.x,y2:end.y}); } }
     if (session.kind === 'junction-slide' && session.junctionId && session.connectionId) { const parent=this.connections().find(c=>c.id===session.connectionId); if(parent){const candidate=this.nearestOnConnection(parent,this.point(event.clientX,event.clientY)); this.junctions.update(entries=>entries.map(j=>j.id===session.junctionId?{...j,positionRatio:candidate.ratio}:j));} }
     if (session.kind === 'sketch') { const point = this.point(event.clientX, event.clientY); const last = this.sketchPoints().at(-1); if (!last || Math.hypot(point.x - last.x, point.y - last.y) > 1.5) this.sketchPoints.update(points => [...points, { ...point, pressure: event.pressure || .5 }]); }
@@ -488,9 +722,31 @@ export class CanvasPage implements AfterViewInit, OnDestroy {
     if (session?.kind === 'connect' && session.itemId) {
       const point = this.point(event.clientX, event.clientY);
       const target = this.connectorTarget(point, session.itemId);
-      if (target) this.addConnection(session.itemId!, target.id, session.side, this.closestSide(target, point));
+      const join = !target ? this.joinCandidate(point) : null;
+      if (join) {
+        const parent = this.connections().find(connection => connection.id === join.connectionId);
+        if (parent && parent.sourceId !== session.itemId && parent.targetId !== session.itemId && !this.connections().some(connection => connection.sourceId === session.itemId && connection.targetId === parent.targetId)) {
+          this.snapshot();
+          const junction = this.getOrCreateJunction(join);
+          this.connections.update(entries => [...entries, { id: canvasId(), sourceId: session.itemId!, sourceSide: session.side, targetId: parent.targetId, targetJunctionId: junction.id, direction: 'forward', kind: 'elbow' }]);
+          this.selectedConnectionId.set(parent.id);
+        }
+      } else if (target) this.addConnection(session.itemId!, target.id, session.side, this.closestSide(target, point));
     }
-    if(session?.kind==='branch' && session.connectionId && session.moved){const parent=this.connections().find(c=>c.id===session.connectionId), point=this.point(event.clientX,event.clientY); if(parent){const target=this.connectorTarget(point,parent.sourceId), join=target?null:this.joinCandidate(point,parent.id); if(target||join){this.snapshot(); const origin=session.junctionId?this.junctions().find(j=>j.id===session.junctionId):this.getOrCreateJunction({connectionId:parent.id,ratio:session.ratio!,x:session.x,y:session.y}); if(origin){const other=join?this.connections().find(c=>c.id===join.connectionId):null; const destination=join?this.getOrCreateJunction(join):null; this.connections.update(entries=>[...entries,{id:canvasId(),sourceId:parent.sourceId,sourceJunctionId:origin.id,targetId:target?.id||other!.targetId,targetJunctionId:destination?.id,direction:'forward',kind:this.connectorKind()}]);}}} }
+    if (session?.kind === 'branch' && session.connectionId && session.moved) {
+      const parent = this.connections().find(connection => connection.id === session.connectionId);
+      const point = this.point(event.clientX, event.clientY);
+      const target = parent ? this.connectorTarget(point, parent.sourceId) : undefined;
+      if (parent && target && target.id !== parent.targetId && !this.connections().some(connection => connection.sourceJunctionId === session.junctionId && connection.targetId === target.id)) {
+        this.snapshot();
+        const junction = session.junctionId ? this.junctions().find(entry => entry.id === session.junctionId) : this.getOrCreateJunction({ connectionId: parent.id, ratio: session.ratio!, x: session.x, y: session.y });
+        if (junction && !this.connections().some(connection => connection.sourceJunctionId === junction.id && connection.targetId === target.id)) {
+          const branch: CanvasConnection = { id: canvasId(), sourceId: parent.sourceId, sourceJunctionId: junction.id, targetId: target.id, targetSide: this.closestSide(target, point), direction: 'forward', kind: 'elbow' };
+          this.connections.update(entries => [...entries, branch]);
+          this.selectedConnectionId.set(branch.id);
+        }
+      }
+    }
     if(session?.kind==='branch' && !session.moved && session.connectionId) this.selectedConnectionId.set(session.connectionId);
     if (session?.kind === 'rebind' && session.connectionId && session.terminal) {
       const connection=this.connections().find(entry=>entry.id===session.connectionId);
@@ -577,9 +833,28 @@ export class CanvasPage implements AfterViewInit, OnDestroy {
       return { ...structuredClone(item), id: ids.get(item.id)!, title, groupId: item.groupId ? groups.get(item.groupId) : undefined, parentId: item.parentId && ids.has(item.parentId) ? ids.get(item.parentId)! : item.parentId, x: item.x + 24, y: item.y + 24,
         erFields: item.erFields?.map(field => ({ ...structuredClone(field), id: fieldIds.get(field.id)!, reference: field.reference ? { entityId: ids.get(field.reference.entityId) || field.reference.entityId, fieldId: ids.has(field.reference.entityId) ? fieldIds.get(field.reference.fieldId) || field.reference.fieldId : field.reference.fieldId } : undefined })) };
     });
-    const relationships: CanvasConnection[] = this.connections().filter(connection => ids.has(connection.sourceId) && ids.has(connection.targetId) && !connection.sourceJunctionId && !connection.targetJunctionId).map(connection => ({ ...structuredClone(connection), id: canvasId(), sourceId: ids.get(connection.sourceId)!, targetId: ids.get(connection.targetId)!, sourceFieldId: connection.sourceFieldId ? fieldIds.get(connection.sourceFieldId) : undefined, targetFieldId: connection.targetFieldId ? fieldIds.get(connection.targetFieldId) : undefined }));
+    const connectionIds = new Map<string, string>(), junctionIds = new Map<string, string>();
+    const relationships: CanvasConnection[] = [];
+    const copiedJunctions: CanvasJunction[] = [];
+    let added = true;
+    while (added) {
+      added = false;
+      for (const connection of this.connections()) {
+        if (connectionIds.has(connection.id) || !ids.has(connection.sourceId) || !ids.has(connection.targetId)) continue;
+        const originalJunctions = [connection.sourceJunctionId, connection.targetJunctionId].filter((id): id is string => !!id);
+        if (originalJunctions.some(id => !connectionIds.has(this.junctions().find(junction => junction.id === id)?.parentConnectorId || ''))) continue;
+        for (const id of originalJunctions) if (!junctionIds.has(id)) {
+          const junction = this.junctions().find(entry => entry.id === id)!;
+          const copyId = canvasId(); junctionIds.set(id, copyId);
+          copiedJunctions.push({ ...junction, id: copyId, parentConnectorId: connectionIds.get(junction.parentConnectorId)! });
+        }
+        const copyId = canvasId(); connectionIds.set(connection.id, copyId);
+        relationships.push({ ...structuredClone(connection), id: copyId, sourceId: ids.get(connection.sourceId)!, targetId: ids.get(connection.targetId)!, sourceJunctionId: connection.sourceJunctionId ? junctionIds.get(connection.sourceJunctionId) : undefined, targetJunctionId: connection.targetJunctionId ? junctionIds.get(connection.targetJunctionId) : undefined, sourceFieldId: connection.sourceFieldId ? fieldIds.get(connection.sourceFieldId) : undefined, targetFieldId: connection.targetFieldId ? fieldIds.get(connection.targetFieldId) : undefined });
+        added = true;
+      }
+    }
     for (const copy of copies) for (const field of copy.erFields || []) if (field.reference && !relationships.some(connection => connection.targetId === copy.id && connection.targetFieldId === field.id)) relationships.push({ id: canvasId(), sourceId: field.reference.entityId, sourceFieldId: field.reference.fieldId, targetId: copy.id, targetFieldId: field.id, kind: 'elbow', direction: 'none', sourceCardinality: field.required ? '1' : '0..1', targetCardinality: field.unique ? '0..1' : '0..many' });
-    this.snapshot(); this.items.update(items => [...items, ...copies]); this.connections.update(entries => [...entries, ...relationships]); this.selectedIds.set(copies.map(item => item.id)); return copies;
+    this.snapshot(); this.items.update(items => [...items, ...copies]); this.junctions.update(entries => [...entries, ...copiedJunctions]); this.connections.update(entries => [...entries, ...relationships]); this.selectedIds.set(copies.map(item => item.id)); return copies;
   }
 
   quickConnectedShape(source: CanvasItem): void {
@@ -589,7 +864,14 @@ export class CanvasPage implements AfterViewInit, OnDestroy {
   }
   removeSelected(): void { const ids = this.selectedIds(); if (!ids.length) return; this.snapshot(); const removed = new Set(ids); let changed = true; while (changed) { changed = false; for (const item of this.items()) if (item.parentId && removed.has(item.parentId) && !removed.has(item.id)) { removed.add(item.id); changed = true; } } this.items.update((items) => items.filter((item) => !removed.has(item.id))); this.removeConnectionGraph(new Set(this.connections().filter(c=>removed.has(c.sourceId)||removed.has(c.targetId)).map(c=>c.id))); this.selectedIds.set([]); }
   removeSelectedConnection(): void { const id=this.selectedConnectionId(); if (!id) return; this.snapshot(); const connection = this.connections().find(entry => entry.id === id); if (connection?.targetFieldId) this.items.update(items => items.map(item => item.id === connection.targetId ? { ...item, erFields: item.erFields?.map(field => field.id === connection.targetFieldId ? { ...field, key: 'none', reference: undefined } : field) } : item)); this.removeConnectionGraph(new Set([id])); this.selectedConnectionId.set(null); }
-  private removeConnectionGraph(removed:Set<string>):void {let changed=true; while(changed){changed=false; for(const connection of this.connections()){const parents=[connection.sourceJunctionId,connection.targetJunctionId].map(id=>this.junctions().find(j=>j.id===id)?.parentConnectorId); if(!removed.has(connection.id)&&parents.some(id=>id&&removed.has(id))){removed.add(connection.id);changed=true;}}} this.connections.update(entries=>entries.filter(c=>!removed.has(c.id))); this.junctions.update(entries=>entries.filter(j=>!removed.has(j.parentConnectorId)));}
+  private removeConnectionGraph(removed:Set<string>):void {
+    let changed=true;
+    while(changed){changed=false; for(const connection of this.connections()){const parents=[connection.sourceJunctionId,connection.targetJunctionId].map(id=>this.junctions().find(j=>j.id===id)?.parentConnectorId); if(!removed.has(connection.id)&&parents.some(id=>id&&removed.has(id))){removed.add(connection.id);changed=true;}}}
+    const remaining = this.connections().filter(connection => !removed.has(connection.id));
+    const usedJunctions = new Set(remaining.flatMap(connection => [connection.sourceJunctionId, connection.targetJunctionId].filter((id): id is string => !!id)));
+    this.connections.set(remaining);
+    this.junctions.update(entries => entries.filter(junction => !removed.has(junction.parentConnectorId) && usedJunctions.has(junction.id)));
+  }
   private connectorTarget(point: {x:number;y:number}, sourceId: string): CanvasItem | undefined {
     const visible = this.visibleItems().map((item, index) => ({ item, index }))
       .sort((a, b) => (b.item.zIndex ?? (['zone', 'frame', 'workspace'].includes(b.item.type) ? 0 : 1)) - (a.item.zIndex ?? (['zone', 'frame', 'workspace'].includes(a.item.type) ? 0 : 1)) || b.index - a.index)
@@ -619,12 +901,22 @@ export class CanvasPage implements AfterViewInit, OnDestroy {
   }
   connectionPath(connection: CanvasConnection): string {
     const routed = this.erRoutes().get(connection.id);
-    if (routed) return routed.points.map((point, index) => `${index ? 'L' : 'M'} ${point.x} ${point.y}`).join(' ');
+    if (routed) {
+      const points = this.connectorRoutePoints(connection);
+      return points.map((point, index) => `${index ? 'L' : 'M'} ${point.x} ${point.y}`).join(' ');
+    }
     const { a, b, source, target } = this.connectionEnds(connection);
     if (connection.kind === 'straight') return `M ${a.x} ${a.y} L ${b.x} ${b.y}`;
     const horizontal = this.horizontalConnection(source,target);
     if (!connection.kind || connection.kind === 'elbow') {
-      if (!connection.routeOffset && !connection.sourceJunctionId && !connection.targetJunctionId) {
+      if (connection.sourceJunctionId && !connection.targetJunctionId) {
+        const sourceSide: ConnectorSide = Math.abs(b.x - a.x) >= Math.abs(b.y - a.y) ? (b.x >= a.x ? 'right' : 'left') : (b.y >= a.y ? 'bottom' : 'top');
+        const targetSide = connection.targetSide || this.closestSide(target, a);
+        const targetPoint = sidePoint(target, targetSide);
+        return elbowRoute(a, targetPoint, sourceSide, targetSide, { x: a.x, y: a.y, width: 0, height: 0 }, target)
+          .map((point, index) => `${index ? 'L' : 'M'} ${point.x} ${point.y}`).join(' ');
+      }
+      if (!connection.routeAxis && !connection.routeOffset && !connection.sourceJunctionId && !connection.targetJunctionId) {
         const sourceCenter = { x: source.x + source.width / 2, y: source.y + source.height / 2 };
         const targetCenter = { x: target.x + target.width / 2, y: target.y + target.height / 2 };
         const autoHorizontal = this.horizontalConnection(source, target);
@@ -632,7 +924,8 @@ export class CanvasPage implements AfterViewInit, OnDestroy {
         const targetSide = connection.targetSide || (autoHorizontal ? targetCenter.x >= sourceCenter.x ? 'left' : 'right' : targetCenter.y >= sourceCenter.y ? 'top' : 'bottom');
         return elbowRoute(a, b, sourceSide, targetSide, source, target).map((point, index) => `${index ? 'L' : 'M'} ${point.x} ${point.y}`).join(' ');
       }
-      if (horizontal) { const mx=(a.x+b.x)/2+(connection.routeOffset||0); return `M ${a.x} ${a.y} L ${mx} ${a.y} L ${mx} ${b.y} L ${b.x} ${b.y}`; }
+      const axis = connection.routeAxis || (horizontal ? 'x' : 'y');
+      if (axis === 'x') { const mx=(a.x+b.x)/2+(connection.routeOffset||0); return `M ${a.x} ${a.y} L ${mx} ${a.y} L ${mx} ${b.y} L ${b.x} ${b.y}`; }
       const my=(a.y+b.y)/2+(connection.routeOffset||0); return `M ${a.x} ${a.y} L ${a.x} ${my} L ${b.x} ${my} L ${b.x} ${b.y}`;
     }
     const bend = Math.min(90, Math.max(24, (horizontal ? Math.abs(b.x-a.x) : Math.abs(b.y-a.y))*.35));
@@ -645,8 +938,8 @@ export class CanvasPage implements AfterViewInit, OnDestroy {
     if (this.connectorKind() === 'curved') { const bend = Math.max(40, Math.abs(x2 - x1) * .45), direction = Math.sign(x2 - x1 || 1); return `M ${x1} ${y1} C ${x1 + direction * bend} ${y1}, ${x2 - direction * bend} ${y2}, ${x2} ${y2}`; }
     return `M ${x1} ${y1} L ${x2} ${y2}`;
   }
-  connectionLabelX(connection: CanvasConnection): number { if (connection.kind === 'elbow') return this.routeHandle(connection).x; const { a, b } = this.connectionEnds(connection); return (a.x + b.x) / 2; }
-  connectionLabelY(connection: CanvasConnection): number { if (connection.kind === 'elbow') return this.routeHandle(connection).y; const { a, b } = this.connectionEnds(connection); return (a.y + b.y) / 2; }
+  connectionLabelX(connection: CanvasConnection): number { if (this.junctions().some(junction => junction.parentConnectorId === connection.id)) return this.pathPoint(connection, .25).x; if (connection.kind === 'elbow') return this.routeHandle(connection).x; const { a, b } = this.connectionEnds(connection); return (a.x + b.x) / 2; }
+  connectionLabelY(connection: CanvasConnection): number { if (this.junctions().some(junction => junction.parentConnectorId === connection.id)) return this.pathPoint(connection, .25).y; if (connection.kind === 'elbow') return this.routeHandle(connection).y; const { a, b } = this.connectionEnds(connection); return (a.y + b.y) / 2; }
   private reparent(id: string): void { const item = this.items().find(entry => entry.id === id); if (!item || item.type === 'zone' || item.type === 'workspace' || item.type === 'frame') return; const x = item.x + item.width / 2, y = item.y + item.height / 2; const zone = [...this.items()].reverse().find(entry => (entry.type === 'zone' || entry.type === 'frame') && entry.id !== id && x >= entry.x && x <= entry.x + entry.width && y >= entry.y && y <= entry.y + entry.height); if (zone) this.update(id, { parentId: zone.id }); else if (['zone', 'frame'].includes(this.items().find(entry => entry.id === item.parentId)?.type || '')) this.update(id, { parentId: null }); }
   createAt(type: ItemType, point: { x: number; y: number }, box?: { width: number; height: number }): void {
     this.finishEditing();
@@ -736,7 +1029,7 @@ export class CanvasPage implements AfterViewInit, OnDestroy {
   arrangeErDiagram(): void {
     this.finishEditing(); const positions = arrangeErEntities(this.visibleItems(), this.connections()); if (!positions.size) return;
     this.snapshot(); this.items.update(items => items.map(item => positions.has(item.id) ? { ...item, ...positions.get(item.id)!, rotation: 0, updatedAt: new Date().toISOString() } : item));
-    this.connections.update(entries => entries.map(entry => positions.has(entry.sourceId) && positions.has(entry.targetId) ? { ...entry, kind: 'elbow', routeOffset: 0, sourceBinding: { mode: 'auto' }, targetBinding: { mode: 'auto' } } : entry));
+    this.connections.update(entries => entries.map(entry => positions.has(entry.sourceId) && positions.has(entry.targetId) ? { ...entry, kind: 'elbow', routeOffset: 0, routeAxis: undefined, sourceBinding: { mode: 'auto' }, targetBinding: { mode: 'auto' } } : entry));
     this.selectedIds.set([...positions.keys()]); this.selectedConnectionId.set(null); this.inspectorOpen.set(false); this.setTool('select');
     const arranged = this.items().filter(item => positions.has(item.id)), viewport = this.viewport()?.nativeElement;
     if (viewport) { const left = Math.min(...arranged.map(item => item.x)), top = Math.min(...arranged.map(item => item.y)), width = Math.max(...arranged.map(item => item.x + item.width)) - left, height = Math.max(...arranged.map(item => item.y + item.height)) - top; const zoom = Math.max(.08, Math.min(1, (viewport.clientWidth - (viewport.clientWidth <= 700 ? 32 : 180)) / width, (viewport.clientHeight - 200) / height)); this.zoom.set(zoom); this.panX.set(viewport.clientWidth / 2 - (left + width / 2) * zoom); this.panY.set((viewport.clientHeight - 70) / 2 - (top + height / 2) * zoom); }
@@ -859,9 +1152,9 @@ export class CanvasPage implements AfterViewInit, OnDestroy {
   setLinkUrl(id: string, event: Event): void { const url = (event.target as HTMLInputElement).value.trim(); this.setStyle(id, { url, title: this.items().find(entry => entry.id === id)?.title || url }); }
   copy(): void { const ids = new Set(this.selectedIds()); this.clipboard = structuredClone(this.items().filter(item => ids.has(item.id))); }
   paste(): void { const copies = this.insertCopies(this.clipboard); if (copies.length) this.clipboard = structuredClone(copies); }
-  async fileSelected(event: Event): Promise<void> { const input = event.target as HTMLInputElement; const files = input.files; if (files?.length) await this.importFiles(files, this.imagePlacement || this.centerPoint()); input.value = ''; input.accept = 'image/*,audio/*,.pdf,.txt,.doc,.docx'; this.imagePlacement = null; this.replaceId = null; }
+  async fileSelected(event: Event): Promise<void> { const input = event.target as HTMLInputElement; const files = input.files; if (files?.length) await this.importFiles(files, this.imagePlacement || this.centerPoint()); input.value = ''; input.accept = 'image/*,audio/*,video/*,.pdf,.txt,.doc,.docx'; this.imagePlacement = null; this.replaceId = null; }
   private centerPoint(): { x: number; y: number } { const rect = this.viewport()?.nativeElement.getBoundingClientRect(); return rect ? this.point(rect.left + rect.width / 2, rect.top + rect.height / 2) : { x: 0, y: 0 }; }
-  private async importFiles(files: FileList | File[], point: { x: number; y: number }): Promise<void> { let index = 0; for (const file of Array.from(files)) { const source = await new Promise<string>((resolve, reject) => { const reader = new FileReader(); reader.onload = () => resolve(String(reader.result)); reader.onerror = () => reject(reader.error); reader.readAsDataURL(file); }); let width = 260, height = 130; const image = file.type.startsWith('image/'); if (image) { const size = await new Promise<{ width: number; height: number }>(resolve => { const img = new Image(); img.onload = () => resolve({ width: img.naturalWidth, height: img.naturalHeight }); img.onerror = () => resolve({ width: 320, height: 240 }); img.src = source; }); const scale = Math.min(1, 520 / size.width, 420 / size.height); width = size.width * scale; height = size.height * scale; } if (image && this.replaceId) { this.snapshot(); this.update(this.replaceId, { image: source, title: file.name, cropX: 0, cropY: 0, cropScale: 1 }); break; } const item: CanvasItem = { id: canvasId(), type: image ? 'image' : file.type.startsWith('audio/') ? 'voice' : 'file', parentId: null, x: point.x + 24 * index, y: point.y + 24 * index, width, height, title: file.name, image: image ? source : undefined, filename: file.name, url: image ? undefined : source, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() }; this.snapshot(); this.items.update(items => [...items, item]); this.selectedIds.set([item.id]); index++; } }
+  private async importFiles(files: FileList | File[], point: { x: number; y: number }, duration?: string): Promise<void> { let index = 0; for (const file of Array.from(files)) { const source = await new Promise<string>((resolve, reject) => { const reader = new FileReader(); reader.onload = () => resolve(String(reader.result)); reader.onerror = () => reject(reader.error); reader.readAsDataURL(file); }); const image = file.type.startsWith('image/'), audio = file.type.startsWith('audio/'), video = file.type.startsWith('video/'); let width = audio ? 300 : video ? 320 : 260, height = audio ? 150 : video ? 210 : 130; if (image) { const size = await new Promise<{ width: number; height: number }>(resolve => { const img = new Image(); img.onload = () => resolve({ width: img.naturalWidth, height: img.naturalHeight }); img.onerror = () => resolve({ width: 320, height: 240 }); img.src = source; }); const scale = Math.min(1, 520 / size.width, 420 / size.height); width = size.width * scale; height = size.height * scale; } if (image && this.replaceId) { this.snapshot(); this.update(this.replaceId, { image: source, title: file.name, cropX: 0, cropY: 0, cropScale: 1 }); break; } const item: CanvasItem = { id: canvasId(), type: image ? 'image' : audio ? 'voice' : video ? 'video' : 'file', parentId: null, x: point.x + 24 * index, y: point.y + 24 * index, width, height, title: file.name, body: audio ? 'A voice note from this board.' : undefined, duration: audio ? duration : undefined, image: image ? source : undefined, filename: file.name, url: image ? undefined : source, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() }; this.snapshot(); this.items.update(items => [...items, item]); this.selectedIds.set([item.id]); index++; } }
   dragOver(event: DragEvent): void { if (event.dataTransfer?.types.includes('Files')) { event.preventDefault(); this.dropActive.set(true); } }
   dragLeave(): void { this.dropActive.set(false); }
   async drop(event: DragEvent): Promise<void> { event.preventDefault(); this.dropActive.set(false); if (!event.dataTransfer?.files.length) return; const target = (event.target as HTMLElement).closest<HTMLElement>('[data-node-id]'); const item = this.items().find(entry => entry.id === target?.dataset['nodeId']); this.replaceId = item?.type === 'image' && !item.image ? item.id : null; await this.importFiles(event.dataTransfer.files, this.point(event.clientX, event.clientY)); this.replaceId = null; }

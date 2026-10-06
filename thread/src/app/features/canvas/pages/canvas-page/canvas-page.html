@@ -65,25 +65,25 @@
             <path
               d="M0 0 L10 5 L0 10"
               fill="none"
-              stroke="var(--color-text-secondary)"
+              stroke="var(--color-primary)"
               stroke-width="1.6"
             />
           </marker>
           <marker id="arrow-selected" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="4.5" markerHeight="4.5" orient="auto">
             <path d="M0 0 L10 5 L0 10" fill="none" stroke="var(--color-primary)" stroke-width="1.6" />
           </marker>
-          <marker id="er-one" viewBox="0 0 28 24" refX="28" refY="12" markerWidth="28" markerHeight="24" markerUnits="userSpaceOnUse" orient="auto-start-reverse"><path d="M18 4V20" fill="none" stroke="var(--color-text-primary)" stroke-width="1.5" /></marker>
-          <marker id="er-optional-one" viewBox="0 0 28 24" refX="28" refY="12" markerWidth="28" markerHeight="24" markerUnits="userSpaceOnUse" orient="auto-start-reverse"><circle cx="9" cy="12" r="4" fill="var(--color-surface)" stroke="var(--color-text-primary)" stroke-width="1.5" /><path d="M20 4V20" fill="none" stroke="var(--color-text-primary)" stroke-width="1.5" /></marker>
-          <marker id="er-many" viewBox="0 0 28 24" refX="28" refY="12" markerWidth="28" markerHeight="24" markerUnits="userSpaceOnUse" orient="auto-start-reverse"><path d="M7 4V20 M12 12L27 3 M12 12L27 21 M12 12H28" fill="none" stroke="var(--color-text-primary)" stroke-width="1.5" /></marker>
-          <marker id="er-optional-many" viewBox="0 0 28 24" refX="28" refY="12" markerWidth="28" markerHeight="24" markerUnits="userSpaceOnUse" orient="auto-start-reverse"><circle cx="6" cy="12" r="4" fill="var(--color-surface)" stroke="var(--color-text-primary)" stroke-width="1.5" /><path d="M12 12L27 3 M12 12L27 21 M12 12H28" fill="none" stroke="var(--color-text-primary)" stroke-width="1.5" /></marker>
+          <marker id="er-one" viewBox="0 0 28 24" refX="28" refY="12" markerWidth="28" markerHeight="24" markerUnits="userSpaceOnUse" orient="auto-start-reverse"><path d="M18 4V20" fill="none" stroke="var(--color-primary)" stroke-width="1.5" /></marker>
+          <marker id="er-optional-one" viewBox="0 0 28 24" refX="28" refY="12" markerWidth="28" markerHeight="24" markerUnits="userSpaceOnUse" orient="auto-start-reverse"><circle cx="9" cy="12" r="4" fill="var(--color-surface)" stroke="var(--color-primary)" stroke-width="1.5" /><path d="M20 4V20" fill="none" stroke="var(--color-primary)" stroke-width="1.5" /></marker>
+          <marker id="er-many" viewBox="0 0 28 24" refX="28" refY="12" markerWidth="28" markerHeight="24" markerUnits="userSpaceOnUse" orient="auto-start-reverse"><path d="M7 4V20 M12 12L27 3 M12 12L27 21 M12 12H28" fill="none" stroke="var(--color-primary)" stroke-width="1.5" /></marker>
+          <marker id="er-optional-many" viewBox="0 0 28 24" refX="28" refY="12" markerWidth="28" markerHeight="24" markerUnits="userSpaceOnUse" orient="auto-start-reverse"><circle cx="6" cy="12" r="4" fill="var(--color-surface)" stroke="var(--color-primary)" stroke-width="1.5" /><path d="M12 12L27 3 M12 12L27 21 M12 12H28" fill="none" stroke="var(--color-primary)" stroke-width="1.5" /></marker>
         </defs>
         @for (connection of visibleConnections(); track connection.id) {
           <path
             [attr.d]="connectionPath(connection)"
             fill="none"
-            [attr.stroke]="selectedConnectionId() === connection.id ? 'var(--color-primary)' : 'var(--color-text-secondary)'"
-            [attr.stroke-opacity]="selectedConnectionId() === connection.id || hoveredConnectionId() === connection.id ? 1 : .85"
-            [attr.stroke-width]="selectedConnectionId() === connection.id ? 2 / zoom() : hoveredConnectionId() === connection.id ? 1.8 / zoom() : 1.5 / zoom()"
+            stroke="var(--color-primary)"
+            [attr.stroke-opacity]="selectedConnectionId() === connection.id || hoveredConnectionId() === connection.id ? 1 : .88"
+            [attr.stroke-width]="selectedConnectionId() === connection.id ? 3 / zoom() : hoveredConnectionId() === connection.id ? 2.7 / zoom() : 2.25 / zoom()"
             [attr.stroke-dasharray]="connection.style === 'dashed' ? '7 6' : null"
             [attr.marker-start]="connection.sourceCardinality ? cardinalityMarker(connection.sourceCardinality) : null"
             [attr.marker-end]="
@@ -91,18 +91,12 @@
                 ? selectedConnectionId() === connection.id ? 'url(#arrow-selected)' : 'url(#arrow)'
                 : null
             "
-            (pointerdown)="selectConnection($event, connection)"
+            (pointerdown)="routeDown($event, connection)"
           />
-          <path class="connection-hit" [attr.d]="connectionPath(connection)" fill="none" stroke="transparent" [attr.stroke-width]="(tool() === 'select' ? 14 : 0) / zoom()" (pointerenter)="hoveredConnectionId.set(connection.id)" (pointerleave)="hoveredConnectionId.set(null)" (pointerdown)="selectConnection($event, connection)" />
-          @if (selectedConnectionId() === connection.id && !editingId() && !isPanning()) {
-            @for (terminal of ['source','target']; track terminal) {
-              <circle class="connection-endpoint" [attr.cx]="endpoint(connection, $any(terminal)).x" [attr.cy]="endpoint(connection, $any(terminal)).y" [attr.r]="5 / zoom()" [attr.stroke-width]="1.5 / zoom()" />
-              <circle class="connection-endpoint-hit" [attr.cx]="endpoint(connection, $any(terminal)).x" [attr.cy]="endpoint(connection, $any(terminal)).y" [attr.r]="14 / zoom()" (pointerdown)="rebindDown($event, connection, $any(terminal))" (pointermove)="pointerMove($event)" (pointerup)="pointerUp($event)" (pointercancel)="pointerCancel($event)" (lostpointercapture)="pointerCancel($event)" />
-            }
-            @if (connection.kind === 'elbow' && !erRoutes().has(connection.id)) {
-              <circle class="connection-route-handle" [attr.cx]="routeHandle(connection).x" [attr.cy]="routeHandle(connection).y" [attr.r]="4 / zoom()" [attr.stroke-width]="1.5 / zoom()" (pointerdown)="routeDown($event, connection)" (pointermove)="pointerMove($event)" (pointerup)="pointerUp($event)" />
-            }
-          }
+          <path class="connection-hit" [attr.d]="connectionPath(connection)" fill="none" stroke="transparent" [attr.stroke-width]="(tool() === 'select' ? 18 : 0) / zoom()" (pointerenter)="hoveredConnectionId.set(connection.id)" (pointerleave)="hoveredConnectionId.set(null)" (pointerdown)="routeDown($event, connection)" (pointermove)="pointerMove($event)" (pointerup)="pointerUp($event)" (pointercancel)="pointerCancel($event)" (lostpointercapture)="pointerCancel($event)" />
+        }
+        @for (junction of junctions(); track junction.id) {
+          <circle class="junction-dot" [attr.cx]="junctionPoint(junction).x" [attr.cy]="junctionPoint(junction).y" [attr.r]="3.5 / zoom()" [attr.stroke-width]="1.5 / zoom()" />
         }
         @if (connectionPreview(); as preview) {
           <path
@@ -119,7 +113,7 @@
       </svg>
       @for (connection of visibleConnections(); track connection.id) {
         @if (connection.label || connection.sourceCardinality || connection.targetCardinality) {
-          <button class="relationship-label" type="button" [style.left.px]="connectionLabelX(connection)" [style.top.px]="connectionLabelY(connection)" (pointerdown)="$event.stopPropagation(); selectConnection($event, connection)" (click)="$event.stopPropagation(); selectedConnectionId.set(connection.id)" [attr.aria-label]="'Relationship ' + (connection.label || 'between entities')">
+          <button class="relationship-label" type="button" [style.left.px]="connectionLabelX(connection)" [style.top.px]="connectionLabelY(connection)" (pointerdown)="$event.stopPropagation(); selectConnection($event, connection)" (click)="$event.stopPropagation(); inspectorOpen.set(false); selectedConnectionId.set(connection.id)" [attr.aria-label]="'Relationship ' + (connection.label || 'between entities')">
             @if (connection.sourceCardinality) { <small>{{ connection.sourceCardinality }}</small> }
             <span>{{ connection.label || connectionFieldLabel(connection) || 'relates to' }}</span>
             @if (connection.targetCardinality) { <small>{{ connection.targetCardinality }}</small> }
@@ -490,9 +484,9 @@
             </div>
           } @else {
             <div class="card-content">
-              <div class="card-top">
-                <span class="card-type">{{ item.type }}</span>
-              </div>
+              @if (item.type !== 'voice' && item.type !== 'video') {
+                <div class="card-top"><span class="card-type">{{ item.type }}</span></div>
+              }
               <div
                 class="card-title" appScroll="y" scrollbar="hover"
                 [attr.contenteditable]="editingId() === item.id"
@@ -503,6 +497,7 @@
                   item.title || (editingId() === item.id ? '' : 'Untitled ' + item.type)
                 "
               ></div>
+              @if (item.type !== 'voice') {
               <div
                 class="card-body" appScroll="y" scrollbar="hover"
                 [attr.contenteditable]="editingId() === item.id"
@@ -510,8 +505,22 @@
                 (blur)="inlineBlur($event, item.id, 'body')"
                 [textContent]="item.body"
               ></div>
+              }
               @if (item.type === 'voice' && item.url) {
-                <audio controls [src]="item.url" (pointerdown)="$event.stopPropagation()"></audio>
+                <div class="voice-player">
+                  <div class="voice-wave" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+                  <div class="voice-meta"><span>Audio</span><span>{{ item.duration || 'Audio clip' }}</span></div>
+                  <audio class="voice-audio-source" [attr.data-voice-id]="item.id" [src]="item.url" preload="metadata" (loadedmetadata)="syncVoicePlayback(item.id,$any($event.target))" (timeupdate)="syncVoicePlayback(item.id,$any($event.target))" (play)="syncVoicePlayback(item.id,$any($event.target))" (pause)="syncVoicePlayback(item.id,$any($event.target))" (ended)="syncVoicePlayback(item.id,$any($event.target))"></audio>
+                  <div class="voice-controls" (pointerdown)="$event.stopPropagation()">
+                    <button class="voice-play" (click)="toggleVoicePlayback(item.id)" [attr.aria-label]="voicePlayback()[item.id]?.playing ? 'Pause audio' : 'Play audio'">{{ voicePlayback()[item.id]?.playing ? 'Ⅱ' : '▶' }}</button>
+                    <span class="voice-current">{{ voiceTime(item.id) }}</span>
+                    <input class="voice-seek" type="range" min="0" [max]="voicePlayback()[item.id]?.duration || 0" step="0.1" [value]="voicePlayback()[item.id]?.current || 0" [style.--voice-progress]="voiceProgress(item.id) + '%'" (input)="seekVoice(item.id,$event)" aria-label="Seek audio" />
+                    <span class="voice-total">{{ voiceTime(item.id,true) }}</span>
+                  </div>
+                </div>
+              }
+              @if (item.type === 'video' && item.url) {
+                <video class="video-player" controls preload="metadata" [src]="item.url" [attr.aria-label]="item.title" (pointerdown)="$event.stopPropagation()"></video>
               }
               @if (item.type === 'file' && item.url) {
                 <a
@@ -602,6 +611,44 @@
       <div class="drop-indicator" data-ui>Drop files to place them here</div>
     }
   </main>
+  <button class="activity-trigger" [class.active]="activityOpen() || timerRunning() || musicPlaying()" (click)="activityOpen.set(!activityOpen()); activityError.set('')" [attr.aria-expanded]="activityOpen()" aria-label="Open timer and music" title="Timer & music">
+    <span aria-hidden="true">◷</span><small>{{ timerRunning() ? formatTimer() : 'Timer & music' }}</small>
+  </button>
+  @if (activityOpen()) {
+    <aside class="activity-panel" data-ui aria-label="Canvas session tools">
+      <header><div><span class="activity-icon">◷</span><div><strong>Focus session</strong><small>Make a little room to think</small></div></div><button class="activity-close" (click)="activityOpen.set(false)" aria-label="Close session tools">×</button></header>
+      <section class="activity-timer">
+        <div class="timer-readout" [class.timer-finished]="!timerSeconds()">{{ formatTimer() }}</div>
+        <div class="timer-presets" aria-label="Timer duration">
+          @for (minutes of [5, 15, 25]; track minutes) { <button [class.active]="timerMinutes() === minutes" [disabled]="timerRunning()" (click)="setTimerMinutes(minutes)">{{ minutes }} min</button> }
+        </div>
+        <div class="timer-actions"><button class="timer-start" (click)="toggleTimer()">{{ timerRunning() ? 'Pause timer' : timerSeconds() === timerMinutes() * 60 ? 'Start timer' : 'Resume timer' }}</button><button class="timer-reset" (click)="resetTimer()" aria-label="Reset timer" title="Reset">↺ <span>Reset</span></button></div>
+      </section>
+      <section class="activity-library">
+        <div class="music-heading"><div><strong>Board audio</strong><small>Recordings and audio files on this canvas</small></div></div>
+        @if (boardAudioItems().length) {
+          <select aria-label="Choose board audio" [value]="selectedBoardAudioId()" (change)="setBoardAudio($event)"><option value="">Choose an audio clip…</option>@for (audio of boardAudioItems(); track audio.id) { <option [value]="audio.id">{{ audio.title }}</option> }</select>
+          @if (selectedBoardAudioUrl(); as audioUrl) { <audio controls preload="none" [src]="audioUrl" aria-label="Play selected board audio" (pointerdown)="$event.stopPropagation()"></audio> }
+        } @else { <p>Add media or record a voice note to play it here.</p> }
+      </section>
+      <section class="activity-library spotify-library">
+        <div class="music-heading"><div><strong>Spotify</strong><small>Paste a track, playlist, or album link</small></div></div>
+        <form (submit)="$event.preventDefault(); loadSpotifyEmbed()"><input type="url" [value]="spotifyLink()" (input)="spotifyLink.set($any($event.target).value)" placeholder="open.spotify.com/playlist/…" aria-label="Spotify link"><button type="submit">Load</button></form>
+        @if (spotifyEmbed(); as embed) { <iframe [src]="embed" [style.height.px]="spotifyEmbedHeight()" title="Spotify player" allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture" allowfullscreen loading="lazy"></iframe> }
+      </section>
+      <section class="activity-music">
+        <div class="music-heading"><div><strong>Background sound</strong><small>{{ musicPlaying() ? 'Playing just for you' : 'A little sound, if you like' }}</small></div><button class="music-toggle" [class.active]="musicPlaying()" (click)="toggleMusic()" [attr.aria-label]="musicPlaying() ? 'Pause background sound' : 'Play background sound'">{{ musicPlaying() ? 'Ⅱ' : '▶' }}</button></div>
+        <div class="music-choices"><button [class.active]="musicTrack() === 'keys'" (click)="setMusicTrack('keys')">Soft keys</button><button [class.active]="musicTrack() === 'rain'" (click)="setMusicTrack('rain')">Rain room</button></div>
+        <label class="music-volume"><span>Volume</span><input type="range" min="0" max="1" step="0.05" [value]="musicVolume()" (input)="setMusicVolume($event)" aria-label="Music volume"></label>
+      </section>
+      @if (activityError()) { <p class="activity-error" role="status">{{ activityError() }}</p> }
+      <p class="activity-footnote">Timer stays on this device. Sound is private to you.</p>
+    </aside>
+  }
+  @if (isRecording()) {
+    <div class="recording-indicator" data-ui role="group" aria-label="Voice recording controls"><span class="recording-dot" [class.paused]="recordingPaused()"></span><span>{{ recordingPaused() ? 'Paused' : 'Recording' }}</span><time>{{ formatDuration(recordingSeconds()) }}</time><button class="recording-pause" (click)="toggleVoicePause()">{{ recordingPaused() ? 'Resume' : 'Pause' }}</button><button (click)="stopVoiceRecording(true)">Stop & save</button></div>
+  }
+  @if (activityError() && !activityOpen()) { <button class="recording-error-toast" data-ui (click)="activityOpen.set(true)">{{ activityError() }} <span>×</span></button> }
   <nav class="tool-rail canvas-action-bar" data-ui aria-label="Canvas tools">
     <button
       [class.active]="tool() === 'select' && !pendingType()"
@@ -656,24 +703,9 @@
         }
       </div>
       <div class="palette-section">Media</div>
-      <div class="palette-grid">
-        @for (
-          entry of [
-            { type: 'image', icon: '▧' },
-            { type: 'gif', icon: '▣' },
-            { type: 'sticker', icon: '✳' },
-            { type: 'file', icon: '▣' },
-            { type: 'link', icon: '↗' },
-            { type: 'voice', icon: '◖' },
-          ];
-          track entry.type
-        ) {
-          <button (click)="chooseType($any(entry.type))">
-            <span>{{ entry.icon }}</span
-            >{{ entry.type === 'voice' ? 'audio' : entry.type }}
-          </button>
-        }
-      </div>
+      <button class="palette-upload-audio" (click)="openMediaFiles()"><span aria-hidden="true">＋</span> Add media <small>Image · audio · video · document</small></button>
+      <button class="palette-upload-audio" (click)="toggleVoiceRecording()"><span aria-hidden="true">●</span> Record voice <small>Start a new microphone recording</small></button>
+      <div class="palette-grid palette-secondary-media"><button (click)="openMedia('gif')"><span>▣</span> GIF</button><button (click)="openMedia('sticker')"><span>✳</span> Sticker</button><button (click)="chooseType('link')"><span>↗</span> Link</button></div>
       <div class="palette-section">Organize</div>
       <div class="palette-grid">
         @for (
@@ -763,6 +795,13 @@
     ><button (click)="zoomBy(1.25)" aria-label="Zoom in">+</button
     ><button (click)="fitView()" aria-label="Fit all">⛶</button>
   </div>
+  @if (tool() === 'select' && selectedConnectionId() && !editingId()) {
+    <div class="connection-toolbar canvas-action-bar" data-ui>
+      <span>Drag line to reroute · drag + to branch</span>
+      <button (click)="inspectorOpen.set(true)">Details</button>
+      <button (click)="removeSelectedConnection()" aria-label="Delete selected connector">Delete</button>
+    </div>
+  }
   @if (tool() === 'select' && selectedIds().length && (!editingId() || selected()?.type === 'text')) {
     <div class="selection-toolbar canvas-action-bar" appScroll="x" scrollbar="hover" [class.editing-text]="!!editingId()" data-ui>
       <span>{{ selectedIds().length }} selected</span>
@@ -1005,9 +1044,9 @@
       </div>
     </aside>
   }
-  @if (selectedConnectionId() && !selected()) {
+  @if (selectedConnectionId() && !selected() && inspectorOpen()) {
     <aside class="inspector relationship-inspector" appScroll="y" scrollbar="auto" data-ui>
-      <div class="inspector-head"><div><small>CONNECTION DETAILS</small><h2>Relationship</h2></div><button (click)="selectedConnectionId.set(null)" aria-label="Close relationship details">×</button></div>
+      <div class="inspector-head"><div><small>CONNECTION DETAILS</small><h2>Relationship</h2></div><button (click)="inspectorOpen.set(false)" aria-label="Close relationship details">×</button></div>
       @if (selectedConnection(); as connection) {
         <div class="inspector-body">
           <p class="er-help">{{ connectionFieldLabel(connection, true) }}</p>
@@ -1015,7 +1054,7 @@
           <div class="inspector-grid"><label>From<thread-select [value]="connection.sourceCardinality || '1'" (change)="setConnection(connection.id, { sourceCardinality: $any($event.target).value })"><thread-option value="1" label="One"></thread-option><thread-option value="0..1" label="Zero or one"></thread-option><thread-option value="many" label="Many"></thread-option><thread-option value="0..many" label="Zero or many"></thread-option></thread-select></label><label>To<thread-select [value]="connection.targetCardinality || 'many'" (change)="setConnection(connection.id, { targetCardinality: $any($event.target).value })"><thread-option value="1" label="One"></thread-option><thread-option value="0..1" label="Zero or one"></thread-option><thread-option value="many" label="Many"></thread-option><thread-option value="0..many" label="Zero or many"></thread-option></thread-select></label></div>
           <label>Line<thread-select [value]="connection.kind || 'elbow'" (change)="setConnection(connection.id, { kind: $any($event.target).value })"><thread-option value="elbow" label="Elbow"></thread-option><thread-option value="straight" label="Straight"></thread-option><thread-option value="curved" label="Curved"></thread-option></thread-select></label>
           @if (!connection.sourceCardinality && !connection.targetCardinality) { <label>Ends<thread-select [value]="connection.direction || 'none'" (change)="setConnection(connection.id, { direction: $any($event.target).value })"><thread-option value="none" label="Line"></thread-option><thread-option value="forward" label="Arrow"></thread-option></thread-select></label> }
-          <button class="inspector-action" (click)="setConnection(connection.id, { kind: 'elbow', routeOffset: 0, sourceBinding: { mode: 'auto' }, targetBinding: { mode: 'auto' } })">Reset to automatic routing</button>
+          <button class="inspector-action" (click)="setConnection(connection.id, { kind: 'elbow', routeOffset: 0, routeAxis: undefined, sourceBinding: { mode: 'auto' }, targetBinding: { mode: 'auto' } })">Reset to automatic routing</button>
           @if (connection.sourceCardinality && connection.targetCardinality) { <button class="inspector-action" (click)="addParallelRelationship(connection)">+ Another relationship between these entities</button> }
           <button class="inspector-action danger" (click)="removeSelectedConnection()">Delete relationship</button>
         </div>
@@ -1033,7 +1072,7 @@
     #fileInput
     type="file"
     multiple
-    accept="image/*,audio/*,.pdf,.txt,.doc,.docx"
+    accept="image/*,audio/*,video/*,.pdf,.txt,.doc,.docx"
     hidden
     (change)="fileSelected($event)"
   />

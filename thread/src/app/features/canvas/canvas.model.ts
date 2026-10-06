@@ -7,6 +7,7 @@ export type ItemType =
   | 'list'
   | 'checklist'
   | 'image'
+  | 'video'
   | 'gif'
   | 'sticker'
   | 'file'
@@ -126,6 +127,7 @@ export interface CanvasConnection {
   sourceBinding?: ConnectorBinding;
   targetBinding?: ConnectorBinding;
   routeOffset?: number;
+  routeAxis?: 'x' | 'y';
   sourceJunctionId?: string;
   targetJunctionId?: string;
 }

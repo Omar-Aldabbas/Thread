@@ -258,6 +258,17 @@ describe('touch navigation over cards', () => {
     expect(page.erRoutes().size).toBe(2);
   });
 
+  it('applies shared manual lane routing to field anchored ER connectors', () => {
+    const { page } = canvas(); page.createAt('er-entity', { x: 0, y: 0 }); page.createAt('er-entity', { x: 520, y: 180 });
+    const [a, b] = page.items(); page.connectErTarget(a.id, b.id);
+    const connection = page.connections()[0], original = page.connectionPath(connection);
+    const handle = document.createElement('span'); handle.setPointerCapture = vi.fn(); handle.hasPointerCapture = vi.fn().mockReturnValue(false);
+    const route = page.routeHandle(connection), down = { button: 0, pointerId: 1, pointerType: 'mouse', clientX: 120 + route.x * 2, clientY: 30 + route.y * 2, currentTarget: handle, target: handle, preventDefault: vi.fn(), stopPropagation: vi.fn() } as unknown as PointerEvent;
+    page.routeDown(down, connection); page.pointerMove({ ...down, clientX: down.clientX + 60 }); page.pointerUp({ ...down, clientX: down.clientX + 60 });
+    expect(page.connections()[0]).toMatchObject({ sourceFieldId: connection.sourceFieldId, targetFieldId: connection.targetFieldId, routeAxis: 'x' });
+    expect(page.connectionPath(page.connections()[0])).not.toBe(original);
+  });
+
   it('places a related entity away from existing cards', () => {
     const { page } = canvas(); page.createAt('er-entity', { x: 0, y: 0 });
     const source = page.items()[0]; page.addRelatedErEntity(source); page.addRelatedErEntity(source);
@@ -385,5 +396,85 @@ describe('touch navigation over cards', () => {
     page.pointerUp({ ...down, clientX: 1270, clientY: 110 });
     expect(page.connections()[0].targetId).toBe('c');
     page.undo(); expect(page.connections()[0].targetId).toBe('b');
+  });
+
+  it('drags the line lane and undoes the route change', () => {
+    const { page } = canvas();
+    page.items.set([
+      { id: 'a', type: 'note', parentId: null, title: 'A', x: 0, y: 0, width: 100, height: 80 },
+      { id: 'b', type: 'task', parentId: null, title: 'B', x: 240, y: 0, width: 100, height: 80 },
+    ]);
+    page.addConnection('a', 'b');
+    const line = document.createElement('span'); line.setPointerCapture = vi.fn(); line.hasPointerCapture = vi.fn().mockReturnValue(false);
+    const down = { button: 0, pointerId: 1, pointerType: 'mouse', clientX: 440, clientY: 110, currentTarget: line, target: line, preventDefault: vi.fn(), stopPropagation: vi.fn() } as unknown as PointerEvent;
+    page.routeDown(down, page.connections()[0]); page.pointerUp(down);
+    expect(page.selectedConnectionId()).toBe(page.connections()[0].id);
+    expect(page.connections()[0].routeAxis).toBeUndefined();
+    page.routeDown(down, page.connections()[0]);
+    page.pointerMove({ ...down, clientY: 150 }); page.pointerUp({ ...down, clientY: 150 });
+    expect(page.connections()[0].routeAxis).toBe('y');
+    expect(page.connections()[0].routeOffset).toBeGreaterThan(0);
+    expect(page.connectionPath(page.connections()[0])).toContain('60');
+    page.undo(); expect(page.connections()[0].routeAxis).toBeUndefined();
+  });
+
+  it('branches one joint to two cards, copies the graph, and undoes parent deletion', () => {
+    const { page } = canvas();
+    page.items.set([
+      { id: 'a', type: 'note', parentId: null, title: 'A', x: 0, y: 0, width: 100, height: 80 },
+      { id: 'b', type: 'task', parentId: null, title: 'B', x: 240, y: 0, width: 100, height: 80 },
+      { id: 'c', type: 'checklist', parentId: null, title: 'C', x: 160, y: 230, width: 100, height: 80 },
+      { id: 'd', type: 'shape', parentId: null, title: 'D', x: 400, y: 230, width: 100, height: 80 },
+    ]);
+    page.addConnection('a', 'b');
+    const parent = page.connections()[0];
+    const handle = document.createElement('span'); handle.setPointerCapture = vi.fn(); handle.hasPointerCapture = vi.fn().mockReturnValue(false);
+    const control = page.branchControlPoint(parent);
+    const down = { button: 0, pointerId: 1, pointerType: 'touch', clientX: 120 + control.x * 2, clientY: 30 + control.y * 2, currentTarget: handle, target: handle, preventDefault: vi.fn(), stopPropagation: vi.fn() } as unknown as PointerEvent;
+    page.branchDown(down, parent);
+    page.pointerMove({ ...down, clientX: 540, clientY: 570 });
+    expect(page.connectionTargetId()).toBe('c');
+    page.pointerUp({ ...down, clientX: 540, clientY: 570 });
+    expect(page.connections()).toHaveLength(2);
+    expect(page.junctions()).toHaveLength(1);
+    const joint = page.junctions()[0];
+    const point = page.junctionPoint(joint);
+    const second = { ...down, clientX: 120 + point.x * 2, clientY: 30 + point.y * 2 };
+    page.junctionDown(second, joint);
+    page.pointerMove({ ...second, clientX: 1020, clientY: 570 });
+    page.pointerUp({ ...second, clientX: 1020, clientY: 570 });
+    expect(page.connections()).toHaveLength(3);
+    expect(page.connections().slice(1).every((entry: any) => entry.sourceJunctionId === joint.id)).toBe(true);
+    page.setConnection(parent.id, { routeAxis: 'y', routeOffset: 45 });
+    expect(Number.isFinite(page.junctionPoint(joint).x)).toBe(true);
+    page.selectedConnectionId.set(page.connections()[2].id); page.removeSelectedConnection();
+    expect(page.connections()).toHaveLength(2);
+    expect(page.junctions()).toHaveLength(1);
+    page.undo(); expect(page.connections()).toHaveLength(3);
+    page.selectedIds.set(['a', 'b', 'c', 'd']); page.duplicate();
+    expect(page.connections()).toHaveLength(6);
+    expect(page.junctions()).toHaveLength(2);
+    const copiedJoint = page.junctions()[1];
+    expect(page.connections().slice(4).every((entry: any) => entry.sourceJunctionId === copiedJoint.id)).toBe(true);
+    page.selectedConnectionId.set(parent.id); page.removeSelectedConnection();
+    expect(page.connections()).toHaveLength(3);
+    page.undo(); expect(page.connections()).toHaveLength(6);
+  });
+
+  it('does not persist a joint when a branch is dropped on empty canvas', () => {
+    const { page } = canvas();
+    page.items.set([
+      { id: 'a', type: 'note', parentId: null, title: 'A', x: 0, y: 0, width: 100, height: 80 },
+      { id: 'b', type: 'task', parentId: null, title: 'B', x: 240, y: 0, width: 100, height: 80 },
+    ]);
+    page.addConnection('a', 'b');
+    const handle = document.createElement('span'); handle.setPointerCapture = vi.fn(); handle.hasPointerCapture = vi.fn().mockReturnValue(false);
+    const point = page.branchControlPoint(page.connections()[0]);
+    const down = { button: 0, pointerId: 1, pointerType: 'touch', clientX: 120 + point.x * 2, clientY: 30 + point.y * 2, currentTarget: handle, target: handle, preventDefault: vi.fn(), stopPropagation: vi.fn() } as unknown as PointerEvent;
+    page.branchDown(down, page.connections()[0]);
+    page.pointerMove({ ...down, clientX: 1200, clientY: 800 });
+    page.pointerUp({ ...down, clientX: 1200, clientY: 800 });
+    expect(page.connections()).toHaveLength(1);
+    expect(page.junctions()).toHaveLength(0);
   });
 });

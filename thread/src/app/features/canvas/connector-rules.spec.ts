@@ -26,4 +26,14 @@ describe('connector capabilities', () => {
       connection('a', 'b'), connection('a', 'b', 'parallel')];
     expect(validConnections(items, records)).toEqual([records[0]]);
   });
+  it('keeps valid branches and rejects orphan or cyclic junctions', () => {
+    const items = [item('a', 'note'), item('b', 'task'), item('c', 'checklist')];
+    const base = connection('a', 'b', 'base');
+    const branch = { ...connection('a', 'c', 'branch'), sourceJunctionId: 'joint' };
+    const cyclic = { ...connection('a', 'c', 'cyclic'), sourceJunctionId: 'cycle' };
+    expect(validConnections(items, [base, branch, cyclic], [
+      { id: 'joint', parentConnectorId: 'base', positionRatio: .5 },
+      { id: 'cycle', parentConnectorId: 'cyclic', positionRatio: .5 },
+    ])).toEqual([base, branch]);
+  });
 });
