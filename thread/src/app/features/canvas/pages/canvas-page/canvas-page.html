@@ -82,8 +82,8 @@
             [attr.d]="connectionPath(connection)"
             fill="none"
             [attr.stroke]="selectedConnectionId() === connection.id ? 'var(--color-primary)' : 'var(--color-text-secondary)'"
-            stroke-opacity=".85"
-            stroke-width="1.5"
+            [attr.stroke-opacity]="selectedConnectionId() === connection.id || hoveredConnectionId() === connection.id ? 1 : .85"
+            [attr.stroke-width]="selectedConnectionId() === connection.id ? 2 / zoom() : hoveredConnectionId() === connection.id ? 1.8 / zoom() : 1.5 / zoom()"
             [attr.stroke-dasharray]="connection.style === 'dashed' ? '7 6' : null"
             [attr.marker-start]="connection.sourceCardinality ? cardinalityMarker(connection.sourceCardinality) : null"
             [attr.marker-end]="
@@ -93,24 +93,16 @@
             "
             (pointerdown)="selectConnection($event, connection)"
           />
-          <path class="connection-hit" [attr.d]="connectionPath(connection)" fill="none" stroke="transparent" [attr.stroke-width]="24 / zoom()" (pointermove)="connectionHover($event, connection)" (pointerleave)="connectionLeave(connection)" (pointerdown)="branchDown($event, connection)" />
+          <path class="connection-hit" [attr.d]="connectionPath(connection)" fill="none" stroke="transparent" [attr.stroke-width]="(tool() === 'select' ? 14 : 0) / zoom()" (pointerenter)="hoveredConnectionId.set(connection.id)" (pointerleave)="hoveredConnectionId.set(null)" (pointerdown)="selectConnection($event, connection)" />
           @if (selectedConnectionId() === connection.id && !editingId() && !isPanning()) {
             @for (terminal of ['source','target']; track terminal) {
-              <circle class="connection-endpoint" [attr.cx]="endpoint(connection, $any(terminal)).x" [attr.cy]="endpoint(connection, $any(terminal)).y" [attr.r]="5 / zoom()" [attr.stroke-width]="1.5 / zoom()" (pointerdown)="rebindDown($event, connection, $any(terminal))" (pointermove)="pointerMove($event)" (pointerup)="pointerUp($event)" />
+              <circle class="connection-endpoint" [attr.cx]="endpoint(connection, $any(terminal)).x" [attr.cy]="endpoint(connection, $any(terminal)).y" [attr.r]="5 / zoom()" [attr.stroke-width]="1.5 / zoom()" />
+              <circle class="connection-endpoint-hit" [attr.cx]="endpoint(connection, $any(terminal)).x" [attr.cy]="endpoint(connection, $any(terminal)).y" [attr.r]="14 / zoom()" (pointerdown)="rebindDown($event, connection, $any(terminal))" (pointermove)="pointerMove($event)" (pointerup)="pointerUp($event)" (pointercancel)="pointerCancel($event)" (lostpointercapture)="pointerCancel($event)" />
             }
             @if (connection.kind === 'elbow' && !erRoutes().has(connection.id)) {
               <circle class="connection-route-handle" [attr.cx]="routeHandle(connection).x" [attr.cy]="routeHandle(connection).y" [attr.r]="4 / zoom()" [attr.stroke-width]="1.5 / zoom()" (pointerdown)="routeDown($event, connection)" (pointermove)="pointerMove($event)" (pointerup)="pointerUp($event)" />
             }
           }
-        }
-        @for (junction of junctions(); track junction.id) {
-          @if (selectedConnectionId() === junction.parentConnectorId || tool() === 'connect') {
-            <circle class="junction-dot" [attr.cx]="junctionPoint(junction).x" [attr.cy]="junctionPoint(junction).y" [attr.r]="3.5 / zoom()" [attr.stroke-width]="1.3 / zoom()" />
-            <circle class="junction-hit" [attr.cx]="junctionPoint(junction).x" [attr.cy]="junctionPoint(junction).y" [attr.r]="13 / zoom()" (pointerdown)="junctionDown($event, junction)" />
-          }
-        }
-        @if (junctionCandidate(); as candidate) {
-          <circle class="junction-candidate" [attr.cx]="candidate.x" [attr.cy]="candidate.y" [attr.r]="4 / zoom()" [attr.stroke-width]="1.5 / zoom()" pointer-events="none" />
         }
         @if (connectionPreview(); as preview) {
           <path
@@ -531,18 +523,10 @@
               }
             </div>
           }
-          @if (item.type === 'shape' && tool() === 'connect' && !editingId()) {
-            @for (side of ['top','right','bottom','left']; track side) {
-              <button class="shape-port" [class.port-top]="side === 'top'" [class.port-right]="side === 'right'" [class.port-bottom]="side === 'bottom'" [class.port-left]="side === 'left'" [style.transform]="'scale(' + 1 / zoom() + ')'" (pointerdown)="connectDown($event, item, $any(side))" [attr.aria-label]="'Connect from ' + side"></button>
+          @if (isConnectable(item) && !editingId() && (tool() === 'connect' || selectedIds().includes(item.id) || connectionPreview())) {
+            @for (side of connectorSides; track side) {
+              <button class="shape-port" [class.port-top]="side === 'top'" [class.port-right]="side === 'right'" [class.port-bottom]="side === 'bottom'" [class.port-left]="side === 'left'" [style.transform]="'scale(' + 1 / zoom() + ')'" (pointerdown)="connectDown($event, item, side)" (pointermove)="pointerMove($event)" (pointerup)="pointerUp($event)" (pointercancel)="pointerCancel($event)" (lostpointercapture)="pointerCancel($event)" [attr.aria-label]="'Connect ' + (item.title || item.type) + ' from ' + side"></button>
             }
-          } @else if (tool() === 'connect' && item.type !== 'chart') {
-            <button
-              class="connect-handle"
-              (pointerdown)="connectDown($event, item)"
-              (pointermove)="pointerMove($event)"
-              (pointerup)="pointerUp($event)"
-              aria-label="Connect {{ item.title }}"
-            ></button>
           }
           @if (item.type === 'shape' && tool() === 'connect' && connectionSourceId() === item.id) {
             <button class="shape-quick-add" [style.transform]="'scale(' + 1 / zoom() + ')'" (pointerdown)="$event.stopPropagation()" (click)="quickConnectedShape(item)" aria-label="Add connected shape">+</button>
@@ -1029,7 +1013,8 @@
           <p class="er-help">{{ connectionFieldLabel(connection, true) }}</p>
           <label>Relationship label<input [value]="connection.label || ''" placeholder="e.g. places" (change)="setConnection(connection.id, { label: $any($event.target).value })" /></label>
           <div class="inspector-grid"><label>From<thread-select [value]="connection.sourceCardinality || '1'" (change)="setConnection(connection.id, { sourceCardinality: $any($event.target).value })"><thread-option value="1" label="One"></thread-option><thread-option value="0..1" label="Zero or one"></thread-option><thread-option value="many" label="Many"></thread-option><thread-option value="0..many" label="Zero or many"></thread-option></thread-select></label><label>To<thread-select [value]="connection.targetCardinality || 'many'" (change)="setConnection(connection.id, { targetCardinality: $any($event.target).value })"><thread-option value="1" label="One"></thread-option><thread-option value="0..1" label="Zero or one"></thread-option><thread-option value="many" label="Many"></thread-option><thread-option value="0..many" label="Zero or many"></thread-option></thread-select></label></div>
-          <label>Line<thread-select [value]="connection.kind || 'straight'" (change)="setConnection(connection.id, { kind: $any($event.target).value })"><thread-option value="straight" label="Straight"></thread-option><thread-option value="elbow" label="Elbow"></thread-option><thread-option value="curved" label="Curved"></thread-option></thread-select></label>
+          <label>Line<thread-select [value]="connection.kind || 'elbow'" (change)="setConnection(connection.id, { kind: $any($event.target).value })"><thread-option value="elbow" label="Elbow"></thread-option><thread-option value="straight" label="Straight"></thread-option><thread-option value="curved" label="Curved"></thread-option></thread-select></label>
+          @if (!connection.sourceCardinality && !connection.targetCardinality) { <label>Ends<thread-select [value]="connection.direction || 'none'" (change)="setConnection(connection.id, { direction: $any($event.target).value })"><thread-option value="none" label="Line"></thread-option><thread-option value="forward" label="Arrow"></thread-option></thread-select></label> }
           <button class="inspector-action" (click)="setConnection(connection.id, { kind: 'elbow', routeOffset: 0, sourceBinding: { mode: 'auto' }, targetBinding: { mode: 'auto' } })">Reset to automatic routing</button>
           @if (connection.sourceCardinality && connection.targetCardinality) { <button class="inspector-action" (click)="addParallelRelationship(connection)">+ Another relationship between these entities</button> }
           <button class="inspector-action danger" (click)="removeSelectedConnection()">Delete relationship</button>

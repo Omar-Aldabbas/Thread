@@ -18,6 +18,8 @@ button { cursor:pointer; border:0; background:none; color:inherit; }
 .connections { position:absolute; left:0; top:0; overflow:visible; pointer-events:none; }
 .connections .connection-hit,.connections .connection-endpoint { pointer-events:stroke; cursor:pointer; }
 .connections .connection-endpoint { fill:var(--color-surface); stroke:var(--color-primary); pointer-events:all; cursor:crosshair; }
+.connections .connection-endpoint { pointer-events:none; }
+.connections .connection-endpoint-hit { fill:transparent; pointer-events:all; cursor:crosshair; touch-action:none; }
 .connections .connection-route-handle { fill:var(--color-surface); stroke:var(--color-primary); pointer-events:all; cursor:move; }
 .canvas-item { position:absolute; min-width:0; min-height:0; box-sizing:border-box; cursor:grab; touch-action:none; user-select:none; }
 .canvas-item:active { cursor:grabbing; }.canvas-item.selected { outline:1.5px solid var(--color-primary); outline-offset:3px; }.canvas-item:focus-visible { outline:2px solid var(--color-primary); outline-offset:3px; }
@@ -229,7 +231,10 @@ button { cursor:pointer; border:0; background:none; color:inherit; }
 .shape-tools button { min-width:38px; height:38px; font-size:19px; white-space:nowrap; }
 .shape-tools button.active { background:var(--color-primary); color:white; }
 .shape-port { position:absolute; z-index:7; width:16px; height:16px; padding:0; border:0; border-radius:50%; background:transparent; touch-action:none; cursor:crosshair; opacity:0; }
-.canvas-item:hover .shape-port,.canvas-item.connection-source .shape-port,.canvas-item.connection-target .shape-port,.shape-port:focus-visible { opacity:1; }
+.canvas-item.selected .shape-port,.canvas-item:hover .shape-port,.canvas-item.connection-source .shape-port,.canvas-item.connection-target .shape-port,.shape-port:focus-visible { opacity:1; }
+.canvas-item.connection-target { outline:2px solid var(--color-primary); outline-offset:3px; }
+.canvas-item.connection-target .shape-port::after { border-color:var(--color-primary); }
+@media (pointer:coarse) { .shape-port { width:32px; height:32px; } .shape-port::after { top:12px; left:12px; } .shape-port.port-top { top:-16px; left:calc(50% - 16px); } .shape-port.port-right { top:calc(50% - 16px); right:-16px; } .shape-port.port-bottom { bottom:-16px; left:calc(50% - 16px); } .shape-port.port-left { top:calc(50% - 16px); left:-16px; } }
 .shape-port::after { content:''; position:absolute; top:4px; left:4px; width:8px; height:8px; box-sizing:border-box; border:1.5px solid var(--color-text-secondary); border-radius:50%; background:var(--color-surface); box-shadow:0 0 0 2px var(--color-surface); }
 .shape-port:hover::after,.shape-port:focus-visible::after { border-color:var(--color-primary); background:var(--color-primary); }
 .shape-port.port-top { top:-8px; left:calc(50% - 8px); }

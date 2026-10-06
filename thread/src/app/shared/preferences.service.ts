@@ -9,7 +9,7 @@ export class PreferencesService {
   private readonly document = inject(DOCUMENT);
   readonly theme = signal<ThemeChoice>(this.readTheme());
   readonly profileName = signal(this.readName());
-  readonly systemDark = signal(this.browser && matchMedia('(prefers-color-scheme: dark)').matches);
+  readonly systemDark = signal(this.browser && typeof matchMedia === 'function' && matchMedia('(prefers-color-scheme: dark)').matches);
   readonly dark = computed(
     () => this.theme() === 'dark' || (this.theme() === 'system' && this.systemDark()),
   );
@@ -24,7 +24,7 @@ export class PreferencesService {
   );
 
   constructor() {
-    if (this.browser) {
+    if (this.browser && typeof matchMedia === 'function') {
       const media = matchMedia('(prefers-color-scheme: dark)');
       media.addEventListener('change', (event) => this.systemDark.set(event.matches));
     }

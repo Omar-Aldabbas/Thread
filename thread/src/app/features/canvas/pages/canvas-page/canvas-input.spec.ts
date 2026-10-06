@@ -297,4 +297,93 @@ describe('touch navigation over cards', () => {
     page.pointerUp(first);
     expect(page.pointers.size).toBe(0);
   });
+
+  it('creates one valid connector, supports undo and redo, and cleans up on card deletion', () => {
+    const { page } = canvas();
+    page.items.set([
+      { id: 'a', type: 'note', parentId: null, title: 'A', x: 0, y: 0, width: 100, height: 80, createdAt: '', updatedAt: '' },
+      { id: 'b', type: 'task', parentId: null, title: 'B', x: 240, y: 0, width: 100, height: 80, createdAt: '', updatedAt: '' },
+      { id: 's', type: 'sketch', parentId: null, title: '', x: 400, y: 0, width: 100, height: 80, createdAt: '', updatedAt: '' },
+    ]);
+    page.addConnection('a', 's'); expect(page.connections()).toHaveLength(0);
+    page.addConnection('a', 'b', 'right', 'left'); page.addConnection('a', 'b');
+    expect(page.connections()).toHaveLength(1);
+    expect(page.connections()[0]).toMatchObject({ sourceSide: 'right', targetSide: 'left', kind: 'elbow' });
+    page.undo(); expect(page.connections()).toHaveLength(0);
+    page.redo(); expect(page.connections()).toHaveLength(1);
+    page.selectedIds.set(['b']); page.removeSelected();
+    expect(page.connections()).toHaveLength(0);
+    page.undo(); expect(page.items().some((item: any) => item.id === 'b')).toBe(true);
+    expect(page.connections()).toHaveLength(1);
+  });
+
+  it('duplicates an internal relationship with remapped endpoints', () => {
+    const { page } = canvas();
+    page.items.set([
+      { id: 'a', type: 'note', parentId: null, title: 'A', x: 0, y: 0, width: 100, height: 80, createdAt: '', updatedAt: '' },
+      { id: 'b', type: 'task', parentId: null, title: 'B', x: 240, y: 0, width: 100, height: 80, createdAt: '', updatedAt: '' },
+    ]);
+    page.addConnection('a', 'b'); page.selectedIds.set(['a', 'b']); page.duplicate();
+    expect(page.connections()).toHaveLength(2);
+    expect(page.connections()[1].sourceId).toBe(page.items()[2].id);
+    expect(page.connections()[1].targetId).toBe(page.items()[3].id);
+  });
+
+  it('rejects a sticker covering an otherwise valid target', () => {
+    const { page } = canvas();
+    page.items.set([
+      { id: 'a', type: 'note', parentId: null, title: 'A', x: 0, y: 0, width: 100, height: 80 },
+      { id: 'b', type: 'task', parentId: null, title: 'B', x: 240, y: 0, width: 100, height: 80 },
+      { id: 'sticker', type: 'sticker', parentId: null, title: '', x: 250, y: 10, width: 80, height: 60 },
+    ]);
+    expect(page.connectorTarget({ x: 280, y: 40 }, 'a')).toBeUndefined();
+    expect(page.connectorTarget({ x: 242, y: 40 }, 'a')?.id).toBe('b');
+  });
+
+  for (const pointerType of ['mouse', 'touch']) it(`connects from a card handle at 200% zoom with ${pointerType}`, () => {
+    const { page } = canvas();
+    const a = { id: 'a', type: 'note', parentId: null, title: 'A', x: 0, y: 0, width: 100, height: 80 };
+    const b = { id: 'b', type: 'task', parentId: null, title: 'B', x: 240, y: 0, width: 100, height: 80 };
+    page.items.set([a, b]);
+    const handle = document.createElement('button'); handle.setPointerCapture = vi.fn(); handle.hasPointerCapture = vi.fn().mockReturnValue(false);
+    const down = { button: 0, pointerId: 1, pointerType, clientX: 320, clientY: 110, currentTarget: handle, target: handle, preventDefault: vi.fn(), stopPropagation: vi.fn() } as unknown as PointerEvent;
+    page.connectDown(down, a, 'right');
+    const release = { ...down, clientX: 700, clientY: 110 };
+    page.pointerMove(release); expect(page.connectionTargetId()).toBe('b');
+    page.pointerUp(release);
+    expect(page.connections()[0]).toMatchObject({ sourceId: 'a', targetId: 'b', sourceSide: 'right' });
+    expect(page.connectionPreview()).toBeNull();
+  });
+
+  it('cancels a connector draft on pointercancel without adding a relationship', () => {
+    const { page } = canvas();
+    const a = { id: 'a', type: 'note', parentId: null, title: 'A', x: 0, y: 0, width: 100, height: 80 };
+    page.items.set([a]);
+    const handle = document.createElement('button'); handle.setPointerCapture = vi.fn(); handle.hasPointerCapture = vi.fn().mockReturnValue(false);
+    const event = { button: 0, pointerId: 1, pointerType: 'touch', clientX: 320, clientY: 110, currentTarget: handle, target: handle, preventDefault: vi.fn(), stopPropagation: vi.fn() } as unknown as PointerEvent;
+    page.connectDown(event, a, 'right'); page.pointerCancel(event);
+    expect(page.connections()).toHaveLength(0);
+    expect(page.connectionPreview()).toBeNull();
+    expect(page.session).toBeNull();
+  });
+
+  it('rebinds an endpoint to a valid card and reverts an invalid drop', () => {
+    const { page } = canvas();
+    page.items.set([
+      { id: 'a', type: 'note', parentId: null, title: 'A', x: 0, y: 0, width: 100, height: 80 },
+      { id: 'b', type: 'task', parentId: null, title: 'B', x: 240, y: 0, width: 100, height: 80 },
+      { id: 'c', type: 'checklist', parentId: null, title: 'C', x: 400, y: 0, width: 100, height: 80 },
+      { id: 's', type: 'sticker', parentId: null, title: '', x: 550, y: 0, width: 100, height: 80 },
+    ]);
+    page.addConnection('a', 'b');
+    const handle = document.createElement('span'); handle.setPointerCapture = vi.fn(); handle.hasPointerCapture = vi.fn().mockReturnValue(false);
+    const down = { button: 0, pointerId: 1, pointerType: 'mouse', clientX: 600, clientY: 110, currentTarget: handle, target: handle, preventDefault: vi.fn(), stopPropagation: vi.fn() } as unknown as PointerEvent;
+    page.rebindDown(down, page.connections()[0], 'target');
+    page.pointerUp({ ...down, clientX: 1000, clientY: 110 });
+    expect(page.connections()[0].targetId).toBe('c');
+    page.rebindDown(down, page.connections()[0], 'target');
+    page.pointerUp({ ...down, clientX: 1270, clientY: 110 });
+    expect(page.connections()[0].targetId).toBe('c');
+    page.undo(); expect(page.connections()[0].targetId).toBe('b');
+  });
 });

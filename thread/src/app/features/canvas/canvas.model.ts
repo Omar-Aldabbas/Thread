@@ -113,6 +113,8 @@ export interface CanvasConnection {
   id: string;
   sourceId: string;
   targetId: string;
+  sourceSide?: ConnectorSide;
+  targetSide?: ConnectorSide;
   label?: string;
   sourceCardinality?: '1' | '0..1' | 'many' | '0..many';
   targetCardinality?: '1' | '0..1' | 'many' | '0..many';

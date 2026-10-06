@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { CanvasConnection, CanvasItem } from './canvas.model';
 import { arrangeErEntities, routeErConnections } from './er-layout';
 
-const entity = (id: string, x: number, y: number, height = 180): CanvasItem => ({ id, type: 'er-entity', title: id, x, y, width: 240, height, createdAt: '', updatedAt: '' });
+const entity = (id: string, x: number, y: number, height = 180): CanvasItem => ({ id, type: 'er-entity', parentId: null, title: id, x, y, width: 240, height, createdAt: '', updatedAt: '' });
 const relation = (id: string, sourceId: string, targetId: string): CanvasConnection => ({ id, sourceId, targetId, kind: 'elbow' });
 
 describe('ER routing', () => {

@@ -18,6 +18,8 @@ import { ThreadSelect, ThreadOption, ThreadCheckbox, ThreadColor } from '../../.
 import { ThreadHeader } from '../../../../shared/thread-header';
 import { ScrollDirective } from '../../../../shared/scroll.directive';
 import { brushDiameter, distanceToStroke, strokeBounds, strokeOutlinePath } from '../../sketch/sketch-geometry';
+import { elbowRoute } from '../../sketch/elbow-route';
+import { connectorSides, isConnectableItem, validConnections } from '../../connector-rules';
 
 type Tool = 'select' | 'hand' | 'text' | 'add' | 'connect' | 'sketch' | 'shape';
 type Session = { kind: 'pan' | 'move' | 'resize' | 'rotate' | 'marquee' | 'place' | 'crop' | 'connect' | 'rebind' | 'route' | 'branch' | 'junction-slide' | 'sketch' | 'erase'; pointerId: number; clientX: number; clientY: number; x: number; y: number; itemId?: string; connectionId?: string; junctionId?: string; ratio?: number; terminal?: 'source' | 'target'; side?: ConnectorSide; corner?: 'nw' | 'ne' | 'sw' | 'se'; before?: State; origins?: Map<string, { x: number; y: number }>; groupCenter?: { x: number; y: number }; groupIds?: string[]; moved?: boolean };
@@ -67,10 +69,12 @@ export class CanvasPage implements AfterViewInit, OnDestroy {
   readonly shapeKind = signal<ShapeKind>('rectangle');
   shapeIcon(kind: ShapeKind): string { return shapeNames[kind]; }
   applyShapeTheme(item: CanvasItem, index: number): void { const theme = shapeThemes[index]; if (theme) this.setStyle(item.id, { shapeFill: theme.fill, shapeStroke: theme.stroke, textColor: theme.text }); }
-  readonly connectorKind = signal<ConnectorKind>('straight');
+  readonly connectorKind = signal<ConnectorKind>('elbow');
+  readonly connectorSides = connectorSides;
   readonly connectionTargetId = signal<string | null>(null);
   readonly junctionCandidate = signal<{ connectionId: string; ratio: number; x: number; y: number } | null>(null);
   readonly selectedConnectionId = signal<string | null>(null);
+  readonly hoveredConnectionId = signal<string | null>(null);
   readonly precisePreview = signal<{ x: number; y: number } | null>(null);
   readonly brushWidth = signal(3);
   readonly activeSketchStrokes = signal<SketchStroke[]>([]);
@@ -201,7 +205,14 @@ export class CanvasPage implements AfterViewInit, OnDestroy {
       }
       return { ...item, datasetId:id, rows:undefined, tableColumns:undefined, tableRows:undefined };
     });
-    return {items,connections:state.connections,junctions:state.junctions || [],datasets};
+    const connections = validConnections(items, state.connections);
+    if (this.browser && connections.length !== (Array.isArray(state.connections) ? state.connections.length : 0)) {
+      try {
+        const backupKey = `${this.storageKey}-connector-backup`;
+        if (!localStorage.getItem(backupKey)) localStorage.setItem(backupKey, JSON.stringify(state));
+      } catch { /* The board still loads if browser storage is full. */ }
+    }
+    return {items,connections,junctions:(state.junctions || []).filter(junction => connections.some(connection => connection.id === junction.parentConnectorId)),datasets};
   }
   private upgradeBudgetDataset(data: ThreadDataset): void {
     const amount = data.columns.find(column => column.key === 'amount');
@@ -273,18 +284,24 @@ export class CanvasPage implements AfterViewInit, OnDestroy {
     if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'd') { event.preventDefault(); this.duplicate(); return; }
     if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'g') { event.preventDefault(); event.shiftKey ? this.ungroupSelected() : this.groupSelected(); return; }
     if (event.key === 'Delete' || event.key === 'Backspace') { if (this.selectedConnectionId()) this.removeSelectedConnection(); else this.removeSelected(); return; }
-    if (event.key === 'Escape') { if (this.cropId()) this.finishCrop(false); else if (this.editingId()) this.finishEditing(); else if (this.pendingAsset()) this.pendingAsset.set(null); else if (this.mediaPicker()) this.mediaPicker.set(null); else if (this.pendingType()) this.pendingType.set(null); else if (this.paletteOpen()) this.paletteOpen.set(false); else this.selectedIds.set([]); this.connectionSourceId.set(null); return; }
+    if (event.key === 'Escape') { if (this.session?.kind === 'connect' || this.session?.kind === 'rebind') { this.session = null; this.clearConnectionDraft(); return; } if (this.cropId()) this.finishCrop(false); else if (this.editingId()) this.finishEditing(); else if (this.pendingAsset()) this.pendingAsset.set(null); else if (this.mediaPicker()) this.mediaPicker.set(null); else if (this.pendingType()) this.pendingType.set(null); else if (this.paletteOpen()) this.paletteOpen.set(false); else this.selectedIds.set([]); this.connectionSourceId.set(null); return; }
     if (event.key === 'Enter' && this.cropId()) { this.finishCrop(true); return; }
     if (event.key === 'Enter' && this.selected()?.type === 'shape') { event.preventDefault(); this.startEditing(this.selected()!.id); return; }
     const keys: Record<string, Tool> = { v: 'select', h: 'hand', t: 'text', n: 'add', c: 'connect', s: 'shape', p: 'sketch' };
     if (keys[event.key.toLowerCase()]) this.setTool(keys[event.key.toLowerCase()]);
   }
   @HostListener('window:keyup', ['$event']) keyUp(event: KeyboardEvent): void { if (event.code === 'Space') this.spaceHeld.set(false); }
-  @HostListener('window:blur') blur(): void { this.spaceHeld.set(false); this.session = null; this.isPanning.set(false); this.pointers.clear(); this.pinch = null; }
+  @HostListener('window:blur') blur(): void { this.spaceHeld.set(false); this.session = null; this.isPanning.set(false); this.pointers.clear(); this.pinch = null; this.clearConnectionDraft(); }
 
   private point(clientX: number, clientY: number): { x: number; y: number } { const rect = this.viewport()?.nativeElement.getBoundingClientRect(); return { x: (clientX - (rect?.left || 0) - this.panX()) / this.zoom(), y: (clientY - (rect?.top || 0) - this.panY()) / this.zoom() }; }
+  isConnectable(item: CanvasItem): boolean { return isConnectableItem(item); }
+  private clearConnectionDraft(): void { this.connectionPreview.set(null); this.connectionTargetId.set(null); this.precisePreview.set(null); this.junctionCandidate.set(null); }
+  private closestSide(item: CanvasItem, point: { x: number; y: number }): ConnectorSide {
+    return connectorSides.reduce((best, side) => Math.hypot(sidePoint(item, side).x - point.x, sidePoint(item, side).y - point.y) < Math.hypot(sidePoint(item, best).x - point.x, sidePoint(item, best).y - point.y) ? side : best, 'right' as ConnectorSide);
+  }
   private beginTouch(event: PointerEvent): boolean {
     if (event.pointerType !== 'touch') return false;
+    if (this.session?.kind === 'connect' || this.session?.kind === 'rebind') return false;
     this.pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
     (event.currentTarget as Element).setPointerCapture(event.pointerId);
     if (this.pointers.size < 2) return false;
@@ -326,14 +343,14 @@ export class CanvasPage implements AfterViewInit, OnDestroy {
     }
     if (this.cropId() === item.id) { this.session = { kind: 'crop', pointerId: event.pointerId, clientX: event.clientX, clientY: event.clientY, x: item.cropX || 0, y: item.cropY || 0, itemId: item.id }; (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId); return; }
     if (this.spaceHeld() || this.tool() === 'hand') { this.session = { kind: 'pan', pointerId: event.pointerId, clientX: event.clientX, clientY: event.clientY, x: this.panX(), y: this.panY() }; this.isPanning.set(true); }
-    else if (this.tool() === 'connect') { if (item.type === 'chart') return; const source = this.connectionSourceId(); if (source && source !== item.id) { this.addConnection(source, item.id); this.setTool('select'); } else { this.connectionSourceId.set(item.id); this.selectedIds.set([item.id]); } return; }
+    else if (this.tool() === 'connect') { if (!isConnectableItem(item)) return; const source = this.connectionSourceId(); if (source && source !== item.id) { this.addConnection(source, item.id); this.setTool('select'); } else { this.connectionSourceId.set(item.id); this.selectedIds.set([item.id]); } return; }
     else { this.finishEditing(); const current = this.selectedIds(); const members = item.groupId ? this.items().filter(entry => entry.groupId === item.groupId).map(entry => entry.id) : [item.id]; this.selectedIds.set(event.shiftKey ? (current.includes(item.id) ? current.filter(id => !members.includes(id)) : [...new Set([...current, ...members])]) : current.includes(item.id) ? current : members); if (event.shiftKey || this.tool() !== 'select' || item.locked) return; const moving = new Set(this.selectedIds()); let changed = true; while (changed) { changed = false; for (const child of this.items()) if (child.parentId && moving.has(child.parentId) && !moving.has(child.id)) { moving.add(child.id); changed = true; } } const origins = new Map(this.items().filter(entry => moving.has(entry.id)).map(entry => [entry.id, { x: entry.x, y: entry.y }])); this.session = { kind: 'move', pointerId: event.pointerId, clientX: event.clientX, clientY: event.clientY, x: item.x, y: item.y, itemId: item.id, origins, before: this.state() }; }
     (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
   }
   resizeDown(event: PointerEvent, item: CanvasItem, corner: 'nw' | 'ne' | 'sw' | 'se' = 'se'): void { event.stopPropagation(); this.session = { kind: 'resize', pointerId: event.pointerId, clientX: event.clientX, clientY: event.clientY, x: item.width, y: item.height, itemId: item.id, corner, before: this.state() }; (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId); }
   rotateDown(event: PointerEvent, item: CanvasItem): void { event.stopPropagation(); const point = this.point(event.clientX, event.clientY); const angle = Math.atan2(point.y - item.y - item.height / 2, point.x - item.x - item.width / 2); this.session = { kind: 'rotate', pointerId: event.pointerId, clientX: event.clientX, clientY: event.clientY, x: angle, y: item.rotation || 0, itemId: item.id, before: this.state() }; (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId); }
   rotateGroupDown(event: PointerEvent): void { event.stopPropagation(); const bounds = this.groupBounds(); if (!bounds) return; const center = { x: bounds.x + bounds.width / 2, y: bounds.y + bounds.height / 2 }, point = this.point(event.clientX, event.clientY); this.session = { kind: 'rotate', pointerId: event.pointerId, clientX: event.clientX, clientY: event.clientY, x: Math.atan2(point.y - center.y, point.x - center.x), y: 0, groupCenter: center, groupIds: [...this.selectedIds()], before: this.state() }; (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId); }
-  connectDown(event: PointerEvent, item: CanvasItem, side: ConnectorSide = 'right'): void { event.preventDefault(); event.stopPropagation(); const anchor = sidePoint(item, side); this.session = { kind: 'connect', pointerId: event.pointerId, clientX: event.clientX, clientY: event.clientY, x: anchor.x, y: anchor.y, itemId: item.id, side }; this.connectionPreview.set({ x1: anchor.x, y1: anchor.y, x2: anchor.x, y2: anchor.y }); (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId); }
+  connectDown(event: PointerEvent, item: CanvasItem, side: ConnectorSide = 'right'): void { if (!isConnectableItem(item)) return; event.preventDefault(); event.stopPropagation(); const anchor = sidePoint(item, side); this.session = { kind: 'connect', pointerId: event.pointerId, clientX: event.clientX, clientY: event.clientY, x: anchor.x, y: anchor.y, itemId: item.id, side }; this.connectionPreview.set({ x1: anchor.x, y1: anchor.y, x2: anchor.x, y2: anchor.y }); (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId); }
   selectConnection(event: PointerEvent, connection: CanvasConnection): void { if (this.tool() !== 'select' && this.tool() !== 'connect') return; event.stopPropagation(); this.selectedIds.set([]); this.selectedConnectionId.set(connection.id); }
   private pathPoint(connection: CanvasConnection, ratio: number): {x:number;y:number} {
     const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
@@ -363,7 +380,21 @@ export class CanvasPage implements AfterViewInit, OnDestroy {
     this.session={kind:'rebind',pointerId:event.pointerId,clientX:event.clientX,clientY:event.clientY,x:end.x,y:end.y,connectionId:connection.id,terminal};
     (event.currentTarget as Element).setPointerCapture(event.pointerId);
   }
-  routeHandle(connection: CanvasConnection): {x:number;y:number} { const routed = this.erRoutes().get(connection.id); if (routed) return routed.label; const {a,b,source,target}=this.connectionEnds(connection), horizontal=this.horizontalConnection(source,target); return horizontal?{x:(a.x+b.x)/2+(connection.routeOffset||0),y:(a.y+b.y)/2}:{x:(a.x+b.x)/2,y:(a.y+b.y)/2+(connection.routeOffset||0)}; }
+  routeHandle(connection: CanvasConnection): {x:number;y:number} {
+    const routed = this.erRoutes().get(connection.id); if (routed) return routed.label;
+    if ((!connection.kind || connection.kind === 'elbow') && !connection.routeOffset) {
+      const matches = [...this.connectionPath(connection).matchAll(/[ML]\s*(-?[\d.]+)\s+(-?[\d.]+)/g)];
+      const points = matches.map(match => ({ x: Number(match[1]), y: Number(match[2]) }));
+      let best = -1, label = points[0] || { x: 0, y: 0 };
+      for (let index = 1; index < points.length; index++) {
+        const a = points[index - 1], b = points[index], length = Math.hypot(b.x - a.x, b.y - a.y);
+        if (length > best) { best = length; label = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }; }
+      }
+      return label;
+    }
+    const {a,b,source,target}=this.connectionEnds(connection), horizontal=this.horizontalConnection(source,target);
+    return horizontal?{x:(a.x+b.x)/2+(connection.routeOffset||0),y:(a.y+b.y)/2}:{x:(a.x+b.x)/2,y:(a.y+b.y)/2+(connection.routeOffset||0)};
+  }
   routeDown(event: PointerEvent, connection: CanvasConnection): void { event.preventDefault(); event.stopPropagation(); const {source,target}=this.connectionEnds(connection), horizontal=this.horizontalConnection(source,target); this.session={kind:'route',pointerId:event.pointerId,clientX:event.clientX,clientY:event.clientY,x:connection.routeOffset||0,y:horizontal?1:0,connectionId:connection.id,before:this.state()}; (event.currentTarget as Element).setPointerCapture(event.pointerId); }
   pointerMove(event: PointerEvent): void {
     if (this.pendingAsset()) this.assetPreview.set(this.point(event.clientX, event.clientY));
@@ -425,9 +456,9 @@ export class CanvasPage implements AfterViewInit, OnDestroy {
     if (session.kind === 'marquee') { const point = this.point(event.clientX, event.clientY); this.marquee.set({ x: Math.min(session.x, point.x), y: Math.min(session.y, point.y), width: Math.abs(point.x - session.x), height: Math.abs(point.y - session.y) }); }
     if (session.kind === 'place' && (this.pendingType() === 'zone' || this.pendingType() === 'shape')) { const point = this.point(event.clientX, event.clientY); this.placement.set({ x: Math.min(session.x, point.x), y: Math.min(session.y, point.y), width: Math.abs(point.x - session.x), height: Math.abs(point.y - session.y) }); }
     if (session.kind === 'crop' && session.itemId) this.update(session.itemId, { cropX: session.x + dx / this.zoom(), cropY: session.y + dy / this.zoom() });
-    if (session.kind === 'connect' || session.kind === 'branch') { const point = this.point(event.clientX, event.clientY); const sourceId=session.itemId || this.connections().find(c=>c.id===session.connectionId)?.sourceId || ''; const target = this.connectorTarget(point, sourceId); const precise = target ? nearestPerimeter(target, point) : null; const isPrecise = !!precise && precise.distance <= 12 / this.zoom(); const join=target?null:this.joinCandidate(point,session.connectionId); const end = target ? isPrecise ? precise!.point : perimeterPoint(target, {x:session.x,y:session.y}) : join || point; this.connectionTargetId.set(target?.id || null); this.precisePreview.set(isPrecise ? end : null); this.junctionCandidate.set(join); this.connectionPreview.set({ x1: session.x, y1: session.y, x2: end.x, y2: end.y }); }
+    if (session.kind === 'connect') { const point = this.point(event.clientX, event.clientY); const target = this.connectorTarget(point, session.itemId || ''); const end = target ? sidePoint(target, this.closestSide(target, point)) : point; this.connectionTargetId.set(target?.id || null); this.precisePreview.set(target ? end : null); this.connectionPreview.set({ x1: session.x, y1: session.y, x2: end.x, y2: end.y }); }
     if (session.kind === 'route' && session.connectionId) this.connections.update(entries=>entries.map(entry=>entry.id===session.connectionId?{...entry,routeOffset:session.x+(session.y?dx:dy)/this.zoom()}:entry));
-    if (session.kind === 'rebind' && session.connectionId) { const connection=this.connections().find(entry=>entry.id===session.connectionId); if (connection) { const point=this.point(event.clientX,event.clientY), other=this.endpoint(connection,session.terminal==='source'?'target':'source'), target=this.connectorTarget(point,session.terminal==='source'?connection.targetId:connection.sourceId), precise=target?nearestPerimeter(target,point):null, isPrecise=!!precise&&precise.distance<=12/this.zoom(), end=target?(isPrecise?precise!.point:perimeterPoint(target,other)):point; this.connectionTargetId.set(target?.id||null); this.precisePreview.set(isPrecise?end:null); this.connectionPreview.set({x1:other.x,y1:other.y,x2:end.x,y2:end.y}); } }
+    if (session.kind === 'rebind' && session.connectionId) { const connection=this.connections().find(entry=>entry.id===session.connectionId); if (connection) { const point=this.point(event.clientX,event.clientY), other=this.endpoint(connection,session.terminal==='source'?'target':'source'), target=this.connectorTarget(point,session.terminal==='source'?connection.targetId:connection.sourceId), end=target?sidePoint(target,this.closestSide(target,point)):point; this.connectionTargetId.set(target?.id||null); this.precisePreview.set(target?end:null); this.connectionPreview.set({x1:other.x,y1:other.y,x2:end.x,y2:end.y}); } }
     if (session.kind === 'junction-slide' && session.junctionId && session.connectionId) { const parent=this.connections().find(c=>c.id===session.connectionId); if(parent){const candidate=this.nearestOnConnection(parent,this.point(event.clientX,event.clientY)); this.junctions.update(entries=>entries.map(j=>j.id===session.junctionId?{...j,positionRatio:candidate.ratio}:j));} }
     if (session.kind === 'sketch') { const point = this.point(event.clientX, event.clientY); const last = this.sketchPoints().at(-1); if (!last || Math.hypot(point.x - last.x, point.y - last.y) > 1.5) this.sketchPoints.update(points => [...points, { ...point, pressure: event.pressure || .5 }]); }
     if (session.kind === 'erase') this.eraseSketchAt(this.point(event.clientX, event.clientY));
@@ -457,16 +488,14 @@ export class CanvasPage implements AfterViewInit, OnDestroy {
     if (session?.kind === 'connect' && session.itemId) {
       const point = this.point(event.clientX, event.clientY);
       const target = this.connectorTarget(point, session.itemId);
-      if (target) this.addConnection(session.itemId!, target.id);
-      else { const join=this.joinCandidate(point); if(join){const parent=this.connections().find(c=>c.id===join.connectionId)!; this.snapshot(); const junction=this.getOrCreateJunction(join); this.connections.update(entries=>[...entries,{id:canvasId(),sourceId:session.itemId!,targetId:parent.targetId,targetJunctionId:junction.id,sourceBinding:{mode:'auto'},direction:'forward',kind:this.connectorKind()}]);} }
+      if (target) this.addConnection(session.itemId!, target.id, session.side, this.closestSide(target, point));
     }
     if(session?.kind==='branch' && session.connectionId && session.moved){const parent=this.connections().find(c=>c.id===session.connectionId), point=this.point(event.clientX,event.clientY); if(parent){const target=this.connectorTarget(point,parent.sourceId), join=target?null:this.joinCandidate(point,parent.id); if(target||join){this.snapshot(); const origin=session.junctionId?this.junctions().find(j=>j.id===session.junctionId):this.getOrCreateJunction({connectionId:parent.id,ratio:session.ratio!,x:session.x,y:session.y}); if(origin){const other=join?this.connections().find(c=>c.id===join.connectionId):null; const destination=join?this.getOrCreateJunction(join):null; this.connections.update(entries=>[...entries,{id:canvasId(),sourceId:parent.sourceId,sourceJunctionId:origin.id,targetId:target?.id||other!.targetId,targetJunctionId:destination?.id,direction:'forward',kind:this.connectorKind()}]);}}} }
     if(session?.kind==='branch' && !session.moved && session.connectionId) this.selectedConnectionId.set(session.connectionId);
     if (session?.kind === 'rebind' && session.connectionId && session.terminal) {
       const connection=this.connections().find(entry=>entry.id===session.connectionId);
       if (connection) { const point=this.point(event.clientX,event.clientY), otherId=session.terminal==='source'?connection.targetId:connection.sourceId, target=this.connectorTarget(point,otherId);
-        if (target) { this.snapshot(); this.connections.update(entries=>entries.map(entry=>entry.id===connection.id?(session.terminal==='source'?{...entry,sourceId:target.id,sourceJunctionId:undefined,sourceBinding:{mode:'auto'}}:{...entry,targetId:target.id,targetJunctionId:undefined,targetBinding:{mode:'auto'}}):entry)); }
-        else { const join=this.joinCandidate(point,connection.id); if(join){const parent=this.connections().find(c=>c.id===join.connectionId)!; this.snapshot(); const junction=this.getOrCreateJunction(join); this.connections.update(entries=>entries.map(entry=>entry.id===connection.id?(session.terminal==='source'?{...entry,sourceId:parent.sourceId,sourceJunctionId:junction.id}:{...entry,targetId:parent.targetId,targetJunctionId:junction.id}):entry));} }
+        if (target && !this.connections().some(entry => entry.id !== connection.id && entry.sourceId === (session.terminal === 'source' ? target.id : connection.sourceId) && entry.targetId === (session.terminal === 'target' ? target.id : connection.targetId) && !entry.sourceFieldId && !entry.targetFieldId)) { this.snapshot(); this.connections.update(entries=>entries.map(entry=>entry.id===connection.id?(session.terminal==='source'?{...entry,sourceId:target.id,sourceSide:this.closestSide(target,point),sourceJunctionId:undefined,sourceBinding:{mode:'auto'}}:{...entry,targetId:target.id,targetSide:this.closestSide(target,point),targetJunctionId:undefined,targetBinding:{mode:'auto'}}):entry)); }
       }
     }
     if (session?.before && ['move', 'resize', 'rotate'].includes(session.kind)) {
@@ -562,7 +591,12 @@ export class CanvasPage implements AfterViewInit, OnDestroy {
   removeSelectedConnection(): void { const id=this.selectedConnectionId(); if (!id) return; this.snapshot(); const connection = this.connections().find(entry => entry.id === id); if (connection?.targetFieldId) this.items.update(items => items.map(item => item.id === connection.targetId ? { ...item, erFields: item.erFields?.map(field => field.id === connection.targetFieldId ? { ...field, key: 'none', reference: undefined } : field) } : item)); this.removeConnectionGraph(new Set([id])); this.selectedConnectionId.set(null); }
   private removeConnectionGraph(removed:Set<string>):void {let changed=true; while(changed){changed=false; for(const connection of this.connections()){const parents=[connection.sourceJunctionId,connection.targetJunctionId].map(id=>this.junctions().find(j=>j.id===id)?.parentConnectorId); if(!removed.has(connection.id)&&parents.some(id=>id&&removed.has(id))){removed.add(connection.id);changed=true;}}} this.connections.update(entries=>entries.filter(c=>!removed.has(c.id))); this.junctions.update(entries=>entries.filter(j=>!removed.has(j.parentConnectorId)));}
   private connectorTarget(point: {x:number;y:number}, sourceId: string): CanvasItem | undefined {
-    return [...this.items()].reverse().find(item => item.id !== sourceId && item.type !== 'workspace' && item.type !== 'frame' && item.type !== 'zone' && item.type !== 'chart' && (containsShape(item, point) || nearestPerimeter(item, point).distance <= 16 / this.zoom()));
+    const visible = this.visibleItems().map((item, index) => ({ item, index }))
+      .sort((a, b) => (b.item.zIndex ?? (['zone', 'frame', 'workspace'].includes(b.item.type) ? 0 : 1)) - (a.item.zIndex ?? (['zone', 'frame', 'workspace'].includes(a.item.type) ? 0 : 1)) || b.index - a.index)
+      .map(entry => entry.item);
+    const underPointer = visible.find(item => item.id !== sourceId && item.type !== 'workspace' && containsShape(item, point));
+    if (underPointer) return isConnectableItem(underPointer) ? underPointer : undefined;
+    return visible.find(item => item.id !== sourceId && isConnectableItem(item) && nearestPerimeter(item, point).distance <= 20 / this.zoom());
   }
   private horizontalConnection(source: CanvasItem,target: CanvasItem): boolean { return Math.abs(target.x+target.width/2-source.x-source.width/2)-(source.width+target.width)/2 >= Math.abs(target.y+target.height/2-source.y-source.height/2)-(source.height+target.height)/2; }
   private connectionEnds(connection: CanvasConnection): { a: { x: number; y: number }; b: { x: number; y: number }; source: CanvasItem; target: CanvasItem } {
@@ -572,14 +606,14 @@ export class CanvasPage implements AfterViewInit, OnDestroy {
     const targetCenter = {x:target.x+target.width/2,y:target.y+target.height/2};
     const dx=targetCenter.x-sourceCenter.x, dy=targetCenter.y-sourceCenter.y;
     const horizontal=this.horizontalConnection(source,target);
-    const sourceSide: ConnectorSide=horizontal?(dx>=0?'right':'left'):(dy>=0?'bottom':'top');
-    const targetSide: ConnectorSide=horizontal?(dx>=0?'left':'right'):(dy>=0?'top':'bottom');
-    const orthogonal=connection.kind==='elbow' || connection.kind==='curved';
+    const sourceSide: ConnectorSide=connection.sourceSide || (horizontal?(dx>=0?'right':'left'):(dy>=0?'bottom':'top'));
+    const targetSide: ConnectorSide=connection.targetSide || (horizontal?(dx>=0?'left':'right'):(dy>=0?'top':'bottom'));
+    const orthogonal=!connection.kind || connection.kind==='elbow' || connection.kind==='curved';
     const sourceJunction=this.junctions().find(j=>j.id===connection.sourceJunctionId);
     const targetJunction=this.junctions().find(j=>j.id===connection.targetJunctionId);
     const junctionA=sourceJunction?this.junctionPoint(sourceJunction):null, junctionB=targetJunction?this.junctionPoint(targetJunction):null;
-    const a = junctionA || (connection.sourceBinding?.mode === 'precise' && connection.sourceBinding.anchor ? world(source, connection.sourceBinding.anchor) : orthogonal && !junctionB ? sidePoint(source,sourceSide) : perimeterPoint(source,junctionB || targetCenter));
-    const b = junctionB || (connection.targetBinding?.mode === 'precise' && connection.targetBinding.anchor ? world(target, connection.targetBinding.anchor) : orthogonal && !junctionA ? sidePoint(target,targetSide) : perimeterPoint(target,junctionA || sourceCenter));
+    const a = junctionA || (connection.sourceSide ? sidePoint(source, sourceSide) : connection.sourceBinding?.mode === 'precise' && connection.sourceBinding.anchor ? world(source, connection.sourceBinding.anchor) : orthogonal && !junctionB ? sidePoint(source,sourceSide) : perimeterPoint(source,junctionB || targetCenter));
+    const b = junctionB || (connection.targetSide ? sidePoint(target, targetSide) : connection.targetBinding?.mode === 'precise' && connection.targetBinding.anchor ? world(target, connection.targetBinding.anchor) : orthogonal && !junctionA ? sidePoint(target,targetSide) : perimeterPoint(target,junctionA || sourceCenter));
     const routed = this.erRoutes().get(connection.id);
     return { a: routed?.points[0] || a, b: routed?.points.at(-1) || b, source, target };
   }
@@ -587,9 +621,17 @@ export class CanvasPage implements AfterViewInit, OnDestroy {
     const routed = this.erRoutes().get(connection.id);
     if (routed) return routed.points.map((point, index) => `${index ? 'L' : 'M'} ${point.x} ${point.y}`).join(' ');
     const { a, b, source, target } = this.connectionEnds(connection);
-    if (!connection.kind || connection.kind === 'straight') return `M ${a.x} ${a.y} L ${b.x} ${b.y}`;
+    if (connection.kind === 'straight') return `M ${a.x} ${a.y} L ${b.x} ${b.y}`;
     const horizontal = this.horizontalConnection(source,target);
-    if (connection.kind === 'elbow') {
+    if (!connection.kind || connection.kind === 'elbow') {
+      if (!connection.routeOffset && !connection.sourceJunctionId && !connection.targetJunctionId) {
+        const sourceCenter = { x: source.x + source.width / 2, y: source.y + source.height / 2 };
+        const targetCenter = { x: target.x + target.width / 2, y: target.y + target.height / 2 };
+        const autoHorizontal = this.horizontalConnection(source, target);
+        const sourceSide = connection.sourceSide || (autoHorizontal ? targetCenter.x >= sourceCenter.x ? 'right' : 'left' : targetCenter.y >= sourceCenter.y ? 'bottom' : 'top');
+        const targetSide = connection.targetSide || (autoHorizontal ? targetCenter.x >= sourceCenter.x ? 'left' : 'right' : targetCenter.y >= sourceCenter.y ? 'top' : 'bottom');
+        return elbowRoute(a, b, sourceSide, targetSide, source, target).map((point, index) => `${index ? 'L' : 'M'} ${point.x} ${point.y}`).join(' ');
+      }
       if (horizontal) { const mx=(a.x+b.x)/2+(connection.routeOffset||0); return `M ${a.x} ${a.y} L ${mx} ${a.y} L ${mx} ${b.y} L ${b.x} ${b.y}`; }
       const my=(a.y+b.y)/2+(connection.routeOffset||0); return `M ${a.x} ${a.y} L ${a.x} ${my} L ${b.x} ${my} L ${b.x} ${b.y}`;
     }
@@ -751,14 +793,14 @@ export class CanvasPage implements AfterViewInit, OnDestroy {
     this.connections.update(entries => [...entries, { ...connection, id, label: '', sourceFieldId: undefined, targetFieldId: undefined, kind: 'elbow', routeOffset: 0, sourceBinding: { mode: 'auto' }, targetBinding: { mode: 'auto' }, sourceJunctionId: undefined, targetJunctionId: undefined }]);
     this.selectedIds.set([]); this.selectedConnectionId.set(id);
   }
-  private addConnection(sourceId: string, targetId: string): void {
+  private addConnection(sourceId: string, targetId: string, sourceSide?: ConnectorSide, targetSide?: ConnectorSide): void {
     const source = this.items().find(item => item.id === sourceId);
     const target = this.items().find(item => item.id === targetId);
     const isEr = source?.type === 'er-entity' && target?.type === 'er-entity';
-    if (!source || !target || sourceId === targetId) return;
-    const existing = isEr ? this.connections().find(entry => (entry.sourceId === sourceId && entry.targetId === targetId) || (entry.sourceId === targetId && entry.targetId === sourceId)) : undefined;
+    if (!source || !target || !isConnectableItem(source) || !isConnectableItem(target) || sourceId === targetId) return;
+    const existing = this.connections().find(entry => !entry.sourceFieldId && !entry.targetFieldId && ((entry.sourceId === sourceId && entry.targetId === targetId) || (isEr && entry.sourceId === targetId && entry.targetId === sourceId)));
     if (existing) { this.selectedIds.set([]); this.selectedConnectionId.set(existing.id); return; }
-    const connection: CanvasConnection = { id: canvasId(), sourceId, targetId, sourceBinding: { mode: 'auto' }, targetBinding: { mode: 'auto' }, direction: isEr ? 'none' : 'forward', kind: isEr ? 'elbow' : this.connectorKind(), sourceCardinality: isEr ? '1' : undefined, targetCardinality: isEr ? 'many' : undefined };
+    const connection: CanvasConnection = { id: canvasId(), sourceId, targetId, sourceSide, targetSide, sourceBinding: { mode: 'auto' }, targetBinding: { mode: 'auto' }, direction: isEr ? 'none' : 'forward', kind: 'elbow', sourceCardinality: isEr ? '1' : undefined, targetCardinality: isEr ? 'many' : undefined };
     this.snapshot(); this.connections.update(entries => [...entries, connection]);
     this.selectedIds.set([]); this.selectedConnectionId.set(connection.id);
   }

@@ -2,13 +2,11 @@ import '@angular/compiler';
 import { Component, signal, ɵresolveComponentResources } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { By } from '@angular/platform-browser';
-import { BrowserTestingModule, platformBrowserTesting } from '@angular/platform-browser/testing';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ControlPopover } from './control-popover';
 import { ThreadCheckbox, ThreadColor, ThreadOption, ThreadSelect } from './thread-controls';
 import { hexToHsv, hsvToHex, normalizeHex } from './color-utils';
 
-TestBed.initTestEnvironment(BrowserTestingModule, platformBrowserTesting());
 
 @Component({ standalone: true, imports: [ThreadSelect, ThreadOption, ThreadCheckbox, ThreadColor], template: `
   <label>Data type<thread-select [value]="selected()" (change)="selected.set($any($event.target).value)" aria-label="Data type">

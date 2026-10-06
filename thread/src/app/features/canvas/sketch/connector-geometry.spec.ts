@@ -4,7 +4,7 @@ import { containsShape, nearestPerimeter, perimeterPoint, sidePoint } from './co
 import { shapeKinds } from '../shapes';
 
 const shape = (kind: CanvasItem['shapeKind']): CanvasItem => ({
-  id: 'shape', type: 'shape', shapeKind: kind, x: 0, y: 0, width: 200, height: 100,
+  id: 'shape', type: 'shape', parentId: null, shapeKind: kind, x: 0, y: 0, width: 200, height: 100,
   title: '', createdAt: '', updatedAt: '',
 });
 
