@@ -69,6 +69,7 @@ export interface CanvasItem {
   url?: string;
   filename?: string;
   duration?: string;
+  waveform?: number[];
   due?: string;
   priority?: 'Low' | 'Medium' | 'High';
   completed?: boolean;
