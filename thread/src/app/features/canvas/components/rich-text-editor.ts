@@ -23,7 +23,13 @@ import { ScrollDirective } from '../../../shared/scroll.directive';
   imports: [ScrollDirective, ThreadSelect, ThreadOption, ThreadColor],
   encapsulation: ViewEncapsulation.None,
   template: `
-    <div #toolbar class="rich-toolbar" appScroll="x" scrollbar="hover" (pointerdown)="$event.stopPropagation()">
+    <div
+      #toolbar
+      class="rich-toolbar"
+      appScroll="x"
+      scrollbar="hover"
+      (pointerdown)="$event.stopPropagation()"
+    >
       <button
         type="button"
         [class.active]="active('bold')"
@@ -87,9 +93,16 @@ import { ScrollDirective } from '../../../shared/scroll.directive';
         <thread-option value="24px" label="24"></thread-option>
         <thread-option value="32px" label="32"></thread-option>
       </thread-select>
-      <thread-color  aria-label="Text color" value="#111111" (change)="color($event)" ></thread-color>
+      <thread-color aria-label="Text color" value="#111111" (change)="color($event)"></thread-color>
     </div>
-    <div #mount class="rich-mount" appScroll="y" scrollbar="hover" (pointerdown)="$event.stopPropagation()"></div>
+    <div
+      #mount
+      class="rich-mount"
+      appScroll="y"
+      scrollbar="hover"
+      (pointerdown)="$event.stopPropagation()"
+      (keydown)="editorKey($event)"
+    ></div>
   `,
   styles: [
     `
@@ -209,6 +222,12 @@ import { ScrollDirective } from '../../../shared/scroll.directive';
   ],
 })
 export class RichTextEditor implements AfterViewInit, OnDestroy {
+  editorKey(event: KeyboardEvent): void {
+    if (event.key !== 'Escape') return;
+    event.preventDefault();
+    event.stopPropagation();
+    this.finished.emit();
+  }
   private readonly host = inject(ElementRef<HTMLElement>);
   @ViewChild('mount', { static: true }) mount!: ElementRef<HTMLElement>;
   @ViewChild('toolbar', { static: true }) toolbar!: ElementRef<HTMLElement>;

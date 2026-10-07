@@ -1,27 +1,43 @@
 ﻿<section class="thread-app">
   <app-thread-header [title]="spaceName()">
-      <label class="search-box"
-        ><span>⌕</span
-        ><input
-          aria-label="Search canvas"
-          placeholder="Search"
-          [value]="search()"
-          (input)="search.set($any($event.target).value)" /></label>
-      <button class="search-toggle" (click)="searchOpen.set(!searchOpen())" [attr.aria-expanded]="searchOpen()" aria-label="Search canvas">⌕</button>
-      <button class="icon-button mobile-undo" (click)="undo()" aria-label="Undo" title="Undo">↶</button>
-      <button class="icon-button" (click)="redo()" aria-label="Redo">↷</button>
-      <button
-        class="quick-task"
-        (click)="chooseType('task')"
-        title="Add a task, then tap the canvas"
-      >
-        + Task</button>
-      <button class="add-top" (click)="setTool('add')">+ <span>Add</span></button>
+    <label class="search-box"
+      ><span>⌕</span
+      ><input
+        aria-label="Search canvas"
+        placeholder="Search"
+        [value]="search()"
+        (input)="search.set($any($event.target).value)"
+    /></label>
+    <button
+      class="search-toggle"
+      (click)="searchOpen.set(!searchOpen())"
+      [attr.aria-expanded]="searchOpen()"
+      aria-label="Search canvas"
+    >
+      ⌕
+    </button>
+    <button class="icon-button mobile-undo" (click)="undo()" aria-label="Undo" title="Undo">
+      ↶
+    </button>
+    <button class="icon-button" (click)="redo()" aria-label="Redo">↷</button>
+    <button class="quick-task" (click)="chooseType('task')" title="Add a task, then tap the canvas">
+      + Task
+    </button>
+    <button class="add-top" (click)="setTool('add')">+ <span>Add</span></button>
   </app-thread-header>
   @if (searchOpen()) {
     <div class="mobile-canvas-search" data-ui>
-      <input type="search" autofocus aria-label="Search canvas" placeholder="Find an item on this canvas" [value]="search()" (input)="search.set($any($event.target).value)" />
-      <button (click)="search.set(''); searchOpen.set(false)" aria-label="Close and clear search">×</button>
+      <input
+        type="search"
+        autofocus
+        aria-label="Search canvas"
+        placeholder="Find an item on this canvas"
+        [value]="search()"
+        (input)="search.set($any($event.target).value)"
+      />
+      <button (click)="search.set(''); searchOpen.set(false)" aria-label="Close and clear search">
+        ×
+      </button>
     </div>
   }
   <main
@@ -29,12 +45,12 @@
     class="canvas-viewport"
     [class.is-panning]="isPanning()"
     [class.hand-cursor]="tool() === 'hand' || spaceHeld()"
+    [class.space-pan]="spaceHeld()"
     [class.placement-cursor]="pendingType() || tool() === 'text'"
     [class.connect-cursor]="tool() === 'connect'"
     [class.sketch-cursor]="tool() === 'sketch'"
     [style.background-size]="gridSize()"
     [style.background-position]="gridPosition()"
-    (pointerdown)="pointerDown($event)"
     (pointermove)="pointerMove($event)"
     (pointerup)="pointerUp($event)"
     (pointercancel)="pointerCancel($event)"
@@ -69,34 +85,152 @@
               stroke-width="1.6"
             />
           </marker>
-          <marker id="arrow-selected" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="4.5" markerHeight="4.5" orient="auto">
-            <path d="M0 0 L10 5 L0 10" fill="none" stroke="var(--color-primary)" stroke-width="1.6" />
+          <marker
+            id="arrow-selected"
+            viewBox="0 0 10 10"
+            refX="10"
+            refY="5"
+            markerWidth="4.5"
+            markerHeight="4.5"
+            orient="auto"
+          >
+            <path
+              d="M0 0 L10 5 L0 10"
+              fill="none"
+              stroke="var(--color-primary)"
+              stroke-width="1.6"
+            />
           </marker>
-          <marker id="er-one" viewBox="0 0 28 24" refX="28" refY="12" markerWidth="28" markerHeight="24" markerUnits="userSpaceOnUse" orient="auto-start-reverse"><path d="M18 4V20" fill="none" stroke="var(--color-primary)" stroke-width="1.5" /></marker>
-          <marker id="er-optional-one" viewBox="0 0 28 24" refX="28" refY="12" markerWidth="28" markerHeight="24" markerUnits="userSpaceOnUse" orient="auto-start-reverse"><circle cx="9" cy="12" r="4" fill="var(--color-surface)" stroke="var(--color-primary)" stroke-width="1.5" /><path d="M20 4V20" fill="none" stroke="var(--color-primary)" stroke-width="1.5" /></marker>
-          <marker id="er-many" viewBox="0 0 28 24" refX="28" refY="12" markerWidth="28" markerHeight="24" markerUnits="userSpaceOnUse" orient="auto-start-reverse"><path d="M7 4V20 M12 12L27 3 M12 12L27 21 M12 12H28" fill="none" stroke="var(--color-primary)" stroke-width="1.5" /></marker>
-          <marker id="er-optional-many" viewBox="0 0 28 24" refX="28" refY="12" markerWidth="28" markerHeight="24" markerUnits="userSpaceOnUse" orient="auto-start-reverse"><circle cx="6" cy="12" r="4" fill="var(--color-surface)" stroke="var(--color-primary)" stroke-width="1.5" /><path d="M12 12L27 3 M12 12L27 21 M12 12H28" fill="none" stroke="var(--color-primary)" stroke-width="1.5" /></marker>
+          <marker
+            id="er-one"
+            viewBox="0 0 28 24"
+            refX="28"
+            refY="12"
+            markerWidth="28"
+            markerHeight="24"
+            markerUnits="userSpaceOnUse"
+            orient="auto-start-reverse"
+          >
+            <path d="M18 4V20" fill="none" stroke="var(--color-primary)" stroke-width="1.5" />
+          </marker>
+          <marker
+            id="er-optional-one"
+            viewBox="0 0 28 24"
+            refX="28"
+            refY="12"
+            markerWidth="28"
+            markerHeight="24"
+            markerUnits="userSpaceOnUse"
+            orient="auto-start-reverse"
+          >
+            <circle
+              cx="9"
+              cy="12"
+              r="4"
+              fill="var(--color-surface)"
+              stroke="var(--color-primary)"
+              stroke-width="1.5"
+            />
+            <path d="M20 4V20" fill="none" stroke="var(--color-primary)" stroke-width="1.5" />
+          </marker>
+          <marker
+            id="er-many"
+            viewBox="0 0 28 24"
+            refX="28"
+            refY="12"
+            markerWidth="28"
+            markerHeight="24"
+            markerUnits="userSpaceOnUse"
+            orient="auto-start-reverse"
+          >
+            <path
+              d="M7 4V20 M12 12L27 3 M12 12L27 21 M12 12H28"
+              fill="none"
+              stroke="var(--color-primary)"
+              stroke-width="1.5"
+            />
+          </marker>
+          <marker
+            id="er-optional-many"
+            viewBox="0 0 28 24"
+            refX="28"
+            refY="12"
+            markerWidth="28"
+            markerHeight="24"
+            markerUnits="userSpaceOnUse"
+            orient="auto-start-reverse"
+          >
+            <circle
+              cx="6"
+              cy="12"
+              r="4"
+              fill="var(--color-surface)"
+              stroke="var(--color-primary)"
+              stroke-width="1.5"
+            />
+            <path
+              d="M12 12L27 3 M12 12L27 21 M12 12H28"
+              fill="none"
+              stroke="var(--color-primary)"
+              stroke-width="1.5"
+            />
+          </marker>
         </defs>
         @for (connection of visibleConnections(); track connection.id) {
           <path
             [attr.d]="connectionPath(connection)"
             fill="none"
             stroke="var(--color-primary)"
-            [attr.stroke-opacity]="selectedConnectionId() === connection.id || hoveredConnectionId() === connection.id ? 1 : .88"
-            [attr.stroke-width]="selectedConnectionId() === connection.id ? 3 / zoom() : hoveredConnectionId() === connection.id ? 2.7 / zoom() : 2.25 / zoom()"
+            [attr.stroke-opacity]="
+              selectedConnectionId() === connection.id || hoveredConnectionId() === connection.id
+                ? 1
+                : 0.88
+            "
+            [attr.stroke-width]="
+              selectedConnectionId() === connection.id
+                ? 3 / zoom()
+                : hoveredConnectionId() === connection.id
+                  ? 2.7 / zoom()
+                  : 2.25 / zoom()
+            "
             [attr.stroke-dasharray]="connection.style === 'dashed' ? '7 6' : null"
-            [attr.marker-start]="connection.sourceCardinality ? cardinalityMarker(connection.sourceCardinality) : null"
+            [attr.marker-start]="
+              connection.sourceCardinality ? cardinalityMarker(connection.sourceCardinality) : null
+            "
             [attr.marker-end]="
-              connection.targetCardinality ? cardinalityMarker(connection.targetCardinality) : connection.direction === 'forward' || connection.direction === 'both'
-                ? selectedConnectionId() === connection.id ? 'url(#arrow-selected)' : 'url(#arrow)'
-                : null
+              connection.targetCardinality
+                ? cardinalityMarker(connection.targetCardinality)
+                : connection.direction === 'forward' || connection.direction === 'both'
+                  ? selectedConnectionId() === connection.id
+                    ? 'url(#arrow-selected)'
+                    : 'url(#arrow)'
+                  : null
             "
             (pointerdown)="routeDown($event, connection)"
           />
-          <path class="connection-hit" [attr.d]="connectionPath(connection)" fill="none" stroke="transparent" [attr.stroke-width]="(tool() === 'select' ? 18 : 0) / zoom()" (pointerenter)="hoveredConnectionId.set(connection.id)" (pointerleave)="hoveredConnectionId.set(null)" (pointerdown)="routeDown($event, connection)" (pointermove)="pointerMove($event)" (pointerup)="pointerUp($event)" (pointercancel)="pointerCancel($event)" (lostpointercapture)="pointerCancel($event)" />
+          <path
+            class="connection-hit"
+            [attr.d]="connectionPath(connection)"
+            fill="none"
+            stroke="transparent"
+            [attr.stroke-width]="(tool() === 'select' ? 18 : 0) / zoom()"
+            (pointerenter)="hoveredConnectionId.set(connection.id)"
+            (pointerleave)="hoveredConnectionId.set(null)"
+            (pointerdown)="routeDown($event, connection)"
+            (pointermove)="pointerMove($event)"
+            (pointerup)="pointerUp($event)"
+            (pointercancel)="pointerCancel($event)"
+            (lostpointercapture)="pointerCancel($event)"
+          />
         }
         @for (junction of junctions(); track junction.id) {
-          <circle class="junction-dot" [attr.cx]="junctionPoint(junction).x" [attr.cy]="junctionPoint(junction).y" [attr.r]="3.5 / zoom()" [attr.stroke-width]="1.5 / zoom()" />
+          <circle
+            class="junction-dot"
+            [attr.cx]="junctionPoint(junction).x"
+            [attr.cy]="junctionPoint(junction).y"
+            [attr.r]="3.5 / zoom()"
+            [attr.stroke-width]="1.5 / zoom()"
+          />
         }
         @if (connectionPreview(); as preview) {
           <path
@@ -108,15 +242,38 @@
           />
         }
         @if (precisePreview(); as anchor) {
-          <circle [attr.cx]="anchor.x" [attr.cy]="anchor.y" [attr.r]="4 / zoom()" fill="var(--color-surface)" stroke="var(--color-primary)" [attr.stroke-width]="1.5 / zoom()" />
+          <circle
+            [attr.cx]="anchor.x"
+            [attr.cy]="anchor.y"
+            [attr.r]="4 / zoom()"
+            fill="var(--color-surface)"
+            stroke="var(--color-primary)"
+            [attr.stroke-width]="1.5 / zoom()"
+          />
         }
       </svg>
       @for (connection of visibleConnections(); track connection.id) {
         @if (connection.label || connection.sourceCardinality || connection.targetCardinality) {
-          <button class="relationship-label" type="button" [style.left.px]="connectionLabelX(connection)" [style.top.px]="connectionLabelY(connection)" (pointerdown)="$event.stopPropagation(); selectConnection($event, connection)" (click)="$event.stopPropagation(); inspectorOpen.set(false); selectedConnectionId.set(connection.id)" [attr.aria-label]="'Relationship ' + (connection.label || 'between entities')">
-            @if (connection.sourceCardinality) { <small>{{ connection.sourceCardinality }}</small> }
+          <button
+            class="relationship-label"
+            type="button"
+            [style.left.px]="connectionLabelX(connection)"
+            [style.top.px]="connectionLabelY(connection)"
+            (pointerdown)="$event.stopPropagation(); selectConnection($event, connection)"
+            (click)="
+              $event.stopPropagation();
+              inspectorOpen.set(false);
+              selectedConnectionId.set(connection.id)
+            "
+            [attr.aria-label]="'Relationship ' + (connection.label || 'between entities')"
+          >
+            @if (connection.sourceCardinality) {
+              <small>{{ connection.sourceCardinality }}</small>
+            }
             <span>{{ connection.label || connectionFieldLabel(connection) || 'relates to' }}</span>
-            @if (connection.targetCardinality) { <small>{{ connection.targetCardinality }}</small> }
+            @if (connection.targetCardinality) {
+              <small>{{ connection.targetCardinality }}</small>
+            }
           </button>
         }
       }
@@ -134,7 +291,9 @@
           [class.task-done]="item.type === 'task' && item.completed"
           [class.text-item]="item.type === 'text'"
           [class.image-item]="item.type === 'image'"
-          [class.visual-asset]="item.type === 'gif' || item.type === 'sticker' || !!item.sketchAsset"
+          [class.visual-asset]="
+            item.type === 'gif' || item.type === 'sticker' || !!item.sketchAsset
+          "
           [class.sketch-item]="item.type === 'sketch'"
           [class.shape-item]="item.type === 'shape'"
           [class.connection-target]="connectionTargetId() === item.id"
@@ -145,21 +304,23 @@
           [style.height.px]="item.height"
           [style.transform]="item.rotation ? 'rotate(' + item.rotation + 'deg)' : null"
           [style.z-index]="
-            item.zIndex || (item.type === 'zone' || item.type === 'workspace' || item.type === 'frame' ? 0 : 1)
+            item.type === 'zone' || item.type === 'workspace' || item.type === 'frame'
+              ? 0
+              : item.zIndex || 1
           "
           [style.background]="item.type === 'note' ? item.background || null : null"
-          (pointerdown)="itemPointerDown($event, item)"
           (pointermove)="pointerMove($event)"
           (pointerup)="pointerUp($event)"
           (pointercancel)="pointerCancel($event)"
-          (dblclick)="$event.stopPropagation(); startEditing(item.id, $event.target)"
+          (dblclick)="$event.stopPropagation(); itemDoubleClick($event, item)"
           tabindex="0"
           [attr.aria-label]="item.type + ': ' + item.title"
         >
           @if (item.type === 'zone' || item.type === 'workspace' || item.type === 'frame') {
-            <div class="zone-label">
+            <div class="zone-label" data-zone-drag="true">
               <span>{{ item.type }}</span
               ><strong
+                data-edit-field="title"
                 [attr.contenteditable]="editingId() === item.id"
                 [attr.data-edit-id]="editingId() === item.id ? item.id : null"
                 (keydown)="inlineKey($event)"
@@ -168,11 +329,45 @@
               ></strong>
             </div>
           } @else if (item.type === 'shape') {
-            <svg class="shape-geometry" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
-              <path [attr.d]="shapePaths[item.shapeKind || 'rectangle']" [attr.fill]="item.shapeFill || '#ffffff'" [attr.stroke]="item.shapeStroke || '#475569'" [attr.stroke-width]="item.shapeStrokeWidth || 2" [attr.stroke-dasharray]="item.shapeStrokeStyle === 'dashed' ? '6 4' : null" stroke-linejoin="round" vector-effect="non-scaling-stroke" />
-              @if (item.shapeKind === 'cylinder') { <path d="M2 14C2 30 98 30 98 14" fill="none" [attr.stroke]="item.shapeStroke || '#475569'" [attr.stroke-width]="item.shapeStrokeWidth || 2" vector-effect="non-scaling-stroke" /> }
+            <svg
+              class="shape-geometry"
+              viewBox="0 0 100 100"
+              preserveAspectRatio="none"
+              aria-hidden="true"
+            >
+              <path
+                [attr.d]="shapePaths[item.shapeKind || 'rectangle']"
+                [attr.fill]="item.shapeFill || '#ffffff'"
+                [attr.stroke]="item.shapeStroke || '#475569'"
+                [attr.stroke-width]="item.shapeStrokeWidth || 2"
+                [attr.stroke-dasharray]="item.shapeStrokeStyle === 'dashed' ? '6 4' : null"
+                stroke-linejoin="round"
+                vector-effect="non-scaling-stroke"
+              />
+              @if (item.shapeKind === 'cylinder') {
+                <path
+                  d="M2 14C2 30 98 30 98 14"
+                  fill="none"
+                  [attr.stroke]="item.shapeStroke || '#475569'"
+                  [attr.stroke-width]="item.shapeStrokeWidth || 2"
+                  vector-effect="non-scaling-stroke"
+                />
+              }
             </svg>
-            <div class="shape-label" [attr.data-shape]="item.shapeKind || 'rectangle'" [style.font-size.px]="item.fontSize || 16" [style.font-weight]="item.fontWeight || 600" [style.color]="item.textColor || '#1e293b'" [style.text-align]="item.textAlign || 'center'" [attr.contenteditable]="editingId() === item.id" [attr.data-edit-id]="editingId() === item.id ? item.id : null" (keydown)="inlineKey($event)" (blur)="inlineBlur($event, item.id, 'title')" [textContent]="item.title"></div>
+            <div
+              class="shape-label"
+              data-edit-field="title"
+              [attr.data-shape]="item.shapeKind || 'rectangle'"
+              [style.font-size.px]="item.fontSize || 16"
+              [style.font-weight]="item.fontWeight || 600"
+              [style.color]="item.textColor || '#1e293b'"
+              [style.text-align]="item.textAlign || 'center'"
+              [attr.contenteditable]="editingId() === item.id"
+              [attr.data-edit-id]="editingId() === item.id ? item.id : null"
+              (keydown)="inlineKey($event)"
+              (blur)="inlineBlur($event, item.id, 'title')"
+              [textContent]="item.title"
+            ></div>
           } @else if (item.type === 'image') {
             @if (item.image) {
               <div class="image-frame">
@@ -195,10 +390,24 @@
               </div>
             }
           } @else if (item.type === 'gif' || item.type === 'sticker' || item.sketchAsset) {
-            <div class="visual-asset-content">@if (item.image) { <img [src]="item.image" [alt]="item.title" [style.transform]="'scale(' + (item.flipX ? -1 : 1) + ',' + (item.flipY ? -1 : 1) + ')'" draggable="false" /> } @else { <span>{{ item.title }}</span> }</div>
+            <div class="visual-asset-content">
+              @if (item.image) {
+                <img
+                  [src]="item.image"
+                  [alt]="item.title"
+                  [style.transform]="
+                    'scale(' + (item.flipX ? -1 : 1) + ',' + (item.flipY ? -1 : 1) + ')'
+                  "
+                  draggable="false"
+                />
+              } @else {
+                <span>{{ item.title }}</span>
+              }
+            </div>
           } @else if (item.type === 'text') {
             <div
               class="text-content"
+              data-edit-field="content"
               [style.font-size.px]="item.fontSize || 21"
               [style.font-weight]="item.fontWeight || 600"
               [style.font-family]="item.fontFamily === 'mono' ? 'ui-monospace, monospace' : null"
@@ -228,7 +437,10 @@
               [style.font-family]="item.fontFamily === 'mono' ? 'ui-monospace, monospace' : null"
             >
               <div
-                class="note-title" appScroll="y" scrollbar="hover"
+                class="note-title"
+                data-edit-field="title"
+                appScroll="y"
+                scrollbar="hover"
                 [style.font-size.px]="item.fontSize || 17"
                 [style.font-weight]="item.fontWeight || 650"
                 [style.text-align]="item.textAlign || 'left'"
@@ -239,7 +451,13 @@
                 (blur)="inlineBlur($event, item.id, 'title')"
                 [textContent]="item.title || (editingId() === item.id ? '' : 'Note')"
               ></div>
-              <div class="note-body" appScroll="y" scrollbar="hover" dir="auto">
+              <div
+                class="note-body"
+                data-edit-field="body"
+                appScroll="y"
+                scrollbar="hover"
+                dir="auto"
+              >
                 @if (editingId() === item.id) {
                   <app-rich-text-editor
                     [html]="richContent(item.id)"
@@ -259,7 +477,6 @@
           } @else if (item.type === 'task') {
             <div class="task-content">
               <thread-checkbox
-
                 [checked]="item.completed"
                 (change)="toggleTask(item.id)"
                 (pointerdown)="$event.stopPropagation()"
@@ -269,6 +486,7 @@
                 @if (editingId() === item.id) {
                   <input
                     class="task-title-input"
+                    data-edit-field="title"
                     [attr.data-edit-id]="item.id"
                     [value]="item.title"
                     placeholder="What needs doing?"
@@ -277,7 +495,12 @@
                     (blur)="taskTitleBlur($event, item.id)"
                   />
                 } @else {
-                  <div class="task-title" dir="auto" [textContent]="item.title || 'New task'"></div>
+                  <div
+                    class="task-title"
+                    data-edit-field="title"
+                    dir="auto"
+                    [textContent]="item.title || 'New task'"
+                  ></div>
                 }
                 @if (item.body) {
                   <p>{{ item.body }}</p>
@@ -290,11 +513,11 @@
                     @for (entry of item.checklist || []; track $index) {
                       <label
                         ><thread-checkbox
-
                           [checked]="entry.completed"
                           (change)="toggleChecklist(item.id, $index)"
                           (pointerdown)="$event.stopPropagation()"
-                        ></thread-checkbox>{{ entry.label }}</label
+                        ></thread-checkbox
+                        >{{ entry.label }}</label
                       >
                     }
                   </div>
@@ -305,8 +528,10 @@
             <div class="list-content" appScroll="y" scrollbar="hover">
               <div
                 class="list-title"
+                data-edit-field="title"
                 dir="auto"
                 [attr.contenteditable]="editingId() === item.id"
+                [attr.data-edit-id]="editingId() === item.id ? item.id : null"
                 (keydown)="inlineKey($event)"
                 (blur)="inlineBlur($event, item.id, 'title')"
                 [textContent]="item.title || (editingId() === item.id ? '' : 'Untitled list')"
@@ -339,117 +564,936 @@
               @if (dataset(item); as data) {
                 <div class="budget-summary">
                   <div class="smart-head">
-                    <div class="budget-heading"><div class="smart-title" [attr.contenteditable]="editingId() === item.id" [attr.data-edit-id]="editingId() === item.id ? item.id : null" (keydown)="inlineKey($event)" (blur)="inlineBlur($event, item.id, 'title')" [textContent]="item.title || (editingId() === item.id ? '' : 'Budget')"></div>@if (item.budgetPeriod === 'monthly' && data.activePeriod) { <div class="budget-period"><button (pointerdown)="$event.stopPropagation()" (click)="changeBudgetMonth(item,-1,false)" aria-label="Previous month">‹</button><span>{{ budgetMonthLabel(data) }}</span><details (pointerdown)="$event.stopPropagation()"><summary aria-label="Next month">›</summary><button (click)="changeBudgetMonth(item,1,true)">Next month · copy planned</button><button (click)="changeBudgetMonth(item,1,false)">Next month · start at zero</button></details></div> }</div>
-                    <thread-select size="compact" class="smart-currency" [value]="item.budgetCurrency || 'JOD'" (pointerdown)="$event.stopPropagation()" (change)="setBudgetCurrency(item,$event)" aria-label="Budget currency"><thread-option label="JOD"></thread-option><thread-option label="USD"></thread-option><thread-option label="EUR"></thread-option><thread-option label="GBP"></thread-option></thread-select>
+                    <div class="budget-heading">
+                      <div
+                        class="smart-title"
+                        data-edit-field="title"
+                        [attr.contenteditable]="editingId() === item.id"
+                        [attr.data-edit-id]="editingId() === item.id ? item.id : null"
+                        (keydown)="inlineKey($event)"
+                        (blur)="inlineBlur($event, item.id, 'title')"
+                        [textContent]="item.title || (editingId() === item.id ? '' : 'Budget')"
+                      ></div>
+                      @if (item.budgetPeriod === 'monthly' && data.activePeriod) {
+                        <div class="budget-period">
+                          <button
+                            (pointerdown)="$event.stopPropagation()"
+                            (click)="changeBudgetMonth(item, -1, false)"
+                            aria-label="Previous month"
+                          >
+                            ‹</button
+                          ><span>{{ budgetMonthLabel(data) }}</span>
+                          <details (pointerdown)="$event.stopPropagation()">
+                            <summary aria-label="Next month">›</summary>
+                            <button (click)="changeBudgetMonth(item, 1, true)">
+                              Next month · copy planned</button
+                            ><button (click)="changeBudgetMonth(item, 1, false)">
+                              Next month · start at zero
+                            </button>
+                          </details>
+                        </div>
+                      }
+                    </div>
+                    <thread-select
+                      size="compact"
+                      class="smart-currency"
+                      [value]="item.budgetCurrency || 'JOD'"
+                      (pointerdown)="$event.stopPropagation()"
+                      (change)="setBudgetCurrency(item, $event)"
+                      aria-label="Budget currency"
+                      ><thread-option label="JOD"></thread-option
+                      ><thread-option label="USD"></thread-option
+                      ><thread-option label="EUR"></thread-option
+                      ><thread-option label="GBP"></thread-option
+                    ></thread-select>
                   </div>
                   <div class="budget-summary-values">
-                    <div><span>Planned</span><strong>{{ money(budgetValue(data,budgetField(data,'Planned'))) }}</strong></div>
-                    <div><span>Actual</span><strong>{{ money(budgetValue(data,budgetField(data,'Actual'))) }}</strong></div>
-                    <div [class.negative]="budgetValue(data,budgetField(data,'Remaining')) < 0"><span>Remaining</span><strong>{{ money(budgetValue(data,budgetField(data,'Remaining'))) }}</strong></div>
+                    <div>
+                      <span>Planned</span
+                      ><strong>{{ money(budgetValue(data, budgetField(data, 'Planned'))) }}</strong>
+                    </div>
+                    <div>
+                      <span>Actual</span
+                      ><strong>{{ money(budgetValue(data, budgetField(data, 'Actual'))) }}</strong>
+                    </div>
+                    <div [class.negative]="budgetValue(data, budgetField(data, 'Remaining')) < 0">
+                      <span>Remaining</span
+                      ><strong>{{
+                        money(budgetValue(data, budgetField(data, 'Remaining')))
+                      }}</strong>
+                    </div>
                   </div>
                 </div>
-                <div class="budget-column-head"><span>Category</span><span>Planned</span><span>Actual</span><span>Remaining</span></div>
+                <div class="budget-column-head">
+                  <span>Category</span><span>Planned</span><span>Actual</span><span>Remaining</span>
+                </div>
                 <div class="budget-entries" appScroll="y" scrollbar="hover">
                   @for (group of budgetSections(data); track group) {
-                    @if (group || budgetRows(data,'').length) {
+                    @if (group || budgetRows(data, '').length) {
                       @if (group) {
                         <div class="budget-group-head">
-                          <button (pointerdown)="$event.stopPropagation()" (click)="toggleBudgetGroup(group)" [attr.aria-expanded]="!collapsedBudgetGroups().includes(group)">{{ collapsedBudgetGroups().includes(group) ? '▸' : '▾' }} {{ group }}</button>
-                          <span>{{ money(budgetValue(data,budgetField(data,'Actual'),group)) }} / {{ money(budgetValue(data,budgetField(data,'Planned'),group)) }}</span>
-                          <details (pointerdown)="$event.stopPropagation()"><summary aria-label="Group options">···</summary><label>Rename <input [value]="group" (change)="renameBudgetGroup(item,group,$event)" /></label><button (click)="moveBudgetGroup(item,group,-1)">Move up</button><button (click)="moveBudgetGroup(item,group,1)">Move down</button><button (click)="deleteBudgetGroup(item,group)">Delete group</button></details>
+                          <button
+                            (pointerdown)="$event.stopPropagation()"
+                            (click)="toggleBudgetGroup(group)"
+                            [attr.aria-expanded]="!collapsedBudgetGroups().includes(group)"
+                          >
+                            {{ collapsedBudgetGroups().includes(group) ? '▸' : '▾' }} {{ group }}
+                          </button>
+                          <span
+                            >{{ money(budgetValue(data, budgetField(data, 'Actual'), group)) }} /
+                            {{
+                              money(budgetValue(data, budgetField(data, 'Planned'), group))
+                            }}</span
+                          >
+                          <details (pointerdown)="$event.stopPropagation()">
+                            <summary aria-label="Group options">···</summary>
+                            <label
+                              >Rename
+                              <input
+                                [value]="group"
+                                (change)="renameBudgetGroup(item, group, $event)" /></label
+                            ><button (click)="moveBudgetGroup(item, group, -1)">Move up</button
+                            ><button (click)="moveBudgetGroup(item, group, 1)">Move down</button
+                            ><button (click)="deleteBudgetGroup(item, group)">Delete group</button>
+                          </details>
                         </div>
                       }
                       @if (!group || !collapsedBudgetGroups().includes(group)) {
-                        @for (row of budgetRows(data,group); track row.id) {
+                        @for (row of budgetRows(data, group); track row.id) {
                           <div class="budget-row" [attr.data-budget-row]="row.id">
-                            @for (field of [budgetItemField(data),budgetField(data,'Planned'),budgetField(data,'Actual')]; track field) {
+                            @for (
+                              field of [
+                                budgetItemField(data),
+                                budgetField(data, 'Planned'),
+                                budgetField(data, 'Actual'),
+                              ];
+                              track field
+                            ) {
                               <div class="budget-cell">
                                 @if (editingDataCell() === item.id + ':' + row.id + ':' + field) {
-                                  <input [attr.data-edit-cell]="item.id + ':' + row.id + ':' + field" [type]="field === budgetItemField(data) ? 'text' : 'number'" [value]="row.values[field] ?? ''" [attr.aria-label]="field" (pointerdown)="$event.stopPropagation()" (focus)="beginDataEdit()" (input)="setBudgetCell(item,row.id,field,$event)" (blur)="stopDataCellEdit()" (keydown)="dataCellKey($event,item,row.id,field,[budgetItemField(data),budgetField(data,'Planned'),budgetField(data,'Actual')])" />
+                                  <input
+                                    [attr.data-edit-cell]="item.id + ':' + row.id + ':' + field"
+                                    [type]="field === budgetItemField(data) ? 'text' : 'number'"
+                                    [value]="row.values[field] ?? ''"
+                                    [attr.aria-label]="field"
+                                    (pointerdown)="$event.stopPropagation()"
+                                    (focus)="beginDataEdit()"
+                                    (input)="setBudgetCell(item, row.id, field, $event)"
+                                    (blur)="stopDataCellEdit()"
+                                    (keydown)="
+                                      dataCellKey($event, item, row.id, field, [
+                                        budgetItemField(data),
+                                        budgetField(data, 'Planned'),
+                                        budgetField(data, 'Actual'),
+                                      ])
+                                    "
+                                  />
                                 } @else {
-                                  <button (pointerdown)="$event.stopPropagation()" (click)="startDataCellEdit(item.id,row.id,field)" [attr.aria-label]="'Edit ' + field">{{ field === budgetItemField(data) ? (row.values[field] || 'Untitled category') : money(row.values[field]) }}</button>
+                                  <button
+                                    (pointerdown)="$event.stopPropagation()"
+                                    (click)="startDataCellEdit(item.id, row.id, field)"
+                                    [attr.aria-label]="'Edit ' + field"
+                                  >
+                                    {{
+                                      field === budgetItemField(data)
+                                        ? row.values[field] || 'Untitled category'
+                                        : money(row.values[field])
+                                    }}
+                                  </button>
                                 }
                               </div>
                             }
-                            <strong class="budget-remainder" [class.negative]="isNegative(row.values[budgetField(data,'Remaining')])">{{ money(row.values[budgetField(data,'Remaining')]) }}</strong>
-                            <details class="budget-row-options" (pointerdown)="$event.stopPropagation()"><summary aria-label="Category options">···</summary><label>Move to group<thread-select [value]="group" (change)="setBudgetGroup(item,row.id,$event)"><thread-option value="" label="Ungrouped"></thread-option>@for (choice of budgetGroups(data); track choice) { <thread-option [value]="choice" label="{{ choice }}"></thread-option> }</thread-select></label><button (click)="deleteBudgetEntry(item,row.id)">Delete category</button></details>
+                            <strong
+                              class="budget-remainder"
+                              [class.negative]="
+                                isNegative(row.values[budgetField(data, 'Remaining')])
+                              "
+                              >{{ money(row.values[budgetField(data, 'Remaining')]) }}</strong
+                            >
+                            <details
+                              class="budget-row-options"
+                              (pointerdown)="$event.stopPropagation()"
+                            >
+                              <summary aria-label="Category options">···</summary>
+                              <label
+                                >Move to group<thread-select
+                                  [value]="group"
+                                  (change)="setBudgetGroup(item, row.id, $event)"
+                                  ><thread-option value="" label="Ungrouped"></thread-option>
+                                  @for (choice of budgetGroups(data); track choice) {
+                                    <thread-option
+                                      [value]="choice"
+                                      label="{{ choice }}"
+                                    ></thread-option>
+                                  }</thread-select></label
+                              ><button (click)="deleteBudgetEntry(item, row.id)">
+                                Delete category
+                              </button>
+                            </details>
                           </div>
                         }
-                        @if (group && budgetRows(data,group).length) { <div class="budget-subtotal"><span>Subtotal</span><span>{{ money(budgetValue(data,budgetField(data,'Planned'),group)) }}</span><span>{{ money(budgetValue(data,budgetField(data,'Actual'),group)) }}</span><span>{{ money(budgetValue(data,budgetField(data,'Remaining'),group)) }}</span></div> }
-                        @if (group) { <button class="budget-add-in-group" (pointerdown)="$event.stopPropagation()" (click)="addBudgetEntry(item.id,group)">+ Category</button> }
+                        @if (group && budgetRows(data, group).length) {
+                          <div class="budget-subtotal">
+                            <span>Subtotal</span
+                            ><span>{{
+                              money(budgetValue(data, budgetField(data, 'Planned'), group))
+                            }}</span
+                            ><span>{{
+                              money(budgetValue(data, budgetField(data, 'Actual'), group))
+                            }}</span
+                            ><span>{{
+                              money(budgetValue(data, budgetField(data, 'Remaining'), group))
+                            }}</span>
+                          </div>
+                        }
+                        @if (group) {
+                          <button
+                            class="budget-add-in-group"
+                            (pointerdown)="$event.stopPropagation()"
+                            (click)="addBudgetEntry(item.id, group)"
+                          >
+                            + Category
+                          </button>
+                        }
                       }
                     }
                   }
-                  @if (!data.rows.length && !budgetGroups(data).length) { <div class="smart-empty">No categories yet. Add one to start planning.</div> }
+                  @if (!data.rows.length && !budgetGroups(data).length) {
+                    <div class="smart-empty">No categories yet. Add one to start planning.</div>
+                  }
                 </div>
-                <div class="budget-footer"><button class="smart-add" (pointerdown)="$event.stopPropagation()" (click)="addBudgetEntry(item.id)">+ Category</button><button class="smart-add" (pointerdown)="$event.stopPropagation()" (click)="addBudgetGroup(item)">+ Group</button>
-                  <details class="smart-menu" (pointerdown)="$event.stopPropagation()"><summary aria-label="Budget actions">···</summary><button (click)="createLinkedView(item,'table')">Create Table</button><button (click)="createLinkedView(item,'chart','comparison')">Create Chart</button><label>Period <thread-select [value]="item.budgetPeriod || 'one-time'" (change)="setBudgetPeriod(item,$event)"><thread-option value="one-time" label="One-time"></thread-option><thread-option value="monthly" label="Monthly"></thread-option></thread-select></label><label>Target <input type="number" min="0" [value]="item.budgetTarget || ''" placeholder="Optional" (change)="setBudgetTarget(item,$event)" /></label></details>
+                <div class="budget-footer">
+                  <button
+                    class="smart-add"
+                    (pointerdown)="$event.stopPropagation()"
+                    (click)="addBudgetEntry(item.id)"
+                  >
+                    + Category</button
+                  ><button
+                    class="smart-add"
+                    (pointerdown)="$event.stopPropagation()"
+                    (click)="addBudgetGroup(item)"
+                  >
+                    + Group</button
+                  ><span class="smart-action-spacer"></span
+                  ><button
+                    class="smart-add"
+                    (pointerdown)="$event.stopPropagation()"
+                    (click)="createLinkedView(item, 'table')"
+                  >
+                    Table view</button
+                  ><button
+                    class="smart-add"
+                    (pointerdown)="$event.stopPropagation()"
+                    (click)="createLinkedView(item, 'chart', 'comparison')"
+                  >
+                    Chart view
+                  </button>
+                  <details class="smart-menu" (pointerdown)="$event.stopPropagation()">
+                    <summary aria-label="Budget settings">···</summary>
+                    <label
+                      >Period
+                      <thread-select
+                        [value]="item.budgetPeriod || 'one-time'"
+                        (change)="setBudgetPeriod(item, $event)"
+                        ><thread-option value="one-time" label="One-time"></thread-option
+                        ><thread-option
+                          value="monthly"
+                          label="Monthly"
+                        ></thread-option></thread-select></label
+                    ><label
+                      >Target
+                      <input
+                        type="number"
+                        min="0"
+                        [value]="item.budgetTarget || ''"
+                        placeholder="Optional"
+                        (change)="setBudgetTarget(item, $event)"
+                    /></label>
+                  </details>
                 </div>
-                @if (item.budgetTarget) { <div class="budget-target"><span>{{ money(budgetUsed(item),item.budgetCurrency) }} of {{ money(item.budgetTarget,item.budgetCurrency) }} target</span><div class="budget-progress"><i [style.width.%]="usedPercent(item)"></i></div></div> }
+                @if (item.budgetTarget) {
+                  <div class="budget-target">
+                    <span
+                      >{{ money(budgetUsed(item), item.budgetCurrency) }} of
+                      {{ money(item.budgetTarget, item.budgetCurrency) }} target</span
+                    >
+                    <div class="budget-progress"><i [style.width.%]="usedPercent(item)"></i></div>
+                  </div>
+                }
               }
             </div>
           } @else if (item.type === 'er-entity') {
             <div class="er-entity-card">
-              <div class="er-entity-head"><span>ENTITY @if (erEntityIssue(item); as issue) { <b class="er-entity-warning" [title]="issue">!</b> }</span>@if (tool() === 'select') { <input class="er-name-input" aria-label="Entity name" placeholder="Entity name" [value]="item.title" (pointerdown)="erControlDown($event, item)" (change)="setString(item.id, 'title', $event)" (keydown)="$event.stopPropagation()" /> } @else { <strong>{{ item.title || 'New entity' }}</strong> }</div>
-              <div class="er-table-heading" aria-hidden="true"><span>Key</span><span>Field name</span><span>Type</span><span></span></div>
+              <div class="er-entity-head">
+                <span
+                  >ENTITY
+                  @if (erEntityIssue(item); as issue) {
+                    <b class="er-entity-warning" [title]="issue">!</b>
+                  }
+                </span>
+                @if (tool() === 'select') {
+                  <input
+                    class="er-name-input"
+                    aria-label="Entity name"
+                    placeholder="Entity name"
+                    [value]="item.title"
+                    (pointerdown)="erControlDown($event, item)"
+                    (change)="setString(item.id, 'title', $event)"
+                    (keydown)="$event.stopPropagation()"
+                  />
+                } @else {
+                  <strong>{{ item.title || 'New entity' }}</strong>
+                }
+              </div>
+              <div class="er-table-heading" aria-hidden="true">
+                <span>Key</span><span>Field name</span><span>Type</span><span></span>
+              </div>
               <div class="er-fields" appScroll="y" scrollbar="hover">
                 @for (field of item.erFields || []; track field.id) {
-                  <div class="er-field-block" [class.is-editing]="erExpandedFieldId() === field.id && selectedIds().includes(item.id)">
+                  <div
+                    class="er-field-block"
+                    [class.is-editing]="
+                      erExpandedFieldId() === field.id && selectedIds().includes(item.id)
+                    "
+                  >
                     <div class="er-field" [class.er-field-editing]="tool() === 'select'">
-                      <span class="er-key" [class.primary]="field.key === 'primary'" [class.foreign]="field.key === 'foreign'" [title]="field.key === 'primary' ? 'Primary key' : field.key === 'foreign' ? 'Foreign key' : 'Regular field'">{{ field.key === 'primary' ? 'PK' : field.key === 'foreign' ? 'FK' : '' }}</span>
+                      <span
+                        class="er-key"
+                        [class.primary]="field.key === 'primary'"
+                        [class.foreign]="field.key === 'foreign'"
+                        [title]="
+                          field.key === 'primary'
+                            ? 'Primary key'
+                            : field.key === 'foreign'
+                              ? 'Foreign key'
+                              : 'Regular field'
+                        "
+                        >{{
+                          field.key === 'primary' ? 'PK' : field.key === 'foreign' ? 'FK' : ''
+                        }}</span
+                      >
                       @if (tool() === 'select') {
-                        <input class="er-inline-name" [attr.data-er-field]="field.id" [attr.aria-label]="'Field name in ' + item.title" [value]="field.name" (pointerdown)="erControlDown($event, item)" (change)="updateErField(item, field.id, { name: $any($event.target).value })" (keydown)="erFieldKey($event, item)" />
-                        <thread-select size="compact" class="er-inline-type" [disabled]="!!field.reference" [attr.aria-label]="'Data type for ' + field.name" [value]="erTypeChoice(field)" (pointerdown)="erControlDown($event, item)" (change)="setErType(item, field, $any($event.target).value)">@for (type of erDataTypes; track type) { <thread-option [value]="type" [label]="type"></thread-option> }<thread-option value="CUSTOM" [label]="erTypeChoice(field) === 'CUSTOM' && field.dataType !== 'CUSTOM' ? field.dataType : 'Custom type'"></thread-option></thread-select>
-                        <button class="er-field-options" [class.has-issue]="!!erFieldIssue(item, field)" [attr.aria-label]="'Edit ' + field.name + ' settings'" [title]="'Field settings for ' + field.name" [attr.aria-expanded]="erExpandedFieldId() === field.id && selectedIds().includes(item.id)" (pointerdown)="erControlDown($event, item)" (click)="$event.stopPropagation(); openErField(item, field)">⋯</button>
-                      } @else { <strong>{{ field.name }}</strong><span class="er-type">{{ field.dataType }}</span><span></span> }
+                        <input
+                          class="er-inline-name"
+                          [attr.data-er-field]="field.id"
+                          [attr.aria-label]="'Field name in ' + item.title"
+                          [value]="field.name"
+                          (pointerdown)="erControlDown($event, item)"
+                          (change)="
+                            updateErField(item, field.id, { name: $any($event.target).value })
+                          "
+                          (keydown)="erFieldKey($event, item)"
+                        />
+                        <thread-select
+                          size="compact"
+                          class="er-inline-type"
+                          [disabled]="!!field.reference"
+                          [attr.aria-label]="'Data type for ' + field.name"
+                          [value]="erTypeChoice(field)"
+                          (pointerdown)="erControlDown($event, item)"
+                          (change)="setErType(item, field, $any($event.target).value)"
+                        >
+                          @for (type of erDataTypes; track type) {
+                            <thread-option [value]="type" [label]="type"></thread-option>
+                          }
+                          <thread-option
+                            value="CUSTOM"
+                            [label]="
+                              erTypeChoice(field) === 'CUSTOM' && field.dataType !== 'CUSTOM'
+                                ? field.dataType
+                                : 'Custom type'
+                            "
+                          ></thread-option
+                        ></thread-select>
+                        <button
+                          class="er-field-options"
+                          [class.has-issue]="!!erFieldIssue(item, field)"
+                          [attr.aria-label]="'Edit ' + field.name + ' settings'"
+                          [title]="'Field settings for ' + field.name"
+                          [attr.aria-expanded]="
+                            erExpandedFieldId() === field.id && selectedIds().includes(item.id)
+                          "
+                          (pointerdown)="erControlDown($event, item)"
+                          (click)="$event.stopPropagation(); openErField(item, field)"
+                        >
+                          ⋯
+                        </button>
+                      } @else {
+                        <strong>{{ field.name }}</strong
+                        ><span class="er-type">{{ field.dataType }}</span
+                        ><span></span>
+                      }
                     </div>
-                    @if (field.reference) { <div class="er-field-summary"><span>References {{ erReferenceLabel(field) }}</span></div> }
+                    @if (field.reference) {
+                      <div class="er-field-summary">
+                        <span>References {{ erReferenceLabel(field) }}</span>
+                      </div>
+                    }
                   </div>
-                } @empty { <p class="er-empty">Add your first field to describe this entity.</p> }
-                @if (tool() === 'select') { <button class="er-add-field" type="button" (pointerdown)="erControlDown($event, item)" (click)="$event.stopPropagation(); addErField(item)">+ Add field</button> }
+                } @empty {
+                  <p class="er-empty">Add your first field to describe this entity.</p>
+                }
+                @if (tool() === 'select') {
+                  <button
+                    class="er-add-field"
+                    type="button"
+                    (pointerdown)="erControlDown($event, item)"
+                    (click)="$event.stopPropagation(); addErField(item)"
+                  >
+                    + Add field
+                  </button>
+                }
               </div>
-              <div class="er-entity-foot"><span>{{ item.erFields?.length || 0 }} fields</span><button type="button" (pointerdown)="$event.stopPropagation()" (click)="$event.stopPropagation(); addRelatedErEntity(item)">+ Related entity</button><button type="button" (pointerdown)="$event.stopPropagation()" (click)="$event.stopPropagation(); beginErConnection(item)">Connect</button></div>
+              <div class="er-entity-foot">
+                <span>{{ item.erFields?.length || 0 }} fields</span
+                ><button
+                  type="button"
+                  (pointerdown)="$event.stopPropagation()"
+                  (click)="$event.stopPropagation(); addRelatedErEntity(item)"
+                >
+                  + Related entity</button
+                ><button
+                  type="button"
+                  (pointerdown)="$event.stopPropagation()"
+                  (click)="$event.stopPropagation(); beginErConnection(item)"
+                >
+                  Connect
+                </button>
+              </div>
             </div>
           } @else if (item.type === 'table') {
             <div class="table-content smart-block">
-              <div class="smart-head"><div class="smart-title" [attr.contenteditable]="editingId() === item.id" [attr.data-edit-id]="editingId() === item.id ? item.id : null" (keydown)="inlineKey($event)" (blur)="inlineBlur($event, item.id, 'title')" [textContent]="item.title || (editingId() === item.id ? '' : 'Table')"></div><span class="linked-label">{{ chartSourceId(item) ? 'Shared data' : '' }}</span></div>
+              <div class="smart-head">
+                <div
+                  class="smart-title"
+                  data-edit-field="title"
+                  [attr.contenteditable]="editingId() === item.id"
+                  [attr.data-edit-id]="editingId() === item.id ? item.id : null"
+                  (keydown)="inlineKey($event)"
+                  (blur)="inlineBlur($event, item.id, 'title')"
+                  [textContent]="item.title || (editingId() === item.id ? '' : 'Table')"
+                ></div>
+                <span class="linked-label">{{
+                  linkedViewCount(item) > 1 ? 'Shared data' : ''
+                }}</span>
+              </div>
               @if (dataset(item); as data) {
-                @if (tableFilter()?.itemId === item.id && (tableFilter()?.value || tableFilter()?.operator === 'empty')) { <div class="table-filter-chip">{{ tableFilter()?.key }} {{ tableFilter()?.operator }} {{ tableFilter()?.value }} <button (pointerdown)="$event.stopPropagation()" (click)="clearTableFilter()" aria-label="Clear filter">×</button></div> }
-                <div class="table-scroll" appScroll="both" scrollbar="auto"><table><colgroup>@for (column of tableViewColumns(item,data); track column.id) { <col [style.width.px]="item.tableColumnWidths?.[column.id] || 120" /> }<col style="width:30px" /></colgroup><thead><tr>
-                  @for (column of tableViewColumns(item,data); track column.id) {
-                    <th draggable="true" (dragstart)="dragTableColumn(column.id,$event)" (dragover)="$event.preventDefault()" (drop)="dropTableColumn(item,data,column.id,$event)"><div class="table-column-head"><span>{{ column.label }}</span><details class="table-column-menu" (pointerdown)="$event.stopPropagation()"><summary [attr.aria-label]="column.label + ' options'">···</summary><label>Name<input [value]="column.label" (change)="setTableHeader(item,column.id,$event)" /></label><label>Type<thread-select [value]="column.type" (change)="setTableColumnType(item,column.id,$event)"><thread-option value="text" label="Text"></thread-option><thread-option value="number" label="Number"></thread-option><thread-option value="currency" label="Currency"></thread-option><thread-option value="date" label="Date"></thread-option><thread-option value="category" label="Select"></thread-option><thread-option value="checkbox" label="Checkbox"></thread-option></thread-select></label><button (click)="setTableSort(item,column.key,1)">Sort ascending</button><button (click)="setTableSort(item,column.key,-1)">Sort descending</button><button (click)="clearTableSort()">Clear sort</button><label>Filter<thread-select [value]="tableFilter()?.key === column.key ? tableFilter()?.operator : 'contains'" (change)="setTableFilterOperator(item,column.key,$event)"><thread-option value="contains" label="Contains"></thread-option><thread-option value="is" label="Is"></thread-option><thread-option value="not" label="Is not"></thread-option><thread-option value="empty" label="Is empty"></thread-option><thread-option value="gt" label="Greater than"></thread-option><thread-option value="lt" label="Less than"></thread-option><thread-option value="between" label="Between"></thread-option></thread-select><input [value]="tableFilter()?.key === column.key ? tableFilter()?.value : ''" placeholder="Value" (input)="setTableFilter(item,column.key,$event)" />@if (tableFilter()?.key === column.key && tableFilter()?.operator === 'between') { <input [value]="tableFilter()?.second || ''" placeholder="And" (input)="setTableFilterSecond(item,column.key,$event)" /> }</label><button (click)="setTableGroup(item,column.key)">Group by this column</button><button (click)="clearTableGroup()">Clear grouping</button>@if (column.type === 'number' || column.type === 'currency' || column.type === 'calculated') { <label>Summarize<thread-select [value]="tableSummary()[item.id + ':' + column.key] || 'sum'" (change)="setTableSummary(item,column.key,$event)"><thread-option value="sum" label="Sum"></thread-option><thread-option value="average" label="Average"></thread-option><thread-option value="min" label="Min"></thread-option><thread-option value="max" label="Max"></thread-option><thread-option value="count" label="Count"></thread-option></thread-select></label> }<button (click)="removeTableColumn(item,column.id)">Delete column</button></details></div><span class="table-resize" (pointerdown)="resizeTableColumn($event,item,column.id)" (dblclick)="fitTableColumn(item,data,column.id);$event.stopPropagation()"></span></th>
+                @if (
+                  tableFilter()?.itemId === item.id &&
+                  (tableFilter()?.value || tableFilter()?.operator === 'empty')
+                ) {
+                  <div class="table-filter-chip">
+                    {{ tableFilter()?.key }} {{ tableFilter()?.operator }}
+                    {{ tableFilter()?.value }}
+                    <button
+                      (pointerdown)="$event.stopPropagation()"
+                      (click)="clearTableFilter()"
+                      aria-label="Clear filter"
+                    >
+                      ×
+                    </button>
+                  </div>
+                }
+                <div class="table-scroll" appScroll="both" scrollbar="auto">
+                  <table>
+                    <colgroup>
+                      @for (column of tableViewColumns(item, data); track column.id) {
+                        <col [style.width.px]="item.tableColumnWidths?.[column.id] || 120" />
+                      }
+                      <col style="width: 30px" />
+                    </colgroup>
+                    <thead>
+                      <tr>
+                        @for (column of tableViewColumns(item, data); track column.id) {
+                          <th
+                            draggable="true"
+                            (dragstart)="dragTableColumn(column.id, $event)"
+                            (dragover)="$event.preventDefault()"
+                            (drop)="dropTableColumn(item, data, column.id, $event)"
+                          >
+                            <div class="table-column-head">
+                              <span>{{ column.label }}</span>
+                              <details
+                                class="table-column-menu"
+                                (pointerdown)="$event.stopPropagation()"
+                              >
+                                <summary [attr.aria-label]="column.label + ' options'">···</summary>
+                                <label
+                                  >Name<input
+                                    [value]="column.label"
+                                    (change)="setTableHeader(item, column.id, $event)" /></label
+                                ><label
+                                  >Type<thread-select
+                                    [value]="column.type"
+                                    (change)="setTableColumnType(item, column.id, $event)"
+                                    ><thread-option value="text" label="Text"></thread-option
+                                    ><thread-option value="number" label="Number"></thread-option
+                                    ><thread-option
+                                      value="currency"
+                                      label="Currency"
+                                    ></thread-option
+                                    ><thread-option value="date" label="Date"></thread-option
+                                    ><thread-option value="category" label="Select"></thread-option
+                                    ><thread-option
+                                      value="checkbox"
+                                      label="Checkbox"
+                                    ></thread-option></thread-select></label
+                                ><button (click)="setTableSort(item, column.key, 1)">
+                                  Sort ascending</button
+                                ><button (click)="setTableSort(item, column.key, -1)">
+                                  Sort descending</button
+                                ><button (click)="clearTableSort()">Clear sort</button
+                                ><label
+                                  >Filter<thread-select
+                                    [value]="
+                                      tableFilter()?.key === column.key
+                                        ? tableFilter()?.operator
+                                        : 'contains'
+                                    "
+                                    (change)="setTableFilterOperator(item, column.key, $event)"
+                                    ><thread-option
+                                      value="contains"
+                                      label="Contains"
+                                    ></thread-option
+                                    ><thread-option value="is" label="Is"></thread-option
+                                    ><thread-option value="not" label="Is not"></thread-option
+                                    ><thread-option value="empty" label="Is empty"></thread-option
+                                    ><thread-option value="gt" label="Greater than"></thread-option
+                                    ><thread-option value="lt" label="Less than"></thread-option
+                                    ><thread-option
+                                      value="between"
+                                      label="Between"
+                                    ></thread-option></thread-select
+                                  ><input
+                                    [value]="
+                                      tableFilter()?.key === column.key ? tableFilter()?.value : ''
+                                    "
+                                    placeholder="Value"
+                                    (input)="setTableFilter(item, column.key, $event)"
+                                  />
+                                  @if (
+                                    tableFilter()?.key === column.key &&
+                                    tableFilter()?.operator === 'between'
+                                  ) {
+                                    <input
+                                      [value]="tableFilter()?.second || ''"
+                                      placeholder="And"
+                                      (input)="setTableFilterSecond(item, column.key, $event)"
+                                    />
+                                  }</label
+                                ><button (click)="setTableGroup(item, column.key)">
+                                  Group by this column</button
+                                ><button (click)="clearTableGroup()">Clear grouping</button>
+                                @if (
+                                  column.type === 'number' ||
+                                  column.type === 'currency' ||
+                                  column.type === 'calculated'
+                                ) {
+                                  <label
+                                    >Summarize<thread-select
+                                      [value]="tableSummary()[item.id + ':' + column.key] || 'sum'"
+                                      (change)="setTableSummary(item, column.key, $event)"
+                                      ><thread-option value="sum" label="Sum"></thread-option
+                                      ><thread-option
+                                        value="average"
+                                        label="Average"
+                                      ></thread-option
+                                      ><thread-option value="min" label="Min"></thread-option
+                                      ><thread-option value="max" label="Max"></thread-option
+                                      ><thread-option
+                                        value="count"
+                                        label="Count"
+                                      ></thread-option></thread-select
+                                  ></label>
+                                }
+                                <button (click)="removeTableColumn(item, column.id)">
+                                  Delete column
+                                </button>
+                              </details>
+                            </div>
+                            <span
+                              class="table-resize"
+                              (pointerdown)="resizeTableColumn($event, item, column.id)"
+                              (dblclick)="
+                                fitTableColumn(item, data, column.id); $event.stopPropagation()
+                              "
+                            ></span>
+                          </th>
+                        }
+                        <th class="row-action"></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      @for (
+                        entry of tableGroupedRows(item, data);
+                        track entry.id;
+                        let rowIndex = $index
+                      ) {
+                        @if (entry.row; as row) {
+                          <tr>
+                            @for (column of tableViewColumns(item, data); track column.id) {
+                              <td
+                                tabindex="0"
+                                [class.cell-selected]="
+                                  selectedDataCell() === item.id + ':' + row.id + ':' + column.key
+                                "
+                                [attr.data-select-cell]="item.id + ':' + row.id + ':' + column.key"
+                                (pointerdown)="$event.stopPropagation()"
+                                (click)="selectTableCell(item, row.id, column.key)"
+                                (dblclick)="editTableCell(item, row.id, column.key)"
+                                (keydown)="tableCellKey($event, item, row.id, column.key)"
+                              >
+                                @if (column.type === 'checkbox') {
+                                  <thread-checkbox
+                                    [checked]="!!row.values[column.key]"
+                                    [attr.aria-label]="
+                                      'Row ' + (rowIndex + 1) + ', ' + column.label
+                                    "
+                                    (pointerdown)="$event.stopPropagation()"
+                                    (change)="
+                                      beginDataEdit();
+                                      setTableCell(item, row.id, column.key, $event);
+                                      endDataEdit()
+                                    "
+                                  ></thread-checkbox>
+                                } @else if (
+                                  editingDataCell() === item.id + ':' + row.id + ':' + column.key
+                                ) {
+                                  <input
+                                    [attr.data-edit-cell]="
+                                      item.id + ':' + row.id + ':' + column.key
+                                    "
+                                    [type]="
+                                      column.type === 'number' || column.type === 'currency'
+                                        ? 'number'
+                                        : column.type === 'date'
+                                          ? 'date'
+                                          : 'text'
+                                    "
+                                    [value]="row.values[column.key] ?? ''"
+                                    [attr.aria-label]="
+                                      'Row ' + (rowIndex + 1) + ', ' + column.label
+                                    "
+                                    (pointerdown)="$event.stopPropagation()"
+                                    (focus)="beginDataEdit()"
+                                    (input)="setTableCell(item, row.id, column.key, $event)"
+                                    (blur)="stopDataCellEdit()"
+                                    (keydown)="tableEditKey($event, item, row.id, column.key)"
+                                  />
+                                } @else {
+                                  <span [class.calculated-cell]="column.type === 'calculated'">{{
+                                    column.type === 'currency' || column.type === 'calculated'
+                                      ? money(row.values[column.key])
+                                      : row.values[column.key]
+                                  }}</span>
+                                }
+                              </td>
+                            }
+                            <td class="row-action">
+                              <button
+                                (pointerdown)="$event.stopPropagation()"
+                                (click)="removeTableRow(item, row.id)"
+                                aria-label="Remove row"
+                              >
+                                ×
+                              </button>
+                            </td>
+                          </tr>
+                        } @else {
+                          <tr class="table-group-row">
+                            <td [attr.colspan]="data.columns.length + 1">
+                              <button
+                                (pointerdown)="$event.stopPropagation()"
+                                (click)="toggleTableGroup(item, entry.group || '')"
+                              >
+                                {{
+                                  collapsedTableGroups().includes(item.id + ':' + entry.group)
+                                    ? '▸'
+                                    : '▾'
+                                }}
+                                {{ entry.group }} <span>{{ entry.count }} rows</span>
+                              </button>
+                            </td>
+                          </tr>
+                        }
+                      }
+                    </tbody>
+                    <tfoot>
+                      <tr>
+                        @for (column of tableViewColumns(item, data); track column.id) {
+                          <td>
+                            @if (
+                              column.type === 'number' ||
+                              column.type === 'currency' ||
+                              column.type === 'calculated'
+                            ) {
+                              <span
+                                >{{ tableSummaryLabel(item, column.key) }}
+                                {{ money(tableSummaryValue(item, data, column.key)) }}</span
+                              >
+                            }
+                          </td>
+                        }
+                        <td></td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                  @if (!data.rows.length) {
+                    <div class="smart-empty">
+                      No rows yet. Add one below.
+                      @if (data.columns.length === 2) {
+                        <button
+                          (pointerdown)="$event.stopPropagation()"
+                          (click)="useCostEstimate(item)"
+                        >
+                          Start a cost estimate
+                        </button>
+                      }
+                    </div>
                   }
-                  <th class="row-action"> </th>
-                </tr></thead><tbody>
-                  @for (entry of tableGroupedRows(item,data); track entry.id; let rowIndex = $index) {
-                    @if (entry.row; as row) { <tr>@for (column of tableViewColumns(item,data); track column.id) {
-                      <td tabindex="0" [class.cell-selected]="selectedDataCell() === item.id + ':' + row.id + ':' + column.key" [attr.data-select-cell]="item.id + ':' + row.id + ':' + column.key" (pointerdown)="$event.stopPropagation()" (click)="selectTableCell(item,row.id,column.key)" (dblclick)="editTableCell(item,row.id,column.key)" (keydown)="tableCellKey($event,item,row.id,column.key)">
-                        @if (column.type === 'checkbox') { <thread-checkbox  [checked]="!!row.values[column.key]" [attr.aria-label]="'Row ' + (rowIndex + 1) + ', ' + column.label" (pointerdown)="$event.stopPropagation()" (change)="beginDataEdit();setTableCell(item,row.id,column.key,$event);endDataEdit()" ></thread-checkbox>
-                        } @else if (editingDataCell() === item.id + ':' + row.id + ':' + column.key) {
-                          <input [attr.data-edit-cell]="item.id + ':' + row.id + ':' + column.key" [type]="column.type === 'number' || column.type === 'currency' ? 'number' : column.type === 'date' ? 'date' : 'text'" [value]="row.values[column.key] ?? ''" [attr.aria-label]="'Row ' + (rowIndex + 1) + ', ' + column.label" (pointerdown)="$event.stopPropagation()" (focus)="beginDataEdit()" (input)="setTableCell(item,row.id,column.key,$event)" (blur)="stopDataCellEdit()" (keydown)="tableEditKey($event,item,row.id,column.key)" />
-                        } @else { <span [class.calculated-cell]="column.type === 'calculated'">{{ column.type === 'currency' || column.type === 'calculated' ? money(row.values[column.key]) : row.values[column.key] }}</span> }
-                      </td>
-                    }<td class="row-action"><button (pointerdown)="$event.stopPropagation()" (click)="removeTableRow(item,row.id)" aria-label="Remove row">×</button></td></tr>
-                    } @else { <tr class="table-group-row"><td [attr.colspan]="data.columns.length + 1"><button (pointerdown)="$event.stopPropagation()" (click)="toggleTableGroup(item,entry.group || '')">{{ collapsedTableGroups().includes(item.id + ':' + entry.group) ? '▸' : '▾' }} {{ entry.group }} <span>{{ entry.count }} rows</span></button></td></tr> }
+                </div>
+                <div class="table-actions">
+                  <button (pointerdown)="$event.stopPropagation()" (click)="addTableRow(item.id)">
+                    + New row
+                  </button>
+                  <details class="smart-menu" (pointerdown)="$event.stopPropagation()">
+                    <summary>+ Column</summary>
+                    <label>Name <input #newColumnName placeholder="Column name" /></label
+                    ><label
+                      >Type
+                      <thread-select #newColumnType
+                        ><thread-option value="text" label="Text"></thread-option
+                        ><thread-option value="number" label="Number"></thread-option
+                        ><thread-option value="currency" label="Currency"></thread-option
+                        ><thread-option value="date" label="Date"></thread-option
+                        ><thread-option value="category" label="Select"></thread-option
+                        ><thread-option
+                          value="checkbox"
+                          label="Checkbox"
+                        ></thread-option></thread-select></label
+                    ><button
+                      (click)="addTableColumn(item.id, newColumnName.value, newColumnType.value)"
+                    >
+                      Create column
+                    </button>
+                  </details>
+                  <details
+                    class="smart-menu calculation-menu"
+                    (pointerdown)="$event.stopPropagation()"
+                  >
+                    <summary>+ Calculation</summary>
+                    <label>Name<input #calculationName placeholder="Total" /></label
+                    ><label
+                      >First field<thread-select #calculationLeft>
+                        @for (column of data.columns; track column.id) {
+                          @if (column.type === 'number' || column.type === 'currency') {
+                            <thread-option
+                              [value]="column.key"
+                              label="{{ column.label }}"
+                            ></thread-option>
+                          }
+                        }</thread-select></label
+                    ><label
+                      >Calculation<thread-select #calculationOperator
+                        ><thread-option value="+" label="Add"></thread-option
+                        ><thread-option value="-" label="Subtract"></thread-option
+                        ><thread-option value="*" label="Multiply"></thread-option
+                        ><thread-option value="/" label="Divide"></thread-option
+                        ><thread-option
+                          value="%"
+                          label="Percentage"
+                        ></thread-option></thread-select></label
+                    ><label
+                      >Second field<thread-select #calculationRight>
+                        @for (column of data.columns; track column.id) {
+                          @if (column.type === 'number' || column.type === 'currency') {
+                            <thread-option
+                              [value]="column.key"
+                              label="{{ column.label }}"
+                            ></thread-option>
+                          }
+                        }</thread-select></label
+                    ><button
+                      (click)="
+                        addCalculatedColumn(
+                          item,
+                          calculationName.value,
+                          calculationLeft.value,
+                          calculationOperator.value,
+                          calculationRight.value
+                        )
+                      "
+                    >
+                      Add calculation
+                    </button>
+                  </details>
+                  @if (canChart(data)) {
+                    <button
+                      (pointerdown)="$event.stopPropagation()"
+                      (click)="createLinkedView(item, 'chart')"
+                    >
+                      Chart view
+                    </button>
                   }
-                </tbody><tfoot><tr>@for (column of tableViewColumns(item,data); track column.id) { <td>@if (column.type === 'number' || column.type === 'currency' || column.type === 'calculated') { <span>{{ tableSummaryLabel(item,column.key) }} {{ money(tableSummaryValue(item,data,column.key)) }}</span> }</td> }<td></td></tr></tfoot></table>@if (!data.rows.length) { <div class="smart-empty">No rows yet. Add one below. @if (data.columns.length === 2) { <button (pointerdown)="$event.stopPropagation()" (click)="useCostEstimate(item)">Start a cost estimate</button> }</div> }</div>
-                <div class="table-actions"><button (pointerdown)="$event.stopPropagation()" (click)="addTableRow(item.id)">+ New row</button><details class="smart-menu" (pointerdown)="$event.stopPropagation()"><summary>+ Column</summary><label>Name <input #newColumnName placeholder="Column name" /></label><label>Type <thread-select #newColumnType><thread-option value="text" label="Text"></thread-option><thread-option value="number" label="Number"></thread-option><thread-option value="currency" label="Currency"></thread-option><thread-option value="date" label="Date"></thread-option><thread-option value="category" label="Select"></thread-option><thread-option value="checkbox" label="Checkbox"></thread-option></thread-select></label><button (click)="addTableColumn(item.id,newColumnName.value,newColumnType.value)">Create column</button></details>
-                <details class="smart-menu calculation-menu" (pointerdown)="$event.stopPropagation()"><summary>+ Calculation</summary><label>Name<input #calculationName placeholder="Total" /></label><label>First field<thread-select #calculationLeft>@for (column of data.columns; track column.id) { @if (column.type === 'number' || column.type === 'currency') { <thread-option [value]="column.key" label="{{ column.label }}"></thread-option> } }</thread-select></label><label>Calculation<thread-select #calculationOperator><thread-option value="+" label="Add"></thread-option><thread-option value="-" label="Subtract"></thread-option><thread-option value="*" label="Multiply"></thread-option><thread-option value="/" label="Divide"></thread-option><thread-option value="%" label="Percentage"></thread-option></thread-select></label><label>Second field<thread-select #calculationRight>@for (column of data.columns; track column.id) { @if (column.type === 'number' || column.type === 'currency') { <thread-option [value]="column.key" label="{{ column.label }}"></thread-option> } }</thread-select></label><button (click)="addCalculatedColumn(item,calculationName.value,calculationLeft.value,calculationOperator.value,calculationRight.value)">Add calculation</button></details>
-                <details class="smart-menu" (pointerdown)="$event.stopPropagation()"><summary>···</summary>@if (canChart(data)) { <button (click)="createLinkedView(item,'chart')">Create Chart</button><button (click)="createLinkedView(item,'budget')">Create Budget</button> }</details></div>
+                  @if (canBudget(data)) {
+                    <button
+                      (pointerdown)="$event.stopPropagation()"
+                      (click)="createLinkedView(item, 'budget')"
+                    >
+                      Budget view
+                    </button>
+                  }
+                </div>
               }
             </div>
           } @else if (item.type === 'chart') {
-            <div class="chart-content smart-block"><div class="smart-head"><div><div class="smart-title" [attr.contenteditable]="editingId() === item.id" [attr.data-edit-id]="editingId() === item.id ? item.id : null" (keydown)="inlineKey($event)" (blur)="inlineBlur($event,item.id,'title')" [textContent]="item.title || (editingId() === item.id ? '' : 'Chart')"></div><div class="chart-subtitle">{{ chartTitle(item) }}</div></div>
-              <details class="smart-menu chart-menu" (pointerdown)="$event.stopPropagation()"><summary aria-label="Chart options">···</summary>
-                @if (dataset(item); as data) {
-                  <button (click)="setChartPreset(item,'comparison')">Planned vs Actual</button>
-                  <button (click)="setChartPreset(item,'actual')">Actual by category</button>
-                  <button (click)="setChartPreset(item,'distribution')">Distribution</button>
-                  <label>Source<thread-select aria-label="Chart data source" [value]="chartSourceId(item)" (change)="linkChartSource(item,$event)"><thread-option value="" disabled label="Select data source"></thread-option>@for (source of dataSources(); track source.item.id) { @if (canChart(source.data)) { <thread-option [value]="source.item.id" label="{{ source.item.title || (source.item.type === 'budget' ? 'Budget' : 'Table') }}"></thread-option> } }</thread-select></label>
-                } @else { <label>Choose a Budget or Table<thread-select aria-label="Chart data source" (change)="linkChartSource(item,$event)"><thread-option value="" label="Choose source"></thread-option>@for (source of dataSources(); track source.item.id) { @if (canChart(source.data)) { <thread-option [value]="source.item.id" label="{{ source.item.title || source.item.type }}"></thread-option> } }</thread-select></label> }
-              </details></div>
-              <app-thread-chart [dataset]="dataset(item)" [config]="item.chartConfig" (pointSelect)="selectChartPoint(item,$event)" />
-              @if (chartSelection()?.itemId === item.id) { <div class="chart-detail"><strong>{{ chartSelection()?.label }}</strong><span>Planned {{ money(chartSelectedValue(item,'Planned')) }}</span><span>Actual {{ money(chartSelectedValue(item,'Actual')) }}</span><div><button (pointerdown)="$event.stopPropagation()" (click)="focusLinkedView(item,'budget')">Open Budget</button><button (pointerdown)="$event.stopPropagation()" (click)="focusLinkedView(item,'table')">Open Table</button></div></div> }
+            <div class="chart-content smart-block">
+              <div class="smart-head">
+                <div>
+                  <div
+                    class="smart-title"
+                    data-edit-field="title"
+                    [attr.contenteditable]="editingId() === item.id"
+                    [attr.data-edit-id]="editingId() === item.id ? item.id : null"
+                    (keydown)="inlineKey($event)"
+                    (blur)="inlineBlur($event, item.id, 'title')"
+                    [textContent]="item.title || (editingId() === item.id ? '' : 'Chart')"
+                  ></div>
+                  <div class="chart-subtitle">{{ chartTitle(item) }}</div>
+                </div>
+                <details class="smart-menu chart-menu" (pointerdown)="$event.stopPropagation()">
+                  <summary aria-label="Chart options">···</summary>
+                  @if (dataset(item); as data) {
+                    @if (chartHasBudget(item)) {
+                      <button (click)="setChartPreset(item, 'comparison')">Planned vs actual</button
+                      ><button (click)="setChartPreset(item, 'actual')">Actual by category</button
+                      ><button (click)="setChartPreset(item, 'distribution')">
+                        Planned distribution
+                      </button>
+                    }
+                    <label
+                      >Source<thread-select
+                        aria-label="Chart data source"
+                        [value]="chartSourceId(item)"
+                        (change)="linkChartSource(item, $event)"
+                        ><thread-option
+                          value=""
+                          disabled
+                          label="Select data source"
+                        ></thread-option>
+                        @for (source of dataSources(); track source.item.id) {
+                          @if (canChart(source.data)) {
+                            <thread-option
+                              [value]="source.item.id"
+                              label="{{
+                                source.item.title ||
+                                  (source.item.type === 'budget' ? 'Budget' : 'Table')
+                              }}"
+                            ></thread-option>
+                          }
+                        }</thread-select
+                    ></label>
+                  } @else {
+                    <label
+                      >Choose a Budget or Table<thread-select
+                        aria-label="Chart data source"
+                        (change)="linkChartSource(item, $event)"
+                        ><thread-option value="" label="Choose source"></thread-option>
+                        @for (source of dataSources(); track source.item.id) {
+                          @if (canChart(source.data)) {
+                            <thread-option
+                              [value]="source.item.id"
+                              label="{{ source.item.title || source.item.type }}"
+                            ></thread-option>
+                          }
+                        }</thread-select
+                    ></label>
+                  }
+                </details>
+              </div>
+              @if (dataset(item); as data) {
+                <div class="chart-controls">
+                  <label
+                    >View<thread-select
+                      [value]="item.chartConfig?.type || 'bar'"
+                      (pointerdown)="$event.stopPropagation()"
+                      (change)="setChartType(item, $event)"
+                    >
+                      @for (type of chartTypes(data); track type) {
+                        <thread-option
+                          [value]="type"
+                          [label]="
+                            type === 'comparison'
+                              ? 'Compare'
+                              : type === 'donut'
+                                ? 'Donut'
+                                : type === 'line'
+                                  ? 'Line'
+                                  : 'Bar'
+                          "
+                        ></thread-option>
+                      }</thread-select></label
+                  ><label
+                    >Group by<thread-select
+                      [value]="item.chartConfig?.categoryField || ''"
+                      (pointerdown)="$event.stopPropagation()"
+                      (change)="setChartField(item, 'categoryField', $event)"
+                    >
+                      @for (column of data.columns; track column.id) {
+                        @if (
+                          column.type === 'text' ||
+                          column.type === 'category' ||
+                          column.type === 'date'
+                        ) {
+                          <thread-option
+                            [value]="column.key"
+                            [label]="column.label"
+                          ></thread-option>
+                        }
+                      }</thread-select></label
+                  ><label
+                    >Value<thread-select
+                      [value]="item.chartConfig?.valueField || ''"
+                      (pointerdown)="$event.stopPropagation()"
+                      (change)="setChartField(item, 'valueField', $event)"
+                    >
+                      @for (column of data.columns; track column.id) {
+                        @if (column.type === 'number' || column.type === 'currency') {
+                          <thread-option
+                            [value]="column.key"
+                            [label]="column.label"
+                          ></thread-option>
+                        }
+                      }</thread-select
+                  ></label>
+                </div>
+              }
+              <app-thread-chart
+                [dataset]="dataset(item)"
+                [config]="item.chartConfig"
+                (pointSelect)="selectChartPoint(item, $event)"
+              />
+              @if (chartSelection()?.itemId === item.id && chartHasBudget(item)) {
+                <div class="chart-detail">
+                  <strong>{{ chartSelection()?.label }}</strong
+                  ><span>Planned {{ money(chartSelectedValue(item, 'Planned')) }}</span
+                  ><span>Actual {{ money(chartSelectedValue(item, 'Actual')) }}</span>
+                  <div>
+                    <button
+                      (pointerdown)="$event.stopPropagation()"
+                      (click)="focusLinkedView(item, 'budget')"
+                    >
+                      Open Budget</button
+                    ><button
+                      (pointerdown)="$event.stopPropagation()"
+                      (click)="focusLinkedView(item, 'table')"
+                    >
+                      Open Table
+                    </button>
+                  </div>
+                </div>
+              }
             </div>
           } @else if (item.type === 'sketch') {
             <app-sketch-renderer [item]="item" />
@@ -457,8 +1501,12 @@
             <div class="link-content" appScroll="y" scrollbar="hover">
               <span class="link-icon">↗</span>
               <div
-                class="card-title" appScroll="y" scrollbar="hover"
+                class="card-title"
+                data-edit-field="title"
+                appScroll="y"
+                scrollbar="hover"
                 [attr.contenteditable]="editingId() === item.id"
+                [attr.data-edit-id]="editingId() === item.id ? item.id : null"
                 (keydown)="inlineKey($event)"
                 (blur)="inlineBlur($event, item.id, 'title')"
                 [textContent]="item.title || (editingId() === item.id ? '' : 'New link')"
@@ -485,10 +1533,15 @@
           } @else {
             <div class="card-content">
               @if (item.type !== 'voice' && item.type !== 'video') {
-                <div class="card-top"><span class="card-type">{{ item.type }}</span></div>
+                <div class="card-top">
+                  <span class="card-type">{{ item.type }}</span>
+                </div>
               }
               <div
-                class="card-title" appScroll="y" scrollbar="hover"
+                class="card-title"
+                data-edit-field="title"
+                appScroll="y"
+                scrollbar="hover"
                 [attr.contenteditable]="editingId() === item.id"
                 [attr.data-edit-id]="editingId() === item.id ? item.id : null"
                 (keydown)="inlineKey($event)"
@@ -498,26 +1551,76 @@
                 "
               ></div>
               @if (item.type !== 'voice') {
-              <div
-                class="card-body" appScroll="y" scrollbar="hover"
-                [attr.contenteditable]="editingId() === item.id"
-                (keydown)="inlineKey($event)"
-                (blur)="inlineBlur($event, item.id, 'body')"
-                [textContent]="item.body"
-              ></div>
+                <div
+                  class="card-body"
+                  data-edit-field="body"
+                  appScroll="y"
+                  scrollbar="hover"
+                  [attr.contenteditable]="editingId() === item.id"
+                  [attr.data-edit-id]="editingId() === item.id ? item.id : null"
+                  (keydown)="inlineKey($event)"
+                  (blur)="inlineBlur($event, item.id, 'body')"
+                  [textContent]="item.body"
+                ></div>
               }
               @if (item.type === 'voice' && item.url) {
                 <div class="voice-player" (pointerdown)="$event.stopPropagation()">
-                  <audio class="voice-audio-source" [attr.data-voice-id]="item.id" [src]="item.url" preload="metadata" (loadedmetadata)="syncVoicePlayback(item.id,$any($event.target))" (timeupdate)="syncVoicePlayback(item.id,$any($event.target))" (play)="syncVoicePlayback(item.id,$any($event.target))" (pause)="syncVoicePlayback(item.id,$any($event.target))" (ended)="syncVoicePlayback(item.id,$any($event.target))"></audio>
-                  <div class="voice-meta"><span>VOICE NOTE</span><time>{{ voiceTime(item.id,true) }}</time></div>
+                  <audio
+                    class="voice-audio-source"
+                    [attr.data-voice-id]="item.id"
+                    [src]="item.url"
+                    preload="metadata"
+                    (loadedmetadata)="syncVoicePlayback(item.id, $any($event.target))"
+                    (timeupdate)="syncVoicePlayback(item.id, $any($event.target))"
+                    (play)="syncVoicePlayback(item.id, $any($event.target))"
+                    (pause)="syncVoicePlayback(item.id, $any($event.target))"
+                    (ended)="syncVoicePlayback(item.id, $any($event.target))"
+                  ></audio>
+                  <div class="voice-meta">
+                    <span>VOICE NOTE</span><time>{{ voiceTime(item.id, true) }}</time>
+                  </div>
                   <div class="voice-controls" [class.playing]="voicePlayback()[item.id]?.playing">
-                    <button class="voice-play" (click)="toggleVoicePlayback(item.id)" [attr.aria-label]="voicePlayback()[item.id]?.playing ? 'Pause audio' : 'Play audio'">{{ voicePlayback()[item.id]?.playing ? 'Ⅱ' : '▶' }}</button>
-                    <div class="voice-wave" role="slider" tabindex="0" aria-label="Audio waveform seek" [attr.aria-valuemin]="0" [attr.aria-valuemax]="voicePlayback()[item.id]?.duration || 0" [attr.aria-valuenow]="voicePlayback()[item.id]?.current || 0" (pointerdown)="seekVoiceAt(item.id,$event)" (keydown)="waveformKey(item.id,$event)">@for (level of voiceWaveform(item); track $index) { <i [style.height.%]="level * 88" [class.played]="$index / voiceWaveform(item).length * 100 <= voiceProgress(item.id)"></i> }</div>
+                    <button
+                      class="voice-play"
+                      (click)="toggleVoicePlayback(item.id)"
+                      [attr.aria-label]="
+                        voicePlayback()[item.id]?.playing ? 'Pause audio' : 'Play audio'
+                      "
+                    >
+                      {{ voicePlayback()[item.id]?.playing ? 'Ⅱ' : '▶' }}
+                    </button>
+                    <div
+                      class="voice-wave"
+                      role="slider"
+                      tabindex="0"
+                      aria-label="Audio waveform seek"
+                      [attr.aria-valuemin]="0"
+                      [attr.aria-valuemax]="voicePlayback()[item.id]?.duration || 0"
+                      [attr.aria-valuenow]="voicePlayback()[item.id]?.current || 0"
+                      (pointerdown)="seekVoiceAt(item.id, $event)"
+                      (keydown)="waveformKey(item.id, $event)"
+                    >
+                      @for (level of voiceWaveform(item); track $index) {
+                        <i
+                          [style.height.%]="level * 88"
+                          [class.played]="
+                            ($index / voiceWaveform(item).length) * 100 <= voiceProgress(item.id)
+                          "
+                        ></i>
+                      }
+                    </div>
                   </div>
                 </div>
               }
               @if (item.type === 'video' && item.url) {
-                <video class="video-player" controls preload="metadata" [src]="item.url" [attr.aria-label]="item.title" (pointerdown)="$event.stopPropagation()"></video>
+                <video
+                  class="video-player"
+                  controls
+                  preload="metadata"
+                  [src]="item.url"
+                  [attr.aria-label]="item.title"
+                  (pointerdown)="$event.stopPropagation()"
+                ></video>
               }
               @if (item.type === 'file' && item.url) {
                 <a
@@ -529,25 +1632,85 @@
               }
             </div>
           }
-          @if (isConnectable(item) && !editingId() && (tool() === 'connect' || selectedIds().includes(item.id) || connectionPreview())) {
+          @if (
+            isConnectable(item) &&
+            !editingId() &&
+            (tool() === 'connect' || selectedIds().includes(item.id) || connectionPreview())
+          ) {
             @for (side of connectorSides; track side) {
-              <button class="shape-port" [class.port-top]="side === 'top'" [class.port-right]="side === 'right'" [class.port-bottom]="side === 'bottom'" [class.port-left]="side === 'left'" [style.transform]="'scale(' + 1 / zoom() + ')'" (pointerdown)="connectDown($event, item, side)" (pointermove)="pointerMove($event)" (pointerup)="pointerUp($event)" (pointercancel)="pointerCancel($event)" (lostpointercapture)="pointerCancel($event)" [attr.aria-label]="'Connect ' + (item.title || item.type) + ' from ' + side"></button>
+              <button
+                class="shape-port"
+                [class.port-top]="side === 'top'"
+                [class.port-right]="side === 'right'"
+                [class.port-bottom]="side === 'bottom'"
+                [class.port-left]="side === 'left'"
+                [style.transform]="'scale(' + 1 / zoom() + ')'"
+                (pointerdown)="connectDown($event, item, side)"
+                (pointermove)="pointerMove($event)"
+                (pointerup)="pointerUp($event)"
+                (pointercancel)="pointerCancel($event)"
+                (lostpointercapture)="pointerCancel($event)"
+                [attr.aria-label]="'Connect ' + (item.title || item.type) + ' from ' + side"
+              ></button>
             }
           }
           @if (item.type === 'shape' && tool() === 'connect' && connectionSourceId() === item.id) {
-            <button class="shape-quick-add" [style.transform]="'scale(' + 1 / zoom() + ')'" (pointerdown)="$event.stopPropagation()" (click)="quickConnectedShape(item)" aria-label="Add connected shape">+</button>
+            <button
+              class="shape-quick-add"
+              [style.transform]="'scale(' + 1 / zoom() + ')'"
+              (pointerdown)="$event.stopPropagation()"
+              (click)="quickConnectedShape(item)"
+              aria-label="Add connected shape"
+            >
+              +
+            </button>
           }
-          @if (tool() === 'select' && selectedIds().length === 1 && selectedIds()[0] === item.id && !item.locked && (!editingId() || item.type === 'text')) {
+          @if (
+            tool() === 'select' &&
+            selectedIds().length === 1 &&
+            selectedIds()[0] === item.id &&
+            !item.locked &&
+            (!editingId() || item.type === 'text')
+          ) {
             @for (corner of ['nw', 'ne', 'sw', 'se']; track corner) {
-              <button class="resize-handle" [style.transform]="'scale(' + 1 / zoom() + ')'" [class.corner-nw]="corner === 'nw'" [class.corner-ne]="corner === 'ne'" [class.corner-sw]="corner === 'sw'" [class.corner-se]="corner === 'se'" (pointerdown)="resizeDown($event, item, $any(corner))" [attr.aria-label]="'Resize ' + item.title + ' from ' + corner"></button>
+              <button
+                class="resize-handle"
+                [style.transform]="'scale(' + 1 / zoom() + ')'"
+                [class.corner-nw]="corner === 'nw'"
+                [class.corner-ne]="corner === 'ne'"
+                [class.corner-sw]="corner === 'sw'"
+                [class.corner-se]="corner === 'se'"
+                (pointerdown)="resizeDown($event, item, $any(corner))"
+                [attr.aria-label]="'Resize ' + item.title + ' from ' + corner"
+              ></button>
             }
-            @if (item.type !== 'er-entity') { <button class="rotate-handle" [style.top.px]="-32 / zoom()" [style.transform]="'scale(' + 1 / zoom() + ')'" (pointerdown)="rotateDown($event, item)" [attr.aria-label]="'Rotate ' + item.title"></button> }
+            @if (item.type !== 'er-entity') {
+              <button
+                class="rotate-handle"
+                [style.top.px]="-32 / zoom()"
+                [style.transform]="'scale(' + 1 / zoom() + ')'"
+                (pointerdown)="rotateDown($event, item)"
+                [attr.aria-label]="'Rotate ' + item.title"
+              ></button>
+            }
           }
         </article>
       }
       @if (tool() === 'select' && groupBounds(); as bounds) {
-        <div class="group-selection" [style.left.px]="bounds.x" [style.top.px]="bounds.y" [style.width.px]="bounds.width" [style.height.px]="bounds.height">
-          <button class="rotate-handle" [style.top.px]="-32 / zoom()" [style.transform]="'scale(' + 1 / zoom() + ')'" (pointerdown)="rotateGroupDown($event)" aria-label="Rotate selected group"></button>
+        <div
+          class="group-selection"
+          [style.left.px]="bounds.x"
+          [style.top.px]="bounds.y"
+          [style.width.px]="bounds.width"
+          [style.height.px]="bounds.height"
+        >
+          <button
+            class="rotate-handle"
+            [style.top.px]="-32 / zoom()"
+            [style.transform]="'scale(' + 1 / zoom() + ')'"
+            (pointerdown)="rotateGroupDown($event)"
+            aria-label="Rotate selected group"
+          ></button>
         </div>
       }
       @if (marquee(); as box) {
@@ -568,7 +1731,14 @@
           [style.height.px]="box.height"
         ></div>
       }
-      @if (snapGuide(); as guide) { @if (guide.x !== undefined) { <div class="alignment-guide vertical" [style.left.px]="guide.x"></div> } @if (guide.y !== undefined) { <div class="alignment-guide horizontal" [style.top.px]="guide.y"></div> } }
+      @if (snapGuide(); as guide) {
+        @if (guide.x !== undefined) {
+          <div class="alignment-guide vertical" [style.left.px]="guide.x"></div>
+        }
+        @if (guide.y !== undefined) {
+          <div class="alignment-guide horizontal" [style.top.px]="guide.y"></div>
+        }
+      }
     </div>
     <div
       class="sketch-layer"
@@ -586,18 +1756,54 @@
         [style.transform]="worldTransform()"
         aria-hidden="true"
       >
-        <defs><filter id="active-sketch-neon" x="-100%" y="-100%" width="300%" height="300%"><feGaussianBlur stdDeviation="6" /></filter></defs>
+        <defs>
+          <filter id="active-sketch-neon" x="-100%" y="-100%" width="300%" height="300%">
+            <feGaussianBlur stdDeviation="6" />
+          </filter>
+        </defs>
         @for (stroke of activeRendered(); track stroke.stroke.id) {
           @if (stroke.stroke.brush === 'neon') {
-            <path [attr.d]="stroke.path" [attr.fill]="stroke.stroke.color" opacity=".85" filter="url(#active-sketch-neon)" />
+            <path
+              [attr.d]="stroke.path"
+              [attr.fill]="stroke.stroke.color"
+              opacity=".85"
+              filter="url(#active-sketch-neon)"
+            />
             <path [attr.d]="stroke.path" [attr.fill]="stroke.stroke.color" opacity=".75" />
-          } @else { <path [attr.d]="stroke.path" [attr.fill]="stroke.stroke.color" [attr.fill-opacity]="stroke.stroke.opacity" /> }
+          } @else {
+            <path
+              [attr.d]="stroke.path"
+              [attr.fill]="stroke.stroke.color"
+              [attr.fill-opacity]="stroke.stroke.opacity"
+            />
+          }
         }
-        @if (currentStroke(); as stroke) { <path [attr.d]="strokeOutlinePath(stroke)" [attr.fill]="stroke.color" [attr.fill-opacity]="stroke.opacity" /> }
-        @if (pendingAsset(); as asset) { @if (assetPreview(); as point) { <image [attr.href]="asset.src" [attr.x]="point.x - 80" [attr.y]="point.y - 60" width="160" height="120" opacity=".6" /> } }
+        @if (currentStroke(); as stroke) {
+          <path
+            [attr.d]="strokeOutlinePath(stroke)"
+            [attr.fill]="stroke.color"
+            [attr.fill-opacity]="stroke.opacity"
+          />
+        }
+        @if (pendingAsset(); as asset) {
+          @if (assetPreview(); as point) {
+            <image
+              [attr.href]="asset.src"
+              [attr.x]="point.x - 80"
+              [attr.y]="point.y - 60"
+              width="160"
+              height="120"
+              opacity=".6"
+            />
+          }
+        }
       </svg>
     </div>
-    @if (transformGuide(); as guide) { <div class="transform-guide" [style.left.px]="guide.x" [style.top.px]="guide.y">{{ guide.label }}</div> }
+    @if (transformGuide(); as guide) {
+      <div class="transform-guide" [style.left.px]="guide.x" [style.top.px]="guide.y">
+        {{ guide.label }}
+      </div>
+    }
     @if (!visibleItems().length && !search()) {
       <div class="empty-hint" data-ui>
         Start creating <span class="desktop-hint">Double-click for a note or press N to add</span
@@ -608,44 +1814,177 @@
       <div class="drop-indicator" data-ui>Drop files to place them here</div>
     }
   </main>
-  <button class="activity-trigger" [class.active]="activityOpen() || timerRunning() || musicPlaying()" (click)="activityOpen.set(!activityOpen()); activityError.set('')" [attr.aria-expanded]="activityOpen()" aria-label="Open timer and music" title="Timer & music">
-    <span aria-hidden="true">◷</span><small>{{ timerRunning() ? formatTimer() : 'Timer & music' }}</small>
+  <button
+    class="activity-trigger"
+    [class.active]="activityOpen() || timerRunning() || musicPlaying()"
+    (click)="activityOpen.set(!activityOpen()); activityError.set('')"
+    [attr.aria-expanded]="activityOpen()"
+    aria-label="Open timer and music"
+    title="Timer & music"
+  >
+    <span aria-hidden="true">◷</span
+    ><small>{{ timerRunning() ? formatTimer() : 'Timer & music' }}</small>
   </button>
   @if (activityOpen()) {
     <aside class="activity-panel" data-ui aria-label="Canvas session tools">
-      <header><div><span class="activity-icon">◷</span><div><strong>Focus session</strong><small>Make a little room to think</small></div></div><button class="activity-close" (click)="activityOpen.set(false)" aria-label="Close session tools">×</button></header>
-      <section class="activity-timer">
-        <div class="timer-readout" [class.timer-finished]="!timerSeconds()">{{ formatTimer() }}</div>
-        <div class="timer-presets" aria-label="Timer duration">
-          @for (minutes of [5, 15, 25]; track minutes) { <button [class.active]="timerMinutes() === minutes" [disabled]="timerRunning()" (click)="setTimerMinutes(minutes)">{{ minutes }} min</button> }
+      <header>
+        <div>
+          <span class="activity-icon">◷</span>
+          <div><strong>Focus session</strong><small>Make a little room to think</small></div>
         </div>
-        <div class="timer-actions"><button class="timer-start" (click)="toggleTimer()">{{ timerRunning() ? 'Pause timer' : timerSeconds() === timerMinutes() * 60 ? 'Start timer' : 'Resume timer' }}</button><button class="timer-reset" (click)="resetTimer()" aria-label="Reset timer" title="Reset">↺ <span>Reset</span></button></div>
+        <button
+          class="activity-close"
+          (click)="activityOpen.set(false)"
+          aria-label="Close session tools"
+        >
+          ×
+        </button>
+      </header>
+      <section class="activity-timer">
+        <div class="timer-readout" [class.timer-finished]="!timerSeconds()">
+          {{ formatTimer() }}
+        </div>
+        <div class="timer-presets" aria-label="Timer duration">
+          @for (minutes of [5, 15, 25]; track minutes) {
+            <button
+              [class.active]="timerMinutes() === minutes"
+              [disabled]="timerRunning()"
+              (click)="setTimerMinutes(minutes)"
+            >
+              {{ minutes }} min
+            </button>
+          }
+        </div>
+        <div class="timer-actions">
+          <button class="timer-start" (click)="toggleTimer()">
+            {{
+              timerRunning()
+                ? 'Pause timer'
+                : timerSeconds() === timerMinutes() * 60
+                  ? 'Start timer'
+                  : 'Resume timer'
+            }}</button
+          ><button
+            class="timer-reset"
+            (click)="resetTimer()"
+            aria-label="Reset timer"
+            title="Reset"
+          >
+            ↺ <span>Reset</span>
+          </button>
+        </div>
       </section>
       <section class="activity-library">
-        <div class="music-heading"><div><strong>Board audio</strong><small>Recordings and audio files on this canvas</small></div></div>
+        <div class="music-heading">
+          <div>
+            <strong>Board audio</strong><small>Recordings and audio files on this canvas</small>
+          </div>
+        </div>
         @if (boardAudioItems().length) {
-          <select aria-label="Choose board audio" [value]="selectedBoardAudioId()" (change)="setBoardAudio($event)"><option value="">Choose an audio clip…</option>@for (audio of boardAudioItems(); track audio.id) { <option [value]="audio.id">{{ audio.title }}</option> }</select>
-          @if (selectedBoardAudioUrl(); as audioUrl) { <audio controls preload="none" [src]="audioUrl" aria-label="Play selected board audio" (pointerdown)="$event.stopPropagation()"></audio> }
-        } @else { <p>Add media or record a voice note to play it here.</p> }
+          <select
+            aria-label="Choose board audio"
+            [value]="selectedBoardAudioId()"
+            (change)="setBoardAudio($event)"
+          >
+            <option value="">Choose an audio clip…</option>
+            @for (audio of boardAudioItems(); track audio.id) {
+              <option [value]="audio.id">{{ audio.title }}</option>
+            }
+          </select>
+          @if (selectedBoardAudioUrl(); as audioUrl) {
+            <audio
+              controls
+              preload="none"
+              [src]="audioUrl"
+              aria-label="Play selected board audio"
+              (pointerdown)="$event.stopPropagation()"
+            ></audio>
+          }
+        } @else {
+          <p>Add media or record a voice note to play it here.</p>
+        }
       </section>
       <section class="activity-library spotify-library">
-        <div class="music-heading"><div><strong>Spotify</strong><small>Paste a track, playlist, or album link</small></div></div>
-        <form (submit)="$event.preventDefault(); loadSpotifyEmbed()"><input type="url" [value]="spotifyLink()" (input)="spotifyLink.set($any($event.target).value)" placeholder="open.spotify.com/playlist/…" aria-label="Spotify link"><button type="submit">Load</button></form>
-        @if (spotifyEmbed(); as embed) { <iframe [src]="embed" [style.height.px]="spotifyEmbedHeight()" title="Spotify player" allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture" allowfullscreen loading="lazy"></iframe> }
+        <div class="music-heading">
+          <div><strong>Spotify</strong><small>Paste a track, playlist, or album link</small></div>
+        </div>
+        <form (submit)="$event.preventDefault(); loadSpotifyEmbed()">
+          <input
+            type="url"
+            [value]="spotifyLink()"
+            (input)="spotifyLink.set($any($event.target).value)"
+            placeholder="open.spotify.com/playlist/…"
+            aria-label="Spotify link"
+          /><button type="submit">Load</button>
+        </form>
+        @if (spotifyEmbed(); as embed) {
+          <iframe
+            [src]="embed"
+            [style.height.px]="spotifyEmbedHeight()"
+            title="Spotify player"
+            allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
+            allowfullscreen
+            loading="lazy"
+          ></iframe>
+        }
       </section>
       <section class="activity-music">
-        <div class="music-heading"><div><strong>Background sound</strong><small>{{ musicPlaying() ? 'Playing just for you' : 'A little sound, if you like' }}</small></div><button class="music-toggle" [class.active]="musicPlaying()" (click)="toggleMusic()" [attr.aria-label]="musicPlaying() ? 'Pause background sound' : 'Play background sound'">{{ musicPlaying() ? 'Ⅱ' : '▶' }}</button></div>
-        <div class="music-choices"><button [class.active]="musicTrack() === 'keys'" (click)="setMusicTrack('keys')">Soft keys</button><button [class.active]="musicTrack() === 'rain'" (click)="setMusicTrack('rain')">Rain room</button></div>
-        <label class="music-volume"><span>Volume</span><input type="range" min="0" max="1" step="0.05" [value]="musicVolume()" (input)="setMusicVolume($event)" aria-label="Music volume"></label>
+        <div class="music-heading">
+          <div>
+            <strong>Background sound</strong
+            ><small>{{
+              musicPlaying() ? 'Playing just for you' : 'A little sound, if you like'
+            }}</small>
+          </div>
+          <button
+            class="music-toggle"
+            [class.active]="musicPlaying()"
+            (click)="toggleMusic()"
+            [attr.aria-label]="musicPlaying() ? 'Pause background sound' : 'Play background sound'"
+          >
+            {{ musicPlaying() ? 'Ⅱ' : '▶' }}
+          </button>
+        </div>
+        <div class="music-choices">
+          <button [class.active]="musicTrack() === 'keys'" (click)="setMusicTrack('keys')">
+            Soft keys</button
+          ><button [class.active]="musicTrack() === 'rain'" (click)="setMusicTrack('rain')">
+            Rain room
+          </button>
+        </div>
+        <label class="music-volume"
+          ><span>Volume</span
+          ><input
+            type="range"
+            min="0"
+            max="1"
+            step="0.05"
+            [value]="musicVolume()"
+            (input)="setMusicVolume($event)"
+            aria-label="Music volume"
+        /></label>
       </section>
-      @if (activityError()) { <p class="activity-error" role="status">{{ activityError() }}</p> }
+      @if (activityError()) {
+        <p class="activity-error" role="status">{{ activityError() }}</p>
+      }
       <p class="activity-footnote">Timer stays on this device. Sound is private to you.</p>
     </aside>
   }
   @if (isRecording()) {
-    <div class="recording-indicator" data-ui role="group" aria-label="Voice recording controls"><span class="recording-dot" [class.paused]="recordingPaused()"></span><span>{{ recordingPaused() ? 'Paused' : 'Recording' }}</span><time>{{ formatDuration(recordingSeconds()) }}</time><button class="recording-pause" (click)="toggleVoicePause()">{{ recordingPaused() ? 'Resume' : 'Pause' }}</button><button (click)="stopVoiceRecording(true)">Stop & save</button></div>
+    <div class="recording-indicator" data-ui role="group" aria-label="Voice recording controls">
+      <span class="recording-dot" [class.paused]="recordingPaused()"></span
+      ><span>{{ recordingPaused() ? 'Paused' : 'Recording' }}</span
+      ><time>{{ formatDuration(recordingSeconds()) }}</time
+      ><button class="recording-pause" (click)="toggleVoicePause()">
+        {{ recordingPaused() ? 'Resume' : 'Pause' }}</button
+      ><button (click)="stopVoiceRecording(true)">Stop & save</button>
+    </div>
   }
-  @if (activityError() && !activityOpen()) { <button class="recording-error-toast" data-ui (click)="activityOpen.set(true)">{{ activityError() }} <span>×</span></button> }
+  @if (activityError() && !activityOpen()) {
+    <button class="recording-error-toast" data-ui (click)="activityOpen.set(true)">
+      {{ activityError() }} <span>×</span>
+    </button>
+  }
   <nav class="tool-rail canvas-action-bar" data-ui aria-label="Canvas tools">
     <button
       [class.active]="tool() === 'select' && !pendingType()"
@@ -655,28 +1994,52 @@
       title="Select (V): select, edit, and move objects"
       [attr.aria-pressed]="tool() === 'select' && !pendingType()"
     >
-      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 3 13 9-6 1.3L9 20 5 3Z"/></svg><small>Select</small></button
-    ><div class="tool-divider navigation-divider" aria-hidden="true"></div><button class="pan-tool" [class.active]="tool() === 'hand'" [attr.aria-pressed]="tool() === 'hand'" (click)="setTool('hand')" aria-label="Pan board" title="Pan (H): move the board. Hold Space for temporary pan." data-shortcut="H">
-      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 12V8a1.5 1.5 0 0 1 3 0v3-6a1.5 1.5 0 0 1 3 0v6-4a1.5 1.5 0 0 1 3 0v4-2a1.5 1.5 0 0 1 3 0v6c0 3-2 5-5 5h-3c-2 0-3-1-4-2l-3-4a1.6 1.6 0 0 1 2.5-2L7 13"/></svg><small>Pan</small></button
-    ><button
-      class="mobile-task"
-      data-shortcut="Task"
-      [class.active]="pendingType() === 'task'"
-      (click)="chooseType('task')"
-      aria-label="Add task"
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 3 13 9-6 1.3L9 20 5 3Z" /></svg
+      ><small>Select</small>
+    </button>
+    <div class="tool-divider navigation-divider" aria-hidden="true"></div>
+    <button
+      class="pan-tool"
+      [class.active]="tool() === 'hand'"
+      [attr.aria-pressed]="tool() === 'hand'"
+      (click)="setTool('hand')"
+      aria-label="Pan board"
+      title="Pan (H): move the board. Hold Space for temporary pan."
+      data-shortcut="H"
     >
-      <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="m8 12 3 3 5-6"/></svg><small>Task</small></button
-    ><div class="tool-divider"></div><button
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path
+          d="M7 12V8a1.5 1.5 0 0 1 3 0v3-6a1.5 1.5 0 0 1 3 0v6-4a1.5 1.5 0 0 1 3 0v4-2a1.5 1.5 0 0 1 3 0v6c0 3-2 5-5 5h-3c-2 0-3-1-4-2l-3-4a1.6 1.6 0 0 1 2.5-2L7 13"
+        /></svg
+      ><small>Pan</small>
+    </button>
+    <div class="tool-divider"></div>
+    <button
       [class.active]="paletteOpen() || !!pendingType()"
       data-shortcut="N"
       (click)="setTool('add')"
       aria-label="Add content"
     >
-      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v16M4 12h16"/></svg><small>Add</small></button
-    ><button [class.active]="tool() === 'sketch' || tool() === 'shape' || tool() === 'connect' || tool() === 'text'" (click)="setTool('sketch')" aria-label="Sketch" data-shortcut="P">
-      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m4 20 4.5-1 11-11a2 2 0 0 0-3-3l-11 11L4 20ZM14 7l3 3"/></svg><small>Sketch</small></button>
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v16M4 12h16" /></svg
+      ><small>Add</small></button
+    ><button
+      [class.active]="
+        tool() === 'sketch' || tool() === 'shape' || tool() === 'connect' || tool() === 'text'
+      "
+      (click)="setTool('sketch')"
+      aria-label="Sketch"
+      data-shortcut="P"
+    >
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="m4 20 4.5-1 11-11a2 2 0 0 0-3-3l-11 11L4 20ZM14 7l3 3" /></svg
+      ><small>Sketch</small>
+    </button>
   </nav>
-  @if (tool() === 'hand') { <div class="hint-pill tool-instruction navigation-hint" data-ui>Pan board · Drag anywhere · V to select objects</div> }
+  @if (tool() === 'hand') {
+    <div class="hint-pill tool-instruction navigation-hint" data-ui>
+      Pan board · Drag anywhere · V to select objects
+    </div>
+  }
   @if (paletteOpen()) {
     <div class="create-palette" appScroll="y" scrollbar="auto" data-ui>
       <div class="palette-title">
@@ -700,9 +2063,18 @@
         }
       </div>
       <div class="palette-section">Media</div>
-      <button class="palette-upload-audio" (click)="openMediaFiles()"><span aria-hidden="true">＋</span> Add media <small>Image · audio · video · document</small></button>
-      <button class="palette-upload-audio" (click)="toggleVoiceRecording()"><span aria-hidden="true">●</span> Record voice <small>Start a new microphone recording</small></button>
-      <div class="palette-grid palette-secondary-media"><button (click)="openMedia('gif')"><span>▣</span> GIF</button><button (click)="openMedia('sticker')"><span>✳</span> Sticker</button><button (click)="chooseType('link')"><span>↗</span> Link</button></div>
+      <button class="palette-upload-audio" (click)="openMediaFiles()">
+        <span aria-hidden="true">＋</span> Add media <small>Image · audio · video · document</small>
+      </button>
+      <button class="palette-upload-audio" (click)="toggleVoiceRecording()">
+        <span aria-hidden="true">●</span> Record voice
+        <small>Start a new microphone recording</small>
+      </button>
+      <div class="palette-grid palette-secondary-media">
+        <button (click)="openMedia('gif')"><span>▣</span> GIF</button
+        ><button (click)="openMedia('sticker')"><span>✳</span> Sticker</button
+        ><button (click)="chooseType('link')"><span>↗</span> Link</button>
+      </div>
       <div class="palette-section">Organize</div>
       <div class="palette-grid">
         @for (
@@ -726,61 +2098,194 @@
         <span>✎</span> Sketch directly on canvas
       </button>
       <button class="palette-sketch palette-er-starter" (click)="createErStarter()">
-        <span>◇</span><span><strong>ER diagram starter</strong><small>Two linked entities with example keys</small></span>
+        <span>◇</span
+        ><span
+          ><strong>ER diagram starter</strong
+          ><small>Two linked entities with example keys</small></span
+        >
       </button>
     </div>
   }
-  @if (mediaPicker(); as kind) { <app-media-picker [kind]="kind" (closed)="mediaPicker.set(null)" (picked)="pickMedia($event)" /> }
-  @if (pendingAsset()) { <div class="hint-pill" data-ui>Tap the canvas to place {{ pendingAsset()?.name }} · Esc to cancel</div> }
+  @if (mediaPicker(); as kind) {
+    <app-media-picker [kind]="kind" (closed)="mediaPicker.set(null)" (picked)="pickMedia($event)" />
+  }
+  @if (pendingAsset()) {
+    <div class="hint-pill" data-ui>
+      Tap the canvas to place {{ pendingAsset()?.name }} · Esc to cancel
+    </div>
+  }
   @if (pendingType()) {
-    <div class="hint-pill" [class.tool-instruction]="tool() === 'shape'" data-ui>Tap the canvas to place {{ pendingType() === 'er-entity' ? 'an ER entity' : pendingType() }} · Esc to cancel</div>
+    <div class="hint-pill" [class.tool-instruction]="tool() === 'shape'" data-ui>
+      Tap the canvas to place {{ pendingType() === 'er-entity' ? 'an ER entity' : pendingType() }} ·
+      Esc to cancel
+    </div>
   }
   @if (tool() === 'sketch' || tool() === 'shape' || tool() === 'connect' || tool() === 'text') {
     <div class="sketch-tools canvas-action-bar" appScroll="x" scrollbar="hover" data-ui>
-      <button class="sketch-tab" [class.active]="tool() === 'sketch'" (click)="setTool('sketch')">Draw</button>
-      <button class="sketch-tab" [class.active]="tool() === 'shape'" (click)="setTool('shape')">Shapes</button>
-      <button class="sketch-tab" [class.active]="tool() === 'connect'" (click)="setTool('connect')">Connector</button>
-      <button class="sketch-tab" [class.active]="tool() === 'text'" (click)="setTool('text')">Text</button>
+      <button class="sketch-tab" [class.active]="tool() === 'sketch'" (click)="setTool('sketch')">
+        Draw
+      </button>
+      <button class="sketch-tab" [class.active]="tool() === 'shape'" (click)="setTool('shape')">
+        Shapes
+      </button>
+      <button class="sketch-tab" [class.active]="tool() === 'connect'" (click)="setTool('connect')">
+        Connector
+      </button>
+      <button class="sketch-tab" [class.active]="tool() === 'text'" (click)="setTool('text')">
+        Text
+      </button>
       <button class="sketch-tab" (click)="openMedia('sticker')">Stickers</button>
       <button class="sketch-tab" (click)="create('er-entity')">ER entity</button>
       @if (tool() === 'sketch') {
-      <button [class.active]="!sketchEraser()" (click)="sketchEraser.set(false)" aria-label="Draw"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m4 20 4.5-1 11-11a2 2 0 0 0-3-3l-11 11L4 20ZM14 7l3 3"/></svg></button>
-      <button
-        [class.active]="sketchEraser()"
-        (click)="sketchEraser.set(true)"
-        aria-label="Erase sketch marks"
-      ><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m8 4-6 8 6 8h11a3 3 0 0 0 3-3V7a3 3 0 0 0-3-3H8Zm3 5 6 6m0-6-6 6"/></svg></button>
-      <thread-select size="compact" aria-label="Brush" [value]="brush()" (change)="brush.set($any($event.target).value)"><thread-option value="pen" label="Pen"></thread-option><thread-option value="marker" label="Marker"></thread-option><thread-option value="highlighter" label="Highlighter"></thread-option><thread-option value="neon" label="Neon"></thread-option></thread-select>
-      <label class="brush-gauge" [attr.aria-label]="'Brush size ' + brushWidth()"><span class="brush-gauge-dot" [style.width.px]="brushWidth() + 4" [style.height.px]="brushWidth() + 4"></span><input type="range" min="1" max="24" step="1" [value]="brushWidth()" (input)="brushWidth.set(+$any($event.target).value)" aria-label="Brush size" /><output>{{ brushWidth() }}</output></label>
-      <div class="sketch-colors">@for (color of ['#111111','#d4111c','#ffffff','#e2b72d','#315b89','#35735b','#9b4dcc','#e27632']; track color) { <button [style.background]="color" [class.active]="sketchColor() === color" (click)="sketchColor.set(color)" [attr.aria-label]="'Draw with ' + color"></button> }</div>
-      <thread-color aria-label="Drawing color" [value]="sketchColor()" (change)="sketchColor.set($any($event.target).value)"></thread-color>
-      <button (click)="undoSketchStroke()" aria-label="Undo stroke"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 8 4 12l4 4M4 12h10a6 6 0 0 1 0 12"/></svg></button>
-      <button (click)="redoSketchStroke()" aria-label="Redo stroke"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m16 8 4 4-4 4m4-4H10a6 6 0 0 0 0 12"/></svg></button>
+        <button
+          [class.active]="!sketchEraser()"
+          (click)="sketchEraser.set(false)"
+          aria-label="Draw"
+        >
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="m4 20 4.5-1 11-11a2 2 0 0 0-3-3l-11 11L4 20ZM14 7l3 3" />
+          </svg>
+        </button>
+        <button
+          [class.active]="sketchEraser()"
+          (click)="sketchEraser.set(true)"
+          aria-label="Erase sketch marks"
+        >
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="m8 4-6 8 6 8h11a3 3 0 0 0 3-3V7a3 3 0 0 0-3-3H8Zm3 5 6 6m0-6-6 6" />
+          </svg>
+        </button>
+        <thread-select
+          size="compact"
+          aria-label="Brush"
+          [value]="brush()"
+          (change)="brush.set($any($event.target).value)"
+          ><thread-option value="pen" label="Pen"></thread-option
+          ><thread-option value="marker" label="Marker"></thread-option
+          ><thread-option value="highlighter" label="Highlighter"></thread-option
+          ><thread-option value="neon" label="Neon"></thread-option
+        ></thread-select>
+        <label class="brush-gauge" [attr.aria-label]="'Brush size ' + brushWidth()"
+          ><span
+            class="brush-gauge-dot"
+            [style.width.px]="brushWidth() + 4"
+            [style.height.px]="brushWidth() + 4"
+          ></span
+          ><input
+            type="range"
+            min="1"
+            max="24"
+            step="1"
+            [value]="brushWidth()"
+            (input)="brushWidth.set(+$any($event.target).value)"
+            aria-label="Brush size"
+          /><output>{{ brushWidth() }}</output></label
+        >
+        <div class="sketch-colors">
+          @for (
+            color of [
+              '#111111',
+              '#d4111c',
+              '#ffffff',
+              '#e2b72d',
+              '#315b89',
+              '#35735b',
+              '#9b4dcc',
+              '#e27632',
+            ];
+            track color
+          ) {
+            <button
+              [style.background]="color"
+              [class.active]="sketchColor() === color"
+              (click)="sketchColor.set(color)"
+              [attr.aria-label]="'Draw with ' + color"
+            ></button>
+          }
+        </div>
+        <thread-color
+          aria-label="Drawing color"
+          [value]="sketchColor()"
+          (change)="sketchColor.set($any($event.target).value)"
+        ></thread-color>
+        <button (click)="undoSketchStroke()" aria-label="Undo stroke">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M8 8 4 12l4 4M4 12h10a6 6 0 0 1 0 12" />
+          </svg>
+        </button>
+        <button (click)="redoSketchStroke()" aria-label="Redo stroke">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="m16 8 4 4-4 4m4-4H10a6 6 0 0 0 0 12" />
+          </svg>
+        </button>
       }
       @if (tool() === 'shape') {
         @for (kind of shapeKinds; track kind) {
-          <button class="shape-choice" [class.active]="shapeKind() === kind" (click)="shapeKind.set(kind)" [attr.aria-label]="shapeNames[kind]" [title]="shapeNames[kind]"><svg viewBox="0 0 100 100" aria-hidden="true"><path [attr.d]="shapePaths[kind]" /></svg><small>{{ shapeNames[kind] }}</small></button>
+          <button
+            class="shape-choice"
+            [class.active]="shapeKind() === kind"
+            (click)="shapeKind.set(kind)"
+            [attr.aria-label]="shapeNames[kind]"
+            [title]="shapeNames[kind]"
+          >
+            <svg viewBox="0 0 100 100" aria-hidden="true"><path [attr.d]="shapePaths[kind]" /></svg
+            ><small>{{ shapeNames[kind] }}</small>
+          </button>
         }
       }
-      @if (tool() === 'shape') { <thread-select aria-label="Shape color theme" [value]="shapeTheme()" (change)="shapeTheme.set(+$any($event.target).value)">@for (theme of shapeThemes; track theme.name; let index = $index) { <thread-option [value]="index" label="{{ theme.name }}"></thread-option> }</thread-select> }
+      @if (tool() === 'shape') {
+        <thread-select
+          aria-label="Shape color theme"
+          [value]="shapeTheme()"
+          (change)="shapeTheme.set(+$any($event.target).value)"
+        >
+          @for (theme of shapeThemes; track theme.name; let index = $index) {
+            <thread-option [value]="index" label="{{ theme.name }}"></thread-option>
+          }
+        </thread-select>
+      }
       @if (tool() === 'connect') {
-        @for (kind of ['straight','elbow','curved']; track kind) {
-          <button class="connector-kind" [class.active]="connectorKind() === kind" (click)="connectorKind.set($any(kind))">{{ kind }}</button>
+        @for (kind of ['straight', 'elbow', 'curved']; track kind) {
+          <button
+            class="connector-kind"
+            [class.active]="connectorKind() === kind"
+            (click)="connectorKind.set($any(kind))"
+          >
+            {{ kind }}
+          </button>
         }
       }
-      <button class="action-done" (click)="setTool('select')" aria-label="Finish using this tool">Done</button>
+      <button class="action-done" (click)="setTool('select')" aria-label="Finish using this tool">
+        Done
+      </button>
     </div>
   }
   @if (tool() === 'connect') {
     <div class="hint-pill tool-instruction" data-ui>
-      {{ connectionSourceId() ? 'Tap the target card to complete the connection' : 'Tap one card, then another to connect them' }}
+      {{
+        connectionSourceId()
+          ? 'Tap the target card to complete the connection'
+          : 'Tap one card, then another to connect them'
+      }}
     </div>
     @if (connectionSourceId(); as sourceId) {
       @if (connectionSourceEntity()?.type === 'er-entity') {
         <div class="er-connect-panel" data-ui>
           <label for="er-target">Connect {{ connectionSourceEntity()?.title }} to</label>
-          <thread-select id="er-target" #erTarget (change)="connectionTargetId.set(erTarget.value)"><thread-option value="" label="Choose an entity…"></thread-option>@for (entity of erEntities(); track entity.id) { @if (entity.id !== sourceId) { <thread-option [value]="entity.id" label="{{ entity.title || 'Unnamed entity' }}"></thread-option> } }</thread-select>
-          <button [disabled]="!erTarget.value" (click)="connectErTarget(sourceId, erTarget.value)">Connect</button>
+          <thread-select id="er-target" #erTarget (change)="connectionTargetId.set(erTarget.value)"
+            ><thread-option value="" label="Choose an entity…"></thread-option>
+            @for (entity of erEntities(); track entity.id) {
+              @if (entity.id !== sourceId) {
+                <thread-option
+                  [value]="entity.id"
+                  label="{{ entity.title || 'Unnamed entity' }}"
+                ></thread-option>
+              }
+            }
+          </thread-select>
+          <button [disabled]="!erTarget.value" (click)="connectErTarget(sourceId, erTarget.value)">
+            Connect
+          </button>
           <button (click)="setTool('select')">Cancel</button>
         </div>
       }
@@ -796,17 +2301,47 @@
     <div class="connection-toolbar canvas-action-bar" data-ui>
       <span>Drag line to reroute · drag + to branch</span>
       <button (click)="inspectorOpen.set(true)">Details</button>
-      <button (click)="removeSelectedConnection()" aria-label="Delete selected connector">Delete</button>
+      <button (click)="removeSelectedConnection()" aria-label="Delete selected connector">
+        Delete
+      </button>
     </div>
   }
-  @if (tool() === 'select' && selectedIds().length && (!editingId() || selected()?.type === 'text')) {
-    <div class="selection-toolbar canvas-action-bar" appScroll="x" scrollbar="hover" [class.editing-text]="!!editingId()" data-ui>
+  @if (
+    tool() === 'select' && selectedIds().length && (!editingId() || selected()?.type === 'text')
+  ) {
+    <div
+      class="selection-toolbar canvas-action-bar"
+      appScroll="x"
+      scrollbar="hover"
+      [class.editing-text]="!!editingId()"
+      data-ui
+    >
       <span>{{ selectedIds().length }} selected</span>
       @if (selected(); as item) {
-        @if (selectedIds().length > 1) { <button (click)="groupSelected()">Group</button> }
-        @if (item.groupId) { <button (click)="ungroupSelected()">Ungroup</button> }
-        @if (selectedIds().length === 1 && item.type === 'task') { <button (click)="addTaskNear(item.id)">+ Task</button><button (click)="addSubtask(item.id)">+ Subtask</button> }
-        @if (item.type === 'er-entity') { @if (selectedIds().length === 1) { <button (click)="editErFields(item)">Field details</button><button (click)="beginErConnection(item)">Connect</button><button (click)="addRelatedErEntity(item)">+ Related entity</button> } <button (click)="exportErDiagram()">Export DBML</button><button (click)="arrangeErDiagram()" title="Arrange ER entities in this view and automatically route relationships">Arrange diagram</button> }
+        @if (selectedIds().length > 1) {
+          <button (click)="groupSelected()">Group</button>
+        }
+        @if (item.groupId) {
+          <button (click)="ungroupSelected()">Ungroup</button>
+        }
+        @if (selectedIds().length === 1 && item.type === 'task') {
+          <button (click)="addTaskNear(item.id)">+ Task</button
+          ><button (click)="addSubtask(item.id)">+ Subtask</button>
+        }
+        @if (item.type === 'er-entity') {
+          @if (selectedIds().length === 1) {
+            <button (click)="editErFields(item)">Field details</button
+            ><button (click)="beginErConnection(item)">Connect</button
+            ><button (click)="addRelatedErEntity(item)">+ Related entity</button>
+          }
+          <button (click)="exportErDiagram()">Export DBML</button
+          ><button
+            (click)="arrangeErDiagram()"
+            title="Arrange ER entities in this view and automatically route relationships"
+          >
+            Arrange diagram
+          </button>
+        }
         @if (selectedIds().length === 1 && (item.type === 'text' || item.type === 'note')) {
           <thread-select
             aria-label="Font family"
@@ -829,7 +2364,8 @@
             <thread-option value="32" label="Section"></thread-option>
             <thread-option value="40" label="Title"></thread-option>
             <thread-option value="48" label="Hero"></thread-option>
-            <thread-option value="64" label="Display"></thread-option></thread-select><button
+            <thread-option value="64" label="Display"></thread-option></thread-select
+          ><button
             (click)="toggleBold(item.id)"
             [class.active]="(item.fontWeight || 600) >= 700"
             aria-label="Bold"
@@ -844,7 +2380,11 @@
             <thread-option value="center" label="Center"></thread-option>
             <thread-option value="right" label="Right"></thread-option>
           </thread-select>
-          <thread-color aria-label="Text color" [value]="item.textColor || '#111111'" (change)="setStyle(item.id, { textColor: $any($event.target).value })"></thread-color>
+          <thread-color
+            aria-label="Text color"
+            [value]="item.textColor || '#111111'"
+            (change)="setStyle(item.id, { textColor: $any($event.target).value })"
+          ></thread-color>
           <div class="swatches" aria-label="Text color">
             @for (
               color of [
@@ -867,7 +2407,11 @@
             }
           </div>
           @if (item.type === 'note') {
-            <thread-color aria-label="Note background" [value]="item.background || '#fff3d6'" (change)="setStyle(item.id, { background: $any($event.target).value })"></thread-color>
+            <thread-color
+              aria-label="Note background"
+              [value]="item.background || '#fff3d6'"
+              (change)="setStyle(item.id, { background: $any($event.target).value })"
+            ></thread-color>
             <div class="swatches" aria-label="Note background">
               @for (color of ['#ffffff', '#fff5d9', '#fcecee', '#eaf2ed', '#eaf0f8']; track color) {
                 <button
@@ -882,30 +2426,170 @@
         }
       }
       <button (click)="duplicate()">Duplicate</button
-      ><button (click)="erExpandedFieldId.set(null); inspectorOpen.set(!inspectorOpen())">Details</button
+      ><button (click)="erExpandedFieldId.set(null); inspectorOpen.set(!inspectorOpen())">
+        Details</button
       ><button (click)="removeSelected()">Delete</button>
     </div>
   }
   @if (selected(); as item) {
     @if (tool() === 'select' && erEditingField(item); as field) {
-      <section class="er-settings" data-ui role="region" aria-label="Field settings" (pointerdown)="$event.stopPropagation()" (keydown)="erSettingsKey($event)">
-        <header><div><small>{{ item.title }}</small><h2>Field settings</h2></div><button type="button" aria-label="Close field settings" (click)="closeErField()">×</button></header>
+      <section
+        class="er-settings"
+        data-ui
+        role="region"
+        aria-label="Field settings"
+        (pointerdown)="$event.stopPropagation()"
+        (keydown)="erSettingsKey($event)"
+      >
+        <header>
+          <div>
+            <small>{{ item.title }}</small>
+            <h2>Field settings</h2>
+          </div>
+          <button type="button" aria-label="Close field settings" (click)="closeErField()">
+            ×
+          </button>
+        </header>
         <div class="er-settings-body" appScroll="y" scrollbar="auto">
-          <nav class="er-field-tabs" aria-label="Fields">@for (entry of item.erFields || []; track entry.id) { <button [class.active]="entry.id === field.id" [attr.aria-pressed]="entry.id === field.id" (click)="openErField(item, entry)">{{ entry.name }}</button> }</nav>
-          <label>Field name<input class="er-settings-name" [value]="field.name" (change)="updateErField(item, field.id, { name: $any($event.target).value })" /></label>
-          <label>Data type<thread-select [disabled]="!!field.reference" [value]="erTypeChoice(field)" (change)="setErType(item, field, $any($event.target).value)">@for (type of erDataTypes; track type) { <thread-option [value]="type" [label]="erTypeLabel(type)"></thread-option> }<thread-option value="CUSTOM" label="Custom SQL type"></thread-option></thread-select></label>
-          @if (field.reference) { <p class="er-help">The data type follows the referenced field automatically.</p> }
-          @if (erTypeChoice(field) === 'CUSTOM') { <label>SQL type<input [value]="field.dataType === 'CUSTOM' ? '' : field.dataType" placeholder="VARCHAR(255)" (change)="updateErField(item, field.id, { dataType: $any($event.target).value })" /></label> }
-          @if (field.dataType === 'ENUM') { <label>Allowed values<textarea rows="3" [disabled]="!!field.reference" placeholder="draft, active, archived" [value]="field.enumValues?.join(', ') || ''" (change)="setErEnum(item, field, $event)"></textarea></label><p class="er-help">Separate values with commas or new lines.</p> }
-          <fieldset><legend>Rules</legend><label class="er-rule"><thread-checkbox [checked]="field.key === 'primary'" (change)="updateErField(item, field.id, { key: $any($event.target).checked ? 'primary' : 'none' })"></thread-checkbox><span>Primary key<small>Identifies each record. Always required.</small></span></label><label class="er-rule"><thread-checkbox [checked]="field.required" [disabled]="field.key === 'primary'" (change)="updateErField(item, field.id, { required: $any($event.target).checked })"></thread-checkbox><span>Required<small>Cannot be empty.</small></span></label><label class="er-rule"><thread-checkbox [checked]="field.unique" (change)="updateErField(item, field.id, { unique: $any($event.target).checked })"></thread-checkbox><span>Unique<small>Each value can appear only once.</small></span></label></fieldset>
-          <label>Relationship<thread-select [disabled]="field.key === 'primary'" [value]="field.reference ? field.reference.entityId + '/' + field.reference.fieldId : ''" (change)="setErReference(item, field, $any($event.target).value)"><thread-option value="" label="No relationship"></thread-option>@for (option of erReferenceOptions(item, field); track option.value) { <thread-option [value]="option.value" [label]="option.label"></thread-option> }</thread-select></label>
-          <p class="er-help">Choose another entity's primary or unique field. Thread adds the foreign key and connection for you.</p>
-          @if (!erReferenceOptions(item, field).length) { <button class="inspector-action" (click)="addRelatedErEntity(item)">+ Create a related entity</button> }
-          <details><summary>Default value and note</summary><label>Default value<input [value]="field.defaultValue || ''" placeholder="For example 0 or now()" (change)="updateErField(item, field.id, { defaultValue: $any($event.target).value })" /></label><label>Note<input [value]="field.note || ''" placeholder="Describe this field" (change)="updateErField(item, field.id, { note: $any($event.target).value })" /></label></details>
-          @if (erFieldIssue(item, field); as issue) { <p class="er-field-warning" role="status">{{ issue }}</p> }
-          <div class="er-field-reorder"><button [disabled]="item.erFields?.[0]?.id === field.id" (click)="moveErField(item, field.id, -1)">Move up</button><button [disabled]="item.erFields?.slice(-1)?.[0]?.id === field.id" (click)="moveErField(item, field.id, 1)">Move down</button></div>
+          <nav class="er-field-tabs" aria-label="Fields">
+            @for (entry of item.erFields || []; track entry.id) {
+              <button
+                [class.active]="entry.id === field.id"
+                [attr.aria-pressed]="entry.id === field.id"
+                (click)="openErField(item, entry)"
+              >
+                {{ entry.name }}
+              </button>
+            }
+          </nav>
+          <label
+            >Field name<input
+              class="er-settings-name"
+              [value]="field.name"
+              (change)="updateErField(item, field.id, { name: $any($event.target).value })"
+          /></label>
+          <label
+            >Data type<thread-select
+              [disabled]="!!field.reference"
+              [value]="erTypeChoice(field)"
+              (change)="setErType(item, field, $any($event.target).value)"
+            >
+              @for (type of erDataTypes; track type) {
+                <thread-option [value]="type" [label]="erTypeLabel(type)"></thread-option>
+              }
+              <thread-option value="CUSTOM" label="Custom SQL type"></thread-option></thread-select
+          ></label>
+          @if (field.reference) {
+            <p class="er-help">The data type follows the referenced field automatically.</p>
+          }
+          @if (erTypeChoice(field) === 'CUSTOM') {
+            <label
+              >SQL type<input
+                [value]="field.dataType === 'CUSTOM' ? '' : field.dataType"
+                placeholder="VARCHAR(255)"
+                (change)="updateErField(item, field.id, { dataType: $any($event.target).value })"
+            /></label>
+          }
+          @if (field.dataType === 'ENUM') {
+            <label
+              >Allowed values<textarea
+                rows="3"
+                [disabled]="!!field.reference"
+                placeholder="draft, active, archived"
+                [value]="field.enumValues?.join(', ') || ''"
+                (change)="setErEnum(item, field, $event)"
+              ></textarea>
+            </label>
+            <p class="er-help">Separate values with commas or new lines.</p>
+          }
+          <fieldset>
+            <legend>Rules</legend>
+            <label class="er-rule"
+              ><thread-checkbox
+                [checked]="field.key === 'primary'"
+                (change)="
+                  updateErField(item, field.id, {
+                    key: $any($event.target).checked ? 'primary' : 'none',
+                  })
+                "
+              ></thread-checkbox
+              ><span
+                >Primary key<small>Identifies each record. Always required.</small></span
+              ></label
+            ><label class="er-rule"
+              ><thread-checkbox
+                [checked]="field.required"
+                [disabled]="field.key === 'primary'"
+                (change)="updateErField(item, field.id, { required: $any($event.target).checked })"
+              ></thread-checkbox
+              ><span>Required<small>Cannot be empty.</small></span></label
+            ><label class="er-rule"
+              ><thread-checkbox
+                [checked]="field.unique"
+                (change)="updateErField(item, field.id, { unique: $any($event.target).checked })"
+              ></thread-checkbox
+              ><span>Unique<small>Each value can appear only once.</small></span></label
+            >
+          </fieldset>
+          <label
+            >Relationship<thread-select
+              [disabled]="field.key === 'primary'"
+              [value]="
+                field.reference ? field.reference.entityId + '/' + field.reference.fieldId : ''
+              "
+              (change)="setErReference(item, field, $any($event.target).value)"
+              ><thread-option value="" label="No relationship"></thread-option>
+              @for (option of erReferenceOptions(item, field); track option.value) {
+                <thread-option [value]="option.value" [label]="option.label"></thread-option>
+              }</thread-select
+          ></label>
+          <p class="er-help">
+            Choose another entity's primary or unique field. Thread adds the foreign key and
+            connection for you.
+          </p>
+          @if (!erReferenceOptions(item, field).length) {
+            <button class="inspector-action" (click)="addRelatedErEntity(item)">
+              + Create a related entity
+            </button>
+          }
+          <details>
+            <summary>Default value and note</summary>
+            <label
+              >Default value<input
+                [value]="field.defaultValue || ''"
+                placeholder="For example 0 or now()"
+                (change)="
+                  updateErField(item, field.id, { defaultValue: $any($event.target).value })
+                " /></label
+            ><label
+              >Note<input
+                [value]="field.note || ''"
+                placeholder="Describe this field"
+                (change)="updateErField(item, field.id, { note: $any($event.target).value })"
+            /></label>
+          </details>
+          @if (erFieldIssue(item, field); as issue) {
+            <p class="er-field-warning" role="status">{{ issue }}</p>
+          }
+          <div class="er-field-reorder">
+            <button
+              [disabled]="item.erFields?.[0]?.id === field.id"
+              (click)="moveErField(item, field.id, -1)"
+            >
+              Move up</button
+            ><button
+              [disabled]="item.erFields?.slice(-1)?.[0]?.id === field.id"
+              (click)="moveErField(item, field.id, 1)"
+            >
+              Move down
+            </button>
+          </div>
         </div>
-        <footer><button class="danger" (click)="removeErField(item, field.id); closeErField()">Delete field</button><button class="er-settings-done" (click)="closeErField()">Done</button></footer>
+        <footer>
+          <button class="danger" (click)="removeErField(item, field.id); closeErField()">
+            Delete field</button
+          ><button class="er-settings-done" (click)="closeErField()">Done</button>
+        </footer>
       </section>
     }
   }
@@ -922,29 +2606,30 @@
       </div>
       <div class="inspector-body">
         @if (selectedIds().length === 1 && selected(); as item) {
-          @if (item.type !== 'er-entity') { <div class="inspector-grid">
-            <label
-              >X<input
-                type="number"
-                [value]="item.x"
-                (change)="setProperty(item.id, 'x', $event)" /></label
-            ><label
-              >Y<input
-                type="number"
-                [value]="item.y"
-                (change)="setProperty(item.id, 'y', $event)" /></label
-            ><label
-              >W<input
-                type="number"
-                [value]="item.width"
-                (change)="setProperty(item.id, 'width', $event)" /></label
-            ><label
-              >H<input
-                type="number"
-                [value]="item.height"
-                (change)="setProperty(item.id, 'height', $event)"
-            /></label>
-          </div>
+          @if (item.type !== 'er-entity') {
+            <div class="inspector-grid">
+              <label
+                >X<input
+                  type="number"
+                  [value]="item.x"
+                  (change)="setProperty(item.id, 'x', $event)" /></label
+              ><label
+                >Y<input
+                  type="number"
+                  [value]="item.y"
+                  (change)="setProperty(item.id, 'y', $event)" /></label
+              ><label
+                >W<input
+                  type="number"
+                  [value]="item.width"
+                  (change)="setProperty(item.id, 'width', $event)" /></label
+              ><label
+                >H<input
+                  type="number"
+                  [value]="item.height"
+                  (change)="setProperty(item.id, 'height', $event)"
+              /></label>
+            </div>
           }
           @if (item.type === 'task') {
             <label
@@ -953,8 +2638,7 @@
                 (change)="setTaskStatus(item.id, $event)"
               >
                 <thread-option value="open" label="Open"></thread-option>
-                <thread-option value="done" label="Done"></thread-option>
-              </thread-select></label
+                <thread-option value="done" label="Done"></thread-option> </thread-select></label
             ><label
               >Due date<input
                 type="date"
@@ -968,8 +2652,7 @@
                 <thread-option value="" label="None"></thread-option>
                 <thread-option label="Low"></thread-option>
                 <thread-option label="Medium"></thread-option>
-                <thread-option label="High"></thread-option>
-              </thread-select></label
+                <thread-option label="High"></thread-option> </thread-select></label
             ><label
               >Notes<textarea
                 [value]="item.body || ''"
@@ -987,7 +2670,6 @@
           @if (item.type === 'list') {
             <label
               ><thread-checkbox
-
                 [checked]="item.ordered || false"
                 (change)="setOrdered(item.id, $event)"
               ></thread-checkbox>
@@ -998,25 +2680,110 @@
             <button class="inspector-action" (click)="startCrop()">Crop image</button
             ><button class="inspector-action" (click)="replaceImage()">Replace image</button>
           }
-          @if (item.type === 'image' || item.type === 'gif' || item.type === 'sticker') { <div class="inspector-grid"><button class="inspector-action" (click)="flip(item.id, 'x')">Flip horizontal</button><button class="inspector-action" (click)="flip(item.id, 'y')">Flip vertical</button></div> }
-          @if (item.type === 'sketch') { <label class="accent-control">Stroke color<thread-color  [value]="item.accent || '#d4111c'" (change)="setStyle(item.id, {accent: $any($event.target).value})" ></thread-color></label> }
+          @if (item.type === 'image' || item.type === 'gif' || item.type === 'sticker') {
+            <div class="inspector-grid">
+              <button class="inspector-action" (click)="flip(item.id, 'x')">Flip horizontal</button
+              ><button class="inspector-action" (click)="flip(item.id, 'y')">Flip vertical</button>
+            </div>
+          }
+          @if (item.type === 'sketch') {
+            <label class="accent-control"
+              >Stroke color<thread-color
+                [value]="item.accent || '#d4111c'"
+                (change)="setStyle(item.id, { accent: $any($event.target).value })"
+              ></thread-color
+            ></label>
+          }
           @if (item.type === 'shape') {
-            <label>Shape<thread-select [value]="item.shapeKind || 'rectangle'" (change)="setStyle(item.id, { shapeKind: $any($event.target).value })">@for (kind of shapeKinds; track kind) { <thread-option [value]="kind" label="{{ shapeNames[kind] }}"></thread-option> }</thread-select></label>
-            <div class="shape-theme-options">@for (theme of shapeThemes; track theme.name; let index = $index) { <button [style.background]="theme.fill" [style.border-color]="theme.stroke" [style.color]="theme.text" (click)="applyShapeTheme(item, index)">{{ theme.name }}</button> }</div>
-            <label>Border style<thread-select [value]="item.shapeStrokeStyle || 'solid'" (change)="setStyle(item.id, { shapeStrokeStyle: $any($event.target).value })"><thread-option value="solid" label="Solid"></thread-option><thread-option value="dashed" label="Dashed"></thread-option></thread-select></label>
-            <label>Label<input [value]="item.title" (change)="setString(item.id, 'title', $event)" /></label>
-            <div class="inspector-grid"><label>Label size<input type="number" min="10" max="64" [value]="item.fontSize || 16" (change)="setTextSize(item.id, $event)" /></label><label>Label color<thread-color  [value]="item.textColor || '#1e293b'" (change)="setStyle(item.id, { textColor: $any($event.target).value })" ></thread-color></label></div>
-            <label>Fill<thread-color  [value]="item.shapeFill || '#ffffff'" (change)="setStyle(item.id, {shapeFill: $any($event.target).value})" ></thread-color></label>
-            <label>Outline<thread-color  [value]="item.shapeStroke || '#6b7280'" (change)="setStyle(item.id, {shapeStroke: $any($event.target).value})" ></thread-color></label>
-            <label>Outline weight<input type="range" min="1" max="8" [value]="item.shapeStrokeWidth || 2" (change)="setStyle(item.id, {shapeStrokeWidth: +$any($event.target).value})" /></label>
+            <label
+              >Shape<thread-select
+                [value]="item.shapeKind || 'rectangle'"
+                (change)="setStyle(item.id, { shapeKind: $any($event.target).value })"
+              >
+                @for (kind of shapeKinds; track kind) {
+                  <thread-option [value]="kind" label="{{ shapeNames[kind] }}"></thread-option>
+                }</thread-select
+            ></label>
+            <div class="shape-theme-options">
+              @for (theme of shapeThemes; track theme.name; let index = $index) {
+                <button
+                  [style.background]="theme.fill"
+                  [style.border-color]="theme.stroke"
+                  [style.color]="theme.text"
+                  (click)="applyShapeTheme(item, index)"
+                >
+                  {{ theme.name }}
+                </button>
+              }
+            </div>
+            <label
+              >Border style<thread-select
+                [value]="item.shapeStrokeStyle || 'solid'"
+                (change)="setStyle(item.id, { shapeStrokeStyle: $any($event.target).value })"
+                ><thread-option value="solid" label="Solid"></thread-option
+                ><thread-option value="dashed" label="Dashed"></thread-option></thread-select
+            ></label>
+            <label
+              >Label<input [value]="item.title" (change)="setString(item.id, 'title', $event)"
+            /></label>
+            <div class="inspector-grid">
+              <label
+                >Label size<input
+                  type="number"
+                  min="10"
+                  max="64"
+                  [value]="item.fontSize || 16"
+                  (change)="setTextSize(item.id, $event)" /></label
+              ><label
+                >Label color<thread-color
+                  [value]="item.textColor || '#1e293b'"
+                  (change)="setStyle(item.id, { textColor: $any($event.target).value })"
+                ></thread-color
+              ></label>
+            </div>
+            <label
+              >Fill<thread-color
+                [value]="item.shapeFill || '#ffffff'"
+                (change)="setStyle(item.id, { shapeFill: $any($event.target).value })"
+              ></thread-color
+            ></label>
+            <label
+              >Outline<thread-color
+                [value]="item.shapeStroke || '#6b7280'"
+                (change)="setStyle(item.id, { shapeStroke: $any($event.target).value })"
+              ></thread-color
+            ></label>
+            <label
+              >Outline weight<input
+                type="range"
+                min="1"
+                max="8"
+                [value]="item.shapeStrokeWidth || 2"
+                (change)="setStyle(item.id, { shapeStrokeWidth: +$any($event.target).value })"
+            /></label>
           }
           @if (item.type === 'er-entity') {
-            <p class="er-help">Click a field name to rename it. Open field settings to add keys, relationships, or allowed values.</p>
-            <label>Entity name<input [value]="item.title" (change)="setStyle(item.id, { title: $any($event.target).value })" /></label>
-            <div class="er-inspector-heading">Fields <span>{{ item.erFields?.length || 0 }}</span></div>
-            @for (field of item.erFields || []; track field.id) { <button class="inspector-action" (click)="openErField(item, field)">{{ field.name }} <span class="er-type">{{ field.dataType }}</span></button> }
+            <p class="er-help">
+              Click a field name to rename it. Open field settings to add keys, relationships, or
+              allowed values.
+            </p>
+            <label
+              >Entity name<input
+                [value]="item.title"
+                (change)="setStyle(item.id, { title: $any($event.target).value })"
+            /></label>
+            <div class="er-inspector-heading">
+              Fields <span>{{ item.erFields?.length || 0 }}</span>
+            </div>
+            @for (field of item.erFields || []; track field.id) {
+              <button class="inspector-action" (click)="openErField(item, field)">
+                {{ field.name }} <span class="er-type">{{ field.dataType }}</span>
+              </button>
+            }
             <button class="inspector-action" (click)="addErField(item)">+ Add field</button>
-            <button class="inspector-action" (click)="addRelatedErEntity(item)">+ Related entity</button>
+            <button class="inspector-action" (click)="addRelatedErEntity(item)">
+              + Related entity
+            </button>
             <button class="inspector-action" (click)="arrangeErDiagram()">Arrange diagram</button>
           }
           @if (item.type === 'link') {
@@ -1035,7 +2802,10 @@
           <button class="inspector-action" (click)="layer('front')">Bring forward</button
           ><button class="inspector-action" (click)="layer('back')">Send backward</button>
         </div>
-        <div class="inspector-grid"><button class="inspector-action" (click)="layer('top')">Bring to front</button><button class="inspector-action" (click)="layer('bottom')">Send to back</button></div>
+        <div class="inspector-grid">
+          <button class="inspector-action" (click)="layer('top')">Bring to front</button
+          ><button class="inspector-action" (click)="layer('bottom')">Send to back</button>
+        </div>
         <button class="inspector-action" (click)="duplicate()">Duplicate</button
         ><button class="inspector-action danger" (click)="removeSelected()">Delete</button>
       </div>
@@ -1043,17 +2813,89 @@
   }
   @if (selectedConnectionId() && !selected() && inspectorOpen()) {
     <aside class="inspector relationship-inspector" appScroll="y" scrollbar="auto" data-ui>
-      <div class="inspector-head"><div><small>CONNECTION DETAILS</small><h2>Relationship</h2></div><button (click)="inspectorOpen.set(false)" aria-label="Close relationship details">×</button></div>
+      <div class="inspector-head">
+        <div>
+          <small>CONNECTION DETAILS</small>
+          <h2>Relationship</h2>
+        </div>
+        <button (click)="inspectorOpen.set(false)" aria-label="Close relationship details">
+          ×
+        </button>
+      </div>
       @if (selectedConnection(); as connection) {
         <div class="inspector-body">
           <p class="er-help">{{ connectionFieldLabel(connection, true) }}</p>
-          <label>Relationship label<input [value]="connection.label || ''" placeholder="e.g. places" (change)="setConnection(connection.id, { label: $any($event.target).value })" /></label>
-          <div class="inspector-grid"><label>From<thread-select [value]="connection.sourceCardinality || '1'" (change)="setConnection(connection.id, { sourceCardinality: $any($event.target).value })"><thread-option value="1" label="One"></thread-option><thread-option value="0..1" label="Zero or one"></thread-option><thread-option value="many" label="Many"></thread-option><thread-option value="0..many" label="Zero or many"></thread-option></thread-select></label><label>To<thread-select [value]="connection.targetCardinality || 'many'" (change)="setConnection(connection.id, { targetCardinality: $any($event.target).value })"><thread-option value="1" label="One"></thread-option><thread-option value="0..1" label="Zero or one"></thread-option><thread-option value="many" label="Many"></thread-option><thread-option value="0..many" label="Zero or many"></thread-option></thread-select></label></div>
-          <label>Line<thread-select [value]="connection.kind || 'elbow'" (change)="setConnection(connection.id, { kind: $any($event.target).value })"><thread-option value="elbow" label="Elbow"></thread-option><thread-option value="straight" label="Straight"></thread-option><thread-option value="curved" label="Curved"></thread-option></thread-select></label>
-          @if (!connection.sourceCardinality && !connection.targetCardinality) { <label>Ends<thread-select [value]="connection.direction || 'none'" (change)="setConnection(connection.id, { direction: $any($event.target).value })"><thread-option value="none" label="Line"></thread-option><thread-option value="forward" label="Arrow"></thread-option></thread-select></label> }
-          <button class="inspector-action" (click)="setConnection(connection.id, { kind: 'elbow', routeOffset: 0, routeAxis: undefined, sourceBinding: { mode: 'auto' }, targetBinding: { mode: 'auto' } })">Reset to automatic routing</button>
-          @if (connection.sourceCardinality && connection.targetCardinality) { <button class="inspector-action" (click)="addParallelRelationship(connection)">+ Another relationship between these entities</button> }
-          <button class="inspector-action danger" (click)="removeSelectedConnection()">Delete relationship</button>
+          <label
+            >Relationship label<input
+              [value]="connection.label || ''"
+              placeholder="e.g. places"
+              (change)="setConnection(connection.id, { label: $any($event.target).value })"
+          /></label>
+          <div class="inspector-grid">
+            <label
+              >From<thread-select
+                [value]="connection.sourceCardinality || '1'"
+                (change)="
+                  setConnection(connection.id, { sourceCardinality: $any($event.target).value })
+                "
+                ><thread-option value="1" label="One"></thread-option
+                ><thread-option value="0..1" label="Zero or one"></thread-option
+                ><thread-option value="many" label="Many"></thread-option
+                ><thread-option
+                  value="0..many"
+                  label="Zero or many"
+                ></thread-option></thread-select></label
+            ><label
+              >To<thread-select
+                [value]="connection.targetCardinality || 'many'"
+                (change)="
+                  setConnection(connection.id, { targetCardinality: $any($event.target).value })
+                "
+                ><thread-option value="1" label="One"></thread-option
+                ><thread-option value="0..1" label="Zero or one"></thread-option
+                ><thread-option value="many" label="Many"></thread-option
+                ><thread-option value="0..many" label="Zero or many"></thread-option></thread-select
+            ></label>
+          </div>
+          <label
+            >Line<thread-select
+              [value]="connection.kind || 'elbow'"
+              (change)="setConnection(connection.id, { kind: $any($event.target).value })"
+              ><thread-option value="elbow" label="Elbow"></thread-option
+              ><thread-option value="straight" label="Straight"></thread-option
+              ><thread-option value="curved" label="Curved"></thread-option></thread-select
+          ></label>
+          @if (!connection.sourceCardinality && !connection.targetCardinality) {
+            <label
+              >Ends<thread-select
+                [value]="connection.direction || 'none'"
+                (change)="setConnection(connection.id, { direction: $any($event.target).value })"
+                ><thread-option value="none" label="Line"></thread-option
+                ><thread-option value="forward" label="Arrow"></thread-option></thread-select
+            ></label>
+          }
+          <button
+            class="inspector-action"
+            (click)="
+              setConnection(connection.id, {
+                kind: 'elbow',
+                routeOffset: 0,
+                routeAxis: undefined,
+                sourceBinding: { mode: 'auto' },
+                targetBinding: { mode: 'auto' },
+              })
+            "
+          >
+            Reset to automatic routing
+          </button>
+          @if (connection.sourceCardinality && connection.targetCardinality) {
+            <button class="inspector-action" (click)="addParallelRelationship(connection)">
+              + Another relationship between these entities
+            </button>
+          }
+          <button class="inspector-action danger" (click)="removeSelectedConnection()">
+            Delete relationship
+          </button>
         </div>
       }
     </aside>
