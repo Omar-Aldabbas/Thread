@@ -1,0 +1,347 @@
+<div class="table-content smart-block">
+  <div class="smart-head">
+    <div
+      class="smart-title"
+      data-edit-field="title"
+      [attr.contenteditable]="page.editingId() === item.id"
+      [attr.data-edit-id]="page.editingId() === item.id ? item.id : null"
+      (keydown)="page.inlineKey($event)"
+      (blur)="page.inlineBlur($event, item.id, 'title')"
+      [textContent]="item.title || (page.editingId() === item.id ? '' : 'Table')"
+    ></div>
+    <span class="linked-label">{{ page.linkedViewCount(item) > 1 ? 'Shared data' : '' }}</span>
+  </div>
+  @if (page.dataset(item); as data) {
+    @if (
+      page.tableFilter()?.itemId === item.id &&
+      (page.tableFilter()?.value || page.tableFilter()?.operator === 'empty')
+    ) {
+      <div class="table-filter-chip">
+        {{ page.tableFilter()?.key }} {{ page.tableFilter()?.operator }}
+        {{ page.tableFilter()?.value }}
+        <button
+          (pointerdown)="$event.stopPropagation()"
+          (click)="page.clearTableFilter()"
+          aria-label="Clear filter"
+        >
+          ×
+        </button>
+      </div>
+    }
+    <div class="table-scroll" appScroll="both" scrollbar="auto">
+      <table>
+        <colgroup>
+          @for (column of page.tableViewColumns(item, data); track column.id) {
+            <col [style.width.px]="item.tableColumnWidths?.[column.id] || 120" />
+          }
+          <col style="width: 30px" />
+        </colgroup>
+        <thead>
+          <tr>
+            @for (column of page.tableViewColumns(item, data); track column.id) {
+              <th
+                draggable="true"
+                (dragstart)="page.dragTableColumn(column.id, $event)"
+                (dragover)="$event.preventDefault()"
+                (drop)="page.dropTableColumn(item, data, column.id, $event)"
+              >
+                <div class="table-column-head">
+                  <span>{{ column.label }}</span>
+                  <button
+                    type="button"
+                    class="table-menu-trigger"
+                    [attr.aria-label]="column.label + ' options'"
+                    [attr.aria-expanded]="activeColumnId() === column.id"
+                    (pointerdown)="$event.stopPropagation()"
+                    (dragstart)="$event.preventDefault(); $event.stopPropagation()"
+                    (click)="toggleColumnMenu(column.id)"
+                  >
+                    ···
+                  </button>
+                </div>
+                <span
+                  class="table-resize"
+                  (pointerdown)="page.resizeTableColumn($event, item, column.id)"
+                  (dblclick)="page.fitTableColumn(item, data, column.id); $event.stopPropagation()"
+                ></span>
+              </th>
+            }
+            <th class="row-action"></th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (entry of page.tableGroupedRows(item, data); track entry.id; let rowIndex = $index) {
+            @if (entry.row; as row) {
+              <tr>
+                @for (column of page.tableViewColumns(item, data); track column.id) {
+                  <td
+                    tabindex="0"
+                    [class.cell-selected]="
+                      page.selectedDataCell() === item.id + ':' + row.id + ':' + column.key
+                    "
+                    [attr.data-select-cell]="item.id + ':' + row.id + ':' + column.key"
+                    (pointerdown)="$event.stopPropagation()"
+                    (click)="page.selectTableCell(item, row.id, column.key)"
+                    (dblclick)="page.editTableCell(item, row.id, column.key)"
+                    (keydown)="page.tableCellKey($event, item, row.id, column.key)"
+                  >
+                    @if (column.type === 'checkbox') {
+                      <thread-checkbox
+                        [checked]="!!row.values[column.key]"
+                        [attr.aria-label]="'Row ' + (rowIndex + 1) + ', ' + column.label"
+                        (pointerdown)="$event.stopPropagation()"
+                        (change)="
+                          page.beginDataEdit();
+                          page.setTableCell(item, row.id, column.key, $event);
+                          page.endDataEdit()
+                        "
+                      ></thread-checkbox>
+                    } @else if (
+                      page.editingDataCell() === item.id + ':' + row.id + ':' + column.key
+                    ) {
+                      <input
+                        [attr.data-edit-cell]="item.id + ':' + row.id + ':' + column.key"
+                        [type]="
+                          column.type === 'number' || column.type === 'currency'
+                            ? 'number'
+                            : column.type === 'date'
+                              ? 'date'
+                              : 'text'
+                        "
+                        [value]="row.values[column.key] ?? ''"
+                        [attr.aria-label]="'Row ' + (rowIndex + 1) + ', ' + column.label"
+                        (pointerdown)="$event.stopPropagation()"
+                        (focus)="page.beginDataEdit()"
+                        (input)="page.setTableCell(item, row.id, column.key, $event)"
+                        (blur)="page.stopDataCellEdit()"
+                        (keydown)="page.tableEditKey($event, item, row.id, column.key)"
+                      />
+                    } @else {
+                      <span [class.calculated-cell]="column.type === 'calculated'">{{
+                        column.type === 'currency' || column.type === 'calculated'
+                          ? page.money(row.values[column.key])
+                          : row.values[column.key]
+                      }}</span>
+                    }
+                  </td>
+                }
+                <td class="row-action">
+                  <button
+                    (pointerdown)="$event.stopPropagation()"
+                    (click)="page.removeTableRow(item, row.id)"
+                    aria-label="Remove row"
+                  >
+                    ×
+                  </button>
+                </td>
+              </tr>
+            } @else {
+              <tr class="table-group-row">
+                <td [attr.colspan]="data.columns.length + 1">
+                  <button
+                    (pointerdown)="$event.stopPropagation()"
+                    (click)="page.toggleTableGroup(item, entry.group || '')"
+                  >
+                    {{
+                      page.collapsedTableGroups().includes(item.id + ':' + entry.group) ? '▸' : '▾'
+                    }}
+                    {{ entry.group }} <span>{{ entry.count }} rows</span>
+                  </button>
+                </td>
+              </tr>
+            }
+          }
+        </tbody>
+        <tfoot>
+          <tr>
+            @for (column of page.tableViewColumns(item, data); track column.id) {
+              <td>
+                @if (
+                  column.type === 'number' ||
+                  column.type === 'currency' ||
+                  column.type === 'calculated'
+                ) {
+                  <span
+                    >{{ page.tableSummaryLabel(item, column.key) }}
+                    {{ page.money(page.tableSummaryValue(item, data, column.key)) }}</span
+                  >
+                }
+              </td>
+            }
+            <td></td>
+          </tr>
+        </tfoot>
+      </table>
+      @if (!data.rows.length) {
+        <div class="smart-empty">
+          No rows yet. Add one below.
+          @if (data.columns.length === 2) {
+            <button (pointerdown)="$event.stopPropagation()" (click)="page.useCostEstimate(item)">
+              Start a cost estimate
+            </button>
+          }
+        </div>
+      }
+    </div>
+    @if (activeColumnId(); as activeId) {
+      @for (column of page.tableViewColumns(item, data); track column.id) {
+        @if (column.id === activeId) {
+          <div class="table-column-menu" (pointerdown)="$event.stopPropagation()">
+            <div class="table-menu-heading">
+              <strong>{{ column.label }}</strong
+              ><button
+                type="button"
+                (click)="activeColumnId.set(null)"
+                aria-label="Close column options"
+              >
+                ×
+              </button>
+            </div>
+            <label
+              >Name<input
+                [value]="column.label"
+                (change)="page.setTableHeader(item, column.id, $event)" /></label
+            ><label
+              >Type<thread-select
+                [value]="column.type"
+                (change)="page.setTableColumnType(item, column.id, $event)"
+                ><thread-option value="text" label="Text"></thread-option
+                ><thread-option value="number" label="Number"></thread-option
+                ><thread-option value="currency" label="Currency"></thread-option
+                ><thread-option value="date" label="Date"></thread-option
+                ><thread-option value="category" label="Select"></thread-option
+                ><thread-option
+                  value="checkbox"
+                  label="Checkbox"
+                ></thread-option></thread-select></label
+            ><button (click)="page.setTableSort(item, column.key, 1)">Sort ascending</button
+            ><button (click)="page.setTableSort(item, column.key, -1)">Sort descending</button
+            ><button (click)="page.clearTableSort()">Clear sort</button
+            ><label
+              >Filter<thread-select
+                [value]="
+                  page.tableFilter()?.key === column.key ? page.tableFilter()?.operator : 'contains'
+                "
+                (change)="page.setTableFilterOperator(item, column.key, $event)"
+                ><thread-option value="contains" label="Contains"></thread-option
+                ><thread-option value="is" label="Is"></thread-option
+                ><thread-option value="not" label="Is not"></thread-option
+                ><thread-option value="empty" label="Is empty"></thread-option
+                ><thread-option value="gt" label="Greater than"></thread-option
+                ><thread-option value="lt" label="Less than"></thread-option
+                ><thread-option value="between" label="Between"></thread-option></thread-select
+              ><input
+                [value]="page.tableFilter()?.key === column.key ? page.tableFilter()?.value : ''"
+                placeholder="Value"
+                (input)="page.setTableFilter(item, column.key, $event)"
+              />
+              @if (
+                page.tableFilter()?.key === column.key && page.tableFilter()?.operator === 'between'
+              ) {
+                <input
+                  [value]="page.tableFilter()?.second || ''"
+                  placeholder="And"
+                  (input)="page.setTableFilterSecond(item, column.key, $event)"
+                />
+              }</label
+            ><button (click)="page.setTableGroup(item, column.key)">Group by this column</button
+            ><button (click)="page.clearTableGroup()">Clear grouping</button>
+            @if (
+              column.type === 'number' || column.type === 'currency' || column.type === 'calculated'
+            ) {
+              <label
+                >Summarize<thread-select
+                  [value]="page.tableSummary()[item.id + ':' + column.key] || 'sum'"
+                  (change)="page.setTableSummary(item, column.key, $event)"
+                  ><thread-option value="sum" label="Sum"></thread-option
+                  ><thread-option value="average" label="Average"></thread-option
+                  ><thread-option value="min" label="Min"></thread-option
+                  ><thread-option value="max" label="Max"></thread-option
+                  ><thread-option value="count" label="Count"></thread-option></thread-select
+              ></label>
+            }
+            <button (click)="page.removeTableColumn(item, column.id)">Delete column</button>
+          </div>
+        }
+      }
+    }
+    <div class="table-actions">
+      <button (pointerdown)="$event.stopPropagation()" (click)="page.addTableRow(item.id)">
+        + New row
+      </button>
+      <details class="smart-menu" (pointerdown)="$event.stopPropagation()">
+        <summary>+ Column</summary>
+        <label>Name <input #newColumnName placeholder="Column name" /></label
+        ><label
+          >Type
+          <thread-select #newColumnType
+            ><thread-option value="text" label="Text"></thread-option
+            ><thread-option value="number" label="Number"></thread-option
+            ><thread-option value="currency" label="Currency"></thread-option
+            ><thread-option value="date" label="Date"></thread-option
+            ><thread-option value="category" label="Select"></thread-option
+            ><thread-option
+              value="checkbox"
+              label="Checkbox"
+            ></thread-option></thread-select></label
+        ><button (click)="page.addTableColumn(item.id, newColumnName.value, newColumnType.value)">
+          Create column
+        </button>
+      </details>
+      <details class="smart-menu calculation-menu" (pointerdown)="$event.stopPropagation()">
+        <summary>+ Calculation</summary>
+        <label>Name<input #calculationName placeholder="Total" /></label
+        ><label
+          >First field<thread-select #calculationLeft>
+            @for (column of data.columns; track column.id) {
+              @if (column.type === 'number' || column.type === 'currency') {
+                <thread-option [value]="column.key" label="{{ column.label }}"></thread-option>
+              }
+            }</thread-select></label
+        ><label
+          >Calculation<thread-select #calculationOperator
+            ><thread-option value="+" label="Add"></thread-option
+            ><thread-option value="-" label="Subtract"></thread-option
+            ><thread-option value="*" label="Multiply"></thread-option
+            ><thread-option value="/" label="Divide"></thread-option
+            ><thread-option value="%" label="Percentage"></thread-option></thread-select></label
+        ><label
+          >Second field<thread-select #calculationRight>
+            @for (column of data.columns; track column.id) {
+              @if (column.type === 'number' || column.type === 'currency') {
+                <thread-option [value]="column.key" label="{{ column.label }}"></thread-option>
+              }
+            }</thread-select></label
+        ><button
+          (click)="
+            page.addCalculatedColumn(
+              item,
+              calculationName.value,
+              calculationLeft.value,
+              calculationOperator.value,
+              calculationRight.value
+            )
+          "
+        >
+          Add calculation
+        </button>
+      </details>
+      @if (page.canChart(data)) {
+        <button
+          (pointerdown)="$event.stopPropagation()"
+          (click)="page.createLinkedView(item, 'chart')"
+        >
+          Chart view
+        </button>
+      }
+      @if (page.canBudget(data)) {
+        <button
+          (pointerdown)="$event.stopPropagation()"
+          (click)="page.createLinkedView(item, 'budget')"
+        >
+          Budget view
+        </button>
+      }
+    </div>
+  }
+</div>

@@ -14,29 +14,8 @@ import { Router } from '@angular/router';
 import { PreferencesService } from '../../../../shared/preferences.service';
 import { ThreadHeader } from '../../../../shared/thread-header';
 import { ScrollDirective } from '../../../../shared/scroll.directive';
-
-type Tool = 'select' | 'hand' | 'edit' | 'add';
-
-type SpaceTone = 'red' | 'blue' | 'yellow' | 'green' | 'neutral';
-
-type SpacePreview = 'mixed' | 'checklist' | 'notes' | 'visual';
-
-interface SpaceCard {
-  id: string;
-
-  title: string;
-
-  itemCount: number;
-
-  updatedAt: string;
-
-  x: number;
-  y: number;
-
-  tone: SpaceTone;
-
-  preview: SpacePreview;
-}
+import { SpaceCard, SpacePreview, SpaceTone, SpaceTool as Tool } from '../../space.model';
+import { SpaceCardView } from '../../components/space-card-view/space-card-view';
 
 interface PanSession {
   pointerId: number;
@@ -64,7 +43,7 @@ interface DragSession {
 
 @Component({
   selector: 'app-spaces-page',
-  imports: [ThreadHeader, ScrollDirective],
+  imports: [ThreadHeader, ScrollDirective, SpaceCardView],
   templateUrl: './spaces-page.html',
   styleUrl: './spaces-page.css',
 })

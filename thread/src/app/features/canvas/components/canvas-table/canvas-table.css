@@ -1,0 +1,361 @@
+:host {
+  display: block;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+}
+button {
+  cursor: pointer;
+  border: 0;
+  background: transparent;
+  color: inherit;
+}
+.table-content {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  padding: 13px;
+  background: var(--color-surface);
+  color: var(--color-text-primary);
+  font-size: 12px;
+}
+.smart-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  min-width: 0;
+  flex: none;
+}
+.smart-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1.3;
+  outline: none;
+}
+.linked-label {
+  flex: none;
+  color: var(--color-text-muted);
+  font-size: 10px;
+}
+.table-filter-chip {
+  align-self: flex-start;
+  flex: none;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 4px 7px;
+  border: 1px solid var(--color-border);
+  color: var(--color-text-secondary);
+  font-size: 10px;
+}
+.table-filter-chip button {
+  margin-left: 5px;
+  color: var(--color-primary);
+}
+.table-scroll {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+  border: 1px solid var(--color-border-light);
+  overscroll-behavior: contain;
+}
+.table-content table {
+  width: max-content;
+  min-width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  table-layout: fixed;
+}
+.table-content th,
+.table-content td {
+  position: relative;
+  min-width: 90px;
+  max-width: 420px;
+  border-right: 1px solid var(--color-border-light);
+  border-bottom: 1px solid var(--color-border-light);
+}
+.table-content th {
+  position: sticky;
+  z-index: 1;
+  top: 0;
+  height: 36px;
+  background: var(--color-surface-muted);
+  text-align: left;
+}
+.table-column-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px;
+  min-width: 0;
+  padding: 4px 7px;
+  font-size: 11px;
+  font-weight: 650;
+}
+.table-column-head > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.table-menu-trigger {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 4px;
+  color: var(--color-text-muted);
+  font-size: 17px;
+  line-height: 1;
+}
+.table-menu-trigger:hover,
+.table-menu-trigger[aria-expanded='true'] {
+  background: var(--color-primary-subtle);
+  color: var(--color-primary);
+}
+.table-resize {
+  position: absolute;
+  z-index: 3;
+  top: 0;
+  right: -4px;
+  width: 8px;
+  height: 100%;
+  cursor: col-resize;
+  touch-action: none;
+}
+.table-resize:hover {
+  border-right: 2px solid var(--color-primary);
+}
+.table-content td {
+  height: 38px;
+  padding: 0 10px;
+  color: var(--color-text-primary);
+  font-size: 12px;
+  outline: none;
+}
+.table-content td > span {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.table-content td.cell-selected {
+  box-shadow: inset 0 0 0 1px var(--color-primary);
+}
+.table-content td input {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  height: 32px;
+  padding: 4px 2px;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--color-text-primary);
+  font-size: 12px;
+}
+.table-content td input:focus {
+  box-shadow: inset 0 0 0 2px var(--color-primary);
+}
+.table-content td .calculated-cell {
+  color: var(--color-text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+.table-content .row-action {
+  min-width: 32px;
+  width: 32px;
+  max-width: 32px;
+  padding: 0;
+  border-right: 0;
+  text-align: center;
+}
+.row-action button {
+  width: 28px;
+  height: 28px;
+  color: var(--color-text-muted);
+  font-size: 15px;
+}
+.table-content .table-group-row td {
+  height: 30px;
+  background: var(--color-surface-muted);
+}
+.table-group-row button {
+  width: 100%;
+  padding: 5px 0;
+  text-align: left;
+  color: var(--color-text-primary);
+  font-size: 10px;
+  font-weight: 700;
+}
+.table-group-row button span {
+  display: inline;
+  margin-left: 7px;
+  color: var(--color-text-muted);
+  font-weight: 400;
+}
+.table-content tfoot td {
+  height: 29px;
+  background: var(--color-surface-muted);
+  color: var(--color-text-secondary);
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+}
+.smart-empty {
+  padding: 20px 8px;
+  color: var(--color-text-muted);
+  text-align: center;
+  line-height: 1.5;
+}
+.smart-empty button {
+  display: block;
+  margin: 5px auto 0;
+  color: var(--color-primary);
+}
+.table-column-menu {
+  position: absolute;
+  z-index: 20;
+  top: 46px;
+  right: 13px;
+  width: min(240px, calc(100% - 26px));
+  max-height: calc(100% - 60px);
+  overflow: auto;
+  padding: 10px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-surface);
+  box-shadow: var(--shadow-md);
+  user-select: text;
+}
+.table-menu-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  padding: 2px 2px 7px;
+  border-bottom: 1px solid var(--color-border-light);
+}
+.table-menu-heading strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.table-menu-heading button {
+  font-size: 18px;
+}
+.table-column-menu label {
+  display: block;
+  padding: 7px 2px;
+  color: var(--color-text-muted);
+  font-size: 10px;
+}
+.table-column-menu input,
+.table-column-menu thread-select {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  min-height: 30px;
+  margin-top: 4px;
+  padding: 5px;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+}
+.table-column-menu > button {
+  display: block;
+  width: 100%;
+  min-height: 30px;
+  padding: 6px 2px;
+  text-align: left;
+  font-size: 11px;
+}
+.table-column-menu > button:hover {
+  color: var(--color-primary);
+  background: var(--color-primary-subtle);
+}
+.table-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 5px 12px;
+  flex: none;
+  max-height: 45%;
+  overflow: auto;
+}
+.table-actions > button,
+.table-actions > .smart-menu > summary {
+  min-height: 30px;
+  padding: 5px 0;
+  color: var(--color-primary);
+  font-size: 11px;
+  font-weight: 700;
+}
+.table-actions > button:hover,
+.table-actions > .smart-menu > summary:hover {
+  color: var(--color-text-primary);
+}
+.smart-menu {
+  position: relative;
+  color: var(--color-text-secondary);
+  font-size: 11px;
+}
+.smart-menu summary {
+  cursor: pointer;
+  list-style: none;
+  white-space: nowrap;
+}
+.smart-menu[open] {
+  align-self: flex-start;
+  min-width: 170px;
+  max-height: min(240px, 60vh);
+  overflow: auto;
+  padding: 0 8px 8px;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  background: var(--color-surface);
+  box-shadow: var(--shadow-sm);
+}
+.smart-menu > button,
+.smart-menu > label {
+  display: block;
+  width: 100%;
+  padding: 6px 2px;
+  text-align: left;
+  font-size: 11px;
+}
+.smart-menu > label input,
+.smart-menu > label thread-select {
+  display: block;
+  width: 100%;
+  margin-top: 4px;
+  padding: 5px;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+}
+.smart-menu > button:hover {
+  color: var(--color-primary);
+  background: var(--color-primary-subtle);
+}
+@media (pointer: coarse) {
+  .table-content td {
+    min-height: 40px;
+  }
+  .table-actions > button,
+  .table-actions summary {
+    min-height: 42px;
+    font-size: 13px;
+  }
+}

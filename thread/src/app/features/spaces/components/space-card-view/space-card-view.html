@@ -1,0 +1,135 @@
+<article
+  class="space-card"
+  [class.tool-select]="tool === 'select'"
+  [class.tool-hand]="tool === 'hand'"
+  [class.tool-edit]="tool === 'edit'"
+  [class.is-panning]="panning"
+  [class.selected]="selected"
+  [class.dragging]="dragging"
+  [class.tone-red]="space.tone === 'red'"
+  [class.tone-blue]="space.tone === 'blue'"
+  [class.tone-yellow]="space.tone === 'yellow'"
+  [class.tone-green]="space.tone === 'green'"
+  [style.left.px]="space.x"
+  [style.top.px]="space.y"
+  tabindex="0"
+  (pointerdown)="cardPointerDown.emit($event)"
+  (pointermove)="cardPointerMove.emit($event)"
+  (pointerup)="cardPointerUp.emit($event)"
+  (pointercancel)="cardPointerCancel.emit($event)"
+  (keydown.enter)="open.emit()"
+  (dblclick)="open.emit()"
+>
+  <div class="card-accent"></div>
+  <button
+    class="mobile-open"
+    type="button"
+    (pointerdown)="$event.stopPropagation()"
+    (pointerup)="$event.stopPropagation()"
+    (click)="$event.stopPropagation(); open.emit()"
+    [attr.aria-label]="'Open ' + space.title"
+  >
+    Open →
+  </button>
+
+  <div class="card-heading">
+    <h2>
+      {{ space.title }}
+    </h2>
+
+    <span>
+      {{ space.itemCount }}
+      items
+    </span>
+  </div>
+
+  <div class="card-preview">
+    @if (space.preview === 'mixed') {
+      <div class="mock-note">
+        <span></span>
+        <span></span>
+        <span></span>
+      </div>
+
+      <div class="mock-list">
+        <i>
+          <b></b>
+          <span></span>
+        </i>
+
+        <i>
+          <b></b>
+          <span></span>
+        </i>
+
+        <i>
+          <b></b>
+          <span></span>
+        </i>
+      </div>
+
+      <div class="mock-picture">
+        <i></i>
+      </div>
+    }
+
+    @if (space.preview === 'checklist') {
+      <div class="mock-list large">
+        <i>
+          <b class="checked"></b>
+          <span></span>
+        </i>
+
+        <i>
+          <b></b>
+          <span></span>
+        </i>
+
+        <i>
+          <b></b>
+          <span></span>
+        </i>
+      </div>
+
+      <div class="mock-picture">
+        <i></i>
+      </div>
+    }
+
+    @if (space.preview === 'notes') {
+      <div class="mock-note">
+        <span></span>
+        <span></span>
+      </div>
+
+      <div class="mock-note red">
+        <span></span>
+        <span></span>
+        <span></span>
+      </div>
+
+      <div class="mock-note dark">
+        <span></span>
+        <span></span>
+      </div>
+    }
+
+    @if (space.preview === 'visual') {
+      <div class="mock-list">
+        <i>
+          <b></b>
+          <span></span>
+        </i>
+
+        <i>
+          <b></b>
+          <span></span>
+        </i>
+      </div>
+
+      <div class="mock-picture wide">
+        <i></i>
+      </div>
+    }
+  </div>
+</article>

@@ -1,0 +1,134 @@
+<div class="er-entity-card">
+  <div class="er-entity-head">
+    <span
+      >ENTITY
+      @if (page.erEntityIssue(item); as issue) {
+        <b class="er-entity-warning" [title]="issue">!</b>
+      }
+    </span>
+    @if (page.tool() === 'select') {
+      <input
+        class="er-name-input"
+        aria-label="Entity name"
+        placeholder="Entity name"
+        [value]="item.title"
+        (pointerdown)="page.erControlDown($event, item)"
+        (change)="page.setString(item.id, 'title', $event)"
+        (keydown)="$event.stopPropagation()"
+      />
+    } @else {
+      <strong>{{ item.title || 'New entity' }}</strong>
+    }
+  </div>
+  <div class="er-table-heading" aria-hidden="true">
+    <span>Key</span><span>Field name</span><span>Type</span><span></span>
+  </div>
+  <div class="er-fields" appScroll="y" scrollbar="hover">
+    @for (field of item.erFields || []; track field.id) {
+      <div
+        class="er-field-block"
+        [class.is-editing]="
+          page.erExpandedFieldId() === field.id && page.selectedIds().includes(item.id)
+        "
+      >
+        <div class="er-field" [class.er-field-editing]="page.tool() === 'select'">
+          <span
+            class="er-key"
+            [class.primary]="field.key === 'primary'"
+            [class.foreign]="field.key === 'foreign'"
+            [title]="
+              field.key === 'primary'
+                ? 'Primary key'
+                : field.key === 'foreign'
+                  ? 'Foreign key'
+                  : 'Regular field'
+            "
+            >{{ field.key === 'primary' ? 'PK' : field.key === 'foreign' ? 'FK' : '' }}</span
+          >
+          @if (page.tool() === 'select') {
+            <input
+              class="er-inline-name"
+              [attr.data-er-field]="field.id"
+              [attr.aria-label]="'Field name in ' + item.title"
+              [value]="field.name"
+              (pointerdown)="page.erControlDown($event, item)"
+              (change)="page.updateErField(item, field.id, { name: $any($event.target).value })"
+              (keydown)="page.erFieldKey($event, item)"
+            />
+            <thread-select
+              size="compact"
+              class="er-inline-type"
+              [disabled]="!!field.reference"
+              [attr.aria-label]="'Data type for ' + field.name"
+              [value]="page.erTypeChoice(field)"
+              (pointerdown)="page.erControlDown($event, item)"
+              (change)="page.setErType(item, field, $any($event.target).value)"
+            >
+              @for (type of page.erDataTypes; track type) {
+                <thread-option [value]="type" [label]="type"></thread-option>
+              }
+              <thread-option
+                value="CUSTOM"
+                [label]="
+                  page.erTypeChoice(field) === 'CUSTOM' && field.dataType !== 'CUSTOM'
+                    ? field.dataType
+                    : 'Custom type'
+                "
+              ></thread-option
+            ></thread-select>
+            <button
+              class="er-field-options"
+              [class.has-issue]="!!page.erFieldIssue(item, field)"
+              [attr.aria-label]="'Edit ' + field.name + ' settings'"
+              [title]="'Field settings for ' + field.name"
+              [attr.aria-expanded]="
+                page.erExpandedFieldId() === field.id && page.selectedIds().includes(item.id)
+              "
+              (pointerdown)="page.erControlDown($event, item)"
+              (click)="$event.stopPropagation(); page.openErField(item, field)"
+            >
+              ⋯
+            </button>
+          } @else {
+            <strong>{{ field.name }}</strong
+            ><span class="er-type">{{ field.dataType }}</span
+            ><span></span>
+          }
+        </div>
+        @if (field.reference) {
+          <div class="er-field-summary">
+            <span>References {{ page.erReferenceLabel(field) }}</span>
+          </div>
+        }
+      </div>
+    } @empty {
+      <p class="er-empty">Add your first field to describe this entity.</p>
+    }
+    @if (page.tool() === 'select') {
+      <button
+        class="er-add-field"
+        type="button"
+        (pointerdown)="page.erControlDown($event, item)"
+        (click)="$event.stopPropagation(); page.addErField(item)"
+      >
+        + Add field
+      </button>
+    }
+  </div>
+  <div class="er-entity-foot">
+    <span>{{ item.erFields?.length || 0 }} fields</span
+    ><button
+      type="button"
+      (pointerdown)="$event.stopPropagation()"
+      (click)="$event.stopPropagation(); page.addRelatedErEntity(item)"
+    >
+      + Related entity</button
+    ><button
+      type="button"
+      (pointerdown)="$event.stopPropagation()"
+      (click)="$event.stopPropagation(); page.beginErConnection(item)"
+    >
+      Connect
+    </button>
+  </div>
+</div>

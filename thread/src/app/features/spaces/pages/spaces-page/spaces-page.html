@@ -47,128 +47,18 @@
     <!-- WORLD -->
     <div class="world" [style.transform]="worldTransform()">
       @for (space of visibleSpaces(); track space.id) {
-        <article
-          class="space-card"
-          [class.selected]="selectedSpaceId() === space.id"
-          [class.dragging]="draggingSpaceId() === space.id"
-          [class.tone-red]="space.tone === 'red'"
-          [class.tone-blue]="space.tone === 'blue'"
-          [class.tone-yellow]="space.tone === 'yellow'"
-          [class.tone-green]="space.tone === 'green'"
-          [style.left.px]="space.x"
-          [style.top.px]="space.y"
-          tabindex="0"
-          (pointerdown)="spacePointerDown($event, space)"
-          (pointermove)="spacePointerMove($event)"
-          (pointerup)="spacePointerUp($event, space)"
-          (pointercancel)="spacePointerUp($event)"
-          (keydown.enter)="openSpace(space)"
-          (dblclick)="openSpace(space)"
-        >
-          <div class="card-accent"></div>
-          <button class="mobile-open" type="button" (pointerdown)="$event.stopPropagation()" (pointerup)="$event.stopPropagation()" (click)="$event.stopPropagation(); openSpace(space)" [attr.aria-label]="'Open ' + space.title">Open →</button>
-
-          <div class="card-heading">
-            <h2>
-              {{ space.title }}
-            </h2>
-
-            <span>
-              {{ space.itemCount }}
-              items
-            </span>
-          </div>
-
-          <div class="card-preview">
-            @if (space.preview === 'mixed') {
-              <div class="mock-note">
-                <span></span>
-                <span></span>
-                <span></span>
-              </div>
-
-              <div class="mock-list">
-                <i>
-                  <b></b>
-                  <span></span>
-                </i>
-
-                <i>
-                  <b></b>
-                  <span></span>
-                </i>
-
-                <i>
-                  <b></b>
-                  <span></span>
-                </i>
-              </div>
-
-              <div class="mock-picture">
-                <i></i>
-              </div>
-            }
-
-            @if (space.preview === 'checklist') {
-              <div class="mock-list large">
-                <i>
-                  <b class="checked"></b>
-                  <span></span>
-                </i>
-
-                <i>
-                  <b></b>
-                  <span></span>
-                </i>
-
-                <i>
-                  <b></b>
-                  <span></span>
-                </i>
-              </div>
-
-              <div class="mock-picture">
-                <i></i>
-              </div>
-            }
-
-            @if (space.preview === 'notes') {
-              <div class="mock-note">
-                <span></span>
-                <span></span>
-              </div>
-
-              <div class="mock-note red">
-                <span></span>
-                <span></span>
-                <span></span>
-              </div>
-
-              <div class="mock-note dark">
-                <span></span>
-                <span></span>
-              </div>
-            }
-
-            @if (space.preview === 'visual') {
-              <div class="mock-list">
-                <i>
-                  <b></b>
-                  <span></span>
-                </i>
-
-                <i>
-                  <b></b>
-                  <span></span>
-                </i>
-              </div>
-
-              <div class="mock-picture wide">
-                <i></i>
-              </div>
-            }
-          </div>
-        </article>
+        <app-space-card
+          [space]="space"
+          [selected]="selectedSpaceId() === space.id"
+          [dragging]="draggingSpaceId() === space.id"
+          [panning]="isPanning()"
+          [tool]="activeTool()"
+          (cardPointerDown)="spacePointerDown($event, space)"
+          (cardPointerMove)="spacePointerMove($event)"
+          (cardPointerUp)="spacePointerUp($event, space)"
+          (cardPointerCancel)="spacePointerUp($event)"
+          (open)="openSpace(space)"
+        ></app-space-card>
       }
     </div>
 

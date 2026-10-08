@@ -36,7 +36,10 @@ import { canvasId } from '../../canvas-id';
 import { arrangeErEntities, routeErConnections } from '../../er-layout';
 import { erDataTypes, enumValues, erFieldIssue, exportErDbml } from '../../er-schema';
 import { shapeKinds, shapeNames, shapePaths, shapeThemes } from '../../shapes';
-import { ThreadChart } from '../../components/thread-chart';
+import { CanvasTable } from '../../components/canvas-table/canvas-table';
+import { CanvasErEntity } from '../../components/canvas-er-entity/canvas-er-entity';
+import { CanvasChart } from '../../components/canvas-chart/canvas-chart';
+import { CanvasBudget } from '../../components/canvas-budget/canvas-budget';
 import {
   containsShape,
   nearestPerimeter,
@@ -65,49 +68,12 @@ import {
 } from '../../sketch/sketch-geometry';
 import { elbowRoute } from '../../sketch/elbow-route';
 import { connectorSides, isConnectableItem, validConnections } from '../../connector-rules';
-
-type Tool = 'select' | 'hand' | 'text' | 'add' | 'connect' | 'sketch' | 'shape';
-type EditField = 'title' | 'body' | 'content';
-type Session = {
-  kind:
-    | 'pan'
-    | 'move'
-    | 'resize'
-    | 'rotate'
-    | 'marquee'
-    | 'place'
-    | 'crop'
-    | 'connect'
-    | 'rebind'
-    | 'route'
-    | 'branch'
-    | 'junction-slide'
-    | 'sketch'
-    | 'erase';
-  pointerId: number;
-  clientX: number;
-  clientY: number;
-  x: number;
-  y: number;
-  itemId?: string;
-  connectionId?: string;
-  junctionId?: string;
-  ratio?: number;
-  terminal?: 'source' | 'target';
-  side?: ConnectorSide;
-  corner?: 'nw' | 'ne' | 'sw' | 'se';
-  before?: State;
-  origins?: Map<string, { x: number; y: number }>;
-  groupCenter?: { x: number; y: number };
-  groupIds?: string[];
-  moved?: boolean;
-};
-type State = {
-  items: CanvasItem[];
-  connections: CanvasConnection[];
-  junctions?: CanvasJunction[];
-  datasets?: ThreadDataset[];
-};
+import type {
+  CanvasSession as Session,
+  CanvasState as State,
+  EditField,
+  Tool,
+} from './canvas-page.types';
 
 @Component({
   selector: 'app-canvas-page',
@@ -120,7 +86,10 @@ type State = {
     SketchRenderer,
     ThreadHeader,
     ScrollDirective,
-    ThreadChart,
+    CanvasTable,
+    CanvasErEntity,
+    CanvasChart,
+    CanvasBudget,
     ThreadSelect,
     ThreadOption,
     ThreadCheckbox,

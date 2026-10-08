@@ -1,0 +1,130 @@
+<div class="chart-content smart-block">
+  <div class="smart-head">
+    <div>
+      <div
+        class="smart-title"
+        data-edit-field="title"
+        [attr.contenteditable]="page.editingId() === item.id"
+        [attr.data-edit-id]="page.editingId() === item.id ? item.id : null"
+        (keydown)="page.inlineKey($event)"
+        (blur)="page.inlineBlur($event, item.id, 'title')"
+        [textContent]="item.title || (page.editingId() === item.id ? '' : 'Chart')"
+      ></div>
+      <div class="chart-subtitle">{{ page.chartTitle(item) }}</div>
+    </div>
+    <details class="smart-menu chart-menu" (pointerdown)="$event.stopPropagation()">
+      <summary aria-label="Chart options">···</summary>
+      @if (page.dataset(item); as data) {
+        @if (page.chartHasBudget(item)) {
+          <button (click)="page.setChartPreset(item, 'comparison')">Planned vs actual</button
+          ><button (click)="page.setChartPreset(item, 'actual')">Actual by category</button
+          ><button (click)="page.setChartPreset(item, 'distribution')">Planned distribution</button>
+        }
+        <label
+          >Source<thread-select
+            aria-label="Chart data source"
+            [value]="page.chartSourceId(item)"
+            (change)="page.linkChartSource(item, $event)"
+            ><thread-option value="" disabled label="Select data source"></thread-option>
+            @for (source of page.dataSources(); track source.item.id) {
+              @if (page.canChart(source.data)) {
+                <thread-option
+                  [value]="source.item.id"
+                  label="{{
+                    source.item.title || (source.item.type === 'budget' ? 'Budget' : 'Table')
+                  }}"
+                ></thread-option>
+              }
+            }</thread-select
+        ></label>
+      } @else {
+        <label
+          >Choose a Budget or Table<thread-select
+            aria-label="Chart data source"
+            (change)="page.linkChartSource(item, $event)"
+            ><thread-option value="" label="Choose source"></thread-option>
+            @for (source of page.dataSources(); track source.item.id) {
+              @if (page.canChart(source.data)) {
+                <thread-option
+                  [value]="source.item.id"
+                  label="{{ source.item.title || source.item.type }}"
+                ></thread-option>
+              }
+            }</thread-select
+        ></label>
+      }
+    </details>
+  </div>
+  @if (page.dataset(item); as data) {
+    <div class="chart-controls">
+      <label
+        >View<thread-select
+          [value]="item.chartConfig?.type || 'bar'"
+          (pointerdown)="$event.stopPropagation()"
+          (change)="page.setChartType(item, $event)"
+        >
+          @for (type of page.chartTypes(data); track type) {
+            <thread-option
+              [value]="type"
+              [label]="
+                type === 'comparison'
+                  ? 'Compare'
+                  : type === 'donut'
+                    ? 'Donut'
+                    : type === 'line'
+                      ? 'Line'
+                      : 'Bar'
+              "
+            ></thread-option>
+          }</thread-select></label
+      ><label
+        >Group by<thread-select
+          [value]="item.chartConfig?.categoryField || ''"
+          (pointerdown)="$event.stopPropagation()"
+          (change)="page.setChartField(item, 'categoryField', $event)"
+        >
+          @for (column of data.columns; track column.id) {
+            @if (column.type === 'text' || column.type === 'category' || column.type === 'date') {
+              <thread-option [value]="column.key" [label]="column.label"></thread-option>
+            }
+          }</thread-select></label
+      ><label
+        >Value<thread-select
+          [value]="item.chartConfig?.valueField || ''"
+          (pointerdown)="$event.stopPropagation()"
+          (change)="page.setChartField(item, 'valueField', $event)"
+        >
+          @for (column of data.columns; track column.id) {
+            @if (column.type === 'number' || column.type === 'currency') {
+              <thread-option [value]="column.key" [label]="column.label"></thread-option>
+            }
+          }</thread-select
+      ></label>
+    </div>
+  }
+  <app-thread-chart
+    [dataset]="page.dataset(item)"
+    [config]="item.chartConfig"
+    (pointSelect)="page.selectChartPoint(item, $event)"
+  />
+  @if (page.chartSelection()?.itemId === item.id && page.chartHasBudget(item)) {
+    <div class="chart-detail">
+      <strong>{{ page.chartSelection()?.label }}</strong
+      ><span>Planned {{ page.money(page.chartSelectedValue(item, 'Planned')) }}</span
+      ><span>Actual {{ page.money(page.chartSelectedValue(item, 'Actual')) }}</span>
+      <div>
+        <button
+          (pointerdown)="$event.stopPropagation()"
+          (click)="page.focusLinkedView(item, 'budget')"
+        >
+          Open Budget</button
+        ><button
+          (pointerdown)="$event.stopPropagation()"
+          (click)="page.focusLinkedView(item, 'table')"
+        >
+          Open Table
+        </button>
+      </div>
+    </div>
+  }
+</div>
