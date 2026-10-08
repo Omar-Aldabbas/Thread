@@ -346,14 +346,14 @@ export class SpacesPage {
      * wherever user clicks.
      */
     if (this.activeTool() === 'add') {
-      this.createSpaceAtClientPosition(event.clientX, event.clientY);
-
       /*
        * Return to Select like
        * design applications often do
        * after placing one item.
        */
       this.setTool('select');
+
+      this.createSpaceAtClientPosition(event.clientX, event.clientY);
 
       return;
     }
@@ -469,12 +469,8 @@ export class SpacesPage {
     this.router.navigate(['/space', space.id]);
   }
   private isMobile(): boolean { return (this.viewport()?.nativeElement.clientWidth ?? Infinity) <= 768; }
-  openToolInSpace(tool: 'task' | 'text' | 'sketch' | 'connect'): void {
-    const space = this.selectedSpace() || this.spaces()[0];
-    if (space) this.router.navigate(['/space', space.id], { queryParams: { tool } });
-  }
-
   selectSpace(space: SpaceCard): void {
+    if (this.editingSpaceId() !== space.id) this.editingSpaceId.set(null);
     this.selectedSpaceId.set(space.id);
   }
 

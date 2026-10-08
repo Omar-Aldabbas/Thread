@@ -1,5 +1,4 @@
 import { CommonModule, isPlatformBrowser } from '@angular/common';
-import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
 import {
   AfterViewInit,
   Component,
@@ -49,6 +48,7 @@ import {
   world,
 } from '../../sketch/connector-geometry';
 import { RichTextEditor } from '../../components/rich-text-editor';
+import { RichTextHtmlPipe } from '../../components/rich-text-html.pipe';
 import { PreferencesService } from '../../../../shared/preferences.service';
 import { MediaPicker, PickedMedia } from '../../components/media-picker';
 import { CanvasTransformOverlay } from '../../transform/canvas-transform-overlay';
@@ -83,6 +83,7 @@ import type {
   imports: [
     CommonModule,
     RichTextEditor,
+    RichTextHtmlPipe,
     MediaPicker,
     SketchRenderer,
     ThreadHeader,
@@ -102,7 +103,6 @@ import type {
 export class CanvasPage implements AfterViewInit, OnDestroy {
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
-  private readonly sanitizer = inject(DomSanitizer);
   readonly datasetStore = inject(DatasetStore);
   readonly datasets = this.datasetStore.datasets;
   readonly preferences = inject(PreferencesService);
@@ -149,6 +149,9 @@ export class CanvasPage implements AfterViewInit, OnDestroy {
   readonly shapeTheme = signal(0);
   readonly junctions = signal<CanvasJunction[]>(this.initial.junctions || []);
   readonly contextId = signal<string | null>(null);
+  readonly routeExpanded = signal(false);
+  private routeCollapseTimer: ReturnType<typeof setTimeout> | null = null;
+  private routeHovered = false;
   readonly selectedIds = signal<string[]>([]);
   readonly tool = signal<Tool>('select');
   readonly spaceHeld = signal(false);
@@ -163,9 +166,6 @@ export class CanvasPage implements AfterViewInit, OnDestroy {
   readonly isRecording = signal(false);
   readonly recordingSeconds = signal(0);
   readonly recordingPaused = signal(false);
-  readonly spotifyLink = signal('');
-  readonly spotifyEmbed = signal<SafeResourceUrl | null>(null);
-  readonly spotifyEmbedHeight = signal(152);
   readonly selectedBoardAudioId = signal('');
   readonly boardAudioItems = computed(() =>
     this.items().filter((item) => item.type === 'voice' && !!item.url),
@@ -298,7 +298,6 @@ export class CanvasPage implements AfterViewInit, OnDestroy {
   private future: State[] = [];
   private dataEditBefore: State | null = null;
   readonly editingDataCell = signal<string | null>(null);
-  readonly selectedDataCell = signal<string | null>(null);
   readonly collapsedBudgetGroups = signal<string[]>([]);
   readonly tableSort = signal<{ itemId: string; key: string; direction: 1 | -1 } | null>(null);
   readonly tableFilter = signal<{
@@ -354,18 +353,44 @@ export class CanvasPage implements AfterViewInit, OnDestroy {
     const path: CanvasItem[] = [];
     let current = this.context();
     while (current) {
-      path.unshift(current);
+      if (this.isDimension(current)) path.unshift(current);
       current = this.items().find((item) => item.id === current?.parentId) || null;
     }
     return path;
   });
-  readonly visibleItems = computed(() =>
-    this.items().filter(
-      (item) =>
-        !this.search() ||
-        `${item.title} ${item.body || ''}`.toLowerCase().includes(this.search().toLowerCase()),
-    ),
+  readonly foregroundBase = computed(
+    () => Math.max(1, ...this.items().map((item) => item.zIndex || 1)) + 1,
   );
+  readonly visibleItems = computed(() => {
+    const items = this.items();
+    const byId = new Map(items.map((item) => [item.id, item]));
+    return items.filter(
+      (item) =>
+        this.itemContextId(item, byId) === this.contextId() &&
+        (!this.search() ||
+          `${item.title} ${item.body || ''}`.toLowerCase().includes(this.search().toLowerCase())),
+    );
+  });
+  isDimension(item: CanvasItem): boolean {
+    return item.type === 'zone' || item.type === 'workspace';
+  }
+  private itemContextId(item: CanvasItem, byId: Map<string, CanvasItem>): string | null {
+    const visited = new Set<string>();
+    let parent = item.parentId ? byId.get(item.parentId) : undefined;
+    while (parent && !visited.has(parent.id)) {
+      if (this.isDimension(parent)) return parent.id;
+      visited.add(parent.id);
+      parent = parent.parentId ? byId.get(parent.parentId) : undefined;
+    }
+    return null;
+  }
+  canvasZIndex(item: CanvasItem): number {
+    if (this.isDimension(item) || item.type === 'frame') return 0;
+    const level = item.zIndex || 1;
+    return item.type === 'sticker' || item.type === 'sketch' || item.sketchAsset === 'sticker'
+      ? this.foregroundBase() * 2 + level
+      : level;
+  }
   readonly visibleConnections = computed(() =>
     this.connections().filter(
       (connection) =>
@@ -456,6 +481,7 @@ export class CanvasPage implements AfterViewInit, OnDestroy {
     });
   }
   ngOnDestroy(): void {
+    if (this.routeCollapseTimer) clearTimeout(this.routeCollapseTimer);
     const viewport = this.viewport()?.nativeElement;
     viewport?.removeEventListener('pointerdown', this.captureCanvasPointerDown, true);
     viewport?.removeEventListener('click', this.captureCanvasClick, true);
@@ -1165,35 +1191,6 @@ export class CanvasPage implements AfterViewInit, OnDestroy {
       input.click();
     }
   }
-  loadSpotifyEmbed(): void {
-    const value = this.spotifyLink().trim();
-    const uri = value.match(/^spotify:(track|playlist|album|artist|episode|show):([A-Za-z0-9]+)$/i);
-    let match = uri;
-    if (!match) {
-      try {
-        const url = new URL(value);
-        if (url.hostname !== 'open.spotify.com') throw new Error();
-        match = url.pathname.match(
-          /^\/(track|playlist|album|artist|episode|show)\/([A-Za-z0-9]+)/i,
-        );
-      } catch {
-        match = null;
-      }
-    }
-    if (!match) {
-      this.activityError.set('Paste a Spotify track, playlist, album, or show link.');
-      return;
-    }
-    const kind = match[1].toLowerCase(),
-      id = match[2];
-    this.spotifyEmbedHeight.set(['playlist', 'album', 'artist', 'show'].includes(kind) ? 352 : 152);
-    this.spotifyEmbed.set(
-      this.sanitizer.bypassSecurityTrustResourceUrl(
-        `https://open.spotify.com/embed/${kind}/${id}?utm_source=thread&theme=0`,
-      ),
-    );
-    this.activityError.set('');
-  }
   setBoardAudio(event: Event): void {
     this.selectedBoardAudioId.set((event.target as HTMLSelectElement).value);
   }
@@ -1335,7 +1332,7 @@ export class CanvasPage implements AfterViewInit, OnDestroy {
     const item: CanvasItem = {
       id: canvasId(),
       type: asset.kind,
-      parentId: this.containerAt(point)?.id || null,
+      parentId: this.containerAt(point)?.id || this.contextId(),
       x: point.x - width / 2,
       y: point.y - height / 2,
       width,
@@ -2778,8 +2775,7 @@ export class CanvasPage implements AfterViewInit, OnDestroy {
   }
   fitView(): void {
     const rect = this.viewport()?.nativeElement.getBoundingClientRect();
-    const frames = this.visibleItems().filter((item) => item.type === 'workspace');
-    const targets = frames.length ? frames : this.visibleItems();
+    const targets = this.visibleItems();
     if (!rect || !targets.length) {
       this.panX.set(0);
       this.panY.set(0);
@@ -2808,15 +2804,53 @@ export class CanvasPage implements AfterViewInit, OnDestroy {
     this.panY.set((rect.height - (maxY - minY) * zoom) / 2 - minY * zoom);
   }
   enter(item: CanvasItem): void {
-    if (item.type !== 'zone' && item.type !== 'workspace') return;
+    if (!this.isDimension(item)) return;
     this.navigate(
       item.zoneType === 'portal' && item.portalTargetId ? item.portalTargetId : item.id,
     );
   }
   navigate(id: string | null): void {
+    if (id && !this.items().some((item) => item.id === id && this.isDimension(item))) return;
+    if (this.routeCollapseTimer) clearTimeout(this.routeCollapseTimer);
+    this.routeExpanded.set(false);
     this.contextId.set(id);
     this.selectedIds.set([]);
     queueMicrotask(() => this.fitView());
+    if (id) setTimeout(() => {
+      if (this.contextId() === id) this.showRouteTemporarily();
+    }, 40);
+  }
+  private showRouteTemporarily(): void {
+    this.routeExpanded.set(true);
+    if (this.routeCollapseTimer) clearTimeout(this.routeCollapseTimer);
+    this.routeCollapseTimer = setTimeout(() => {
+      if (!this.routeHovered) this.routeExpanded.set(false);
+      this.routeCollapseTimer = null;
+    }, 3200);
+  }
+  routePointerEnter(event: PointerEvent): void {
+    if (event.pointerType === 'touch') return;
+    this.routeHovered = true;
+    if (this.routeCollapseTimer) clearTimeout(this.routeCollapseTimer);
+    this.routeCollapseTimer = null;
+    this.routeExpanded.set(true);
+  }
+  routePointerLeave(event: PointerEvent): void {
+    if (event.pointerType === 'touch') return;
+    this.routeHovered = false;
+    this.routeExpanded.set(false);
+  }
+  routeFocusIn(): void {
+    if (this.routeCollapseTimer) clearTimeout(this.routeCollapseTimer);
+    this.routeCollapseTimer = null;
+    this.routeExpanded.set(true);
+  }
+  routeFocusOut(event: FocusEvent): void {
+    const next = event.relatedTarget as Node | null;
+    if (!next || !(event.currentTarget as HTMLElement).contains(next)) this.routeExpanded.set(false);
+  }
+  toggleRoute(): void {
+    this.showRouteTemporarily();
   }
   goToSpaces(): void {
     this.router.navigate(['/spaces']);
@@ -3182,8 +3216,7 @@ export class CanvasPage implements AfterViewInit, OnDestroy {
       .map((item, index) => ({ item, index }))
       .sort(
         (a, b) =>
-          (b.item.zIndex ?? (['zone', 'frame', 'workspace'].includes(b.item.type) ? 0 : 1)) -
-            (a.item.zIndex ?? (['zone', 'frame', 'workspace'].includes(a.item.type) ? 0 : 1)) ||
+          this.canvasZIndex(b.item) - this.canvasZIndex(a.item) ||
           b.index - a.index,
       )
       .map((entry) => entry.item);
@@ -3362,11 +3395,11 @@ export class CanvasPage implements AfterViewInit, OnDestroy {
     return (a.y + b.y) / 2;
   }
   private containerAt(point: { x: number; y: number }, excludeId?: string): CanvasItem | undefined {
-    return this.items()
+    return this.visibleItems()
       .map((item, index) => ({ item, index }))
       .filter(
         ({ item }) =>
-          (item.type === 'zone' || item.type === 'frame') &&
+          item.type === 'frame' &&
           item.id !== excludeId &&
           point.x >= item.x &&
           point.x <= item.x + item.width &&
@@ -3379,7 +3412,8 @@ export class CanvasPage implements AfterViewInit, OnDestroy {
     const item = this.items().find((entry) => entry.id === id);
     if (!item || item.type === 'zone' || item.type === 'workspace' || item.type === 'frame') return;
     const zone = this.containerAt({ x: item.x + item.width / 2, y: item.y + item.height / 2 }, id);
-    if (item.parentId !== (zone?.id || null)) this.update(id, { parentId: zone?.id || null });
+    const parentId = zone?.id || this.contextId();
+    if (item.parentId !== parentId) this.update(id, { parentId });
   }
   createAt(
     type: ItemType,
@@ -3403,8 +3437,10 @@ export class CanvasPage implements AfterViewInit, OnDestroy {
           ? this.shapeKind() === 'circle'
             ? 160
             : 200
-          : type === 'zone' || type === 'frame'
-            ? 420
+          : type === 'zone'
+            ? 320
+            : type === 'frame'
+              ? 420
             : type === 'er-entity'
               ? 360
               : type === 'budget'
@@ -3434,8 +3470,10 @@ export class CanvasPage implements AfterViewInit, OnDestroy {
             : ['diamond', 'triangle', 'cylinder'].includes(this.shapeKind())
               ? 150
               : 120
-          : type === 'zone' || type === 'frame'
-            ? 280
+          : type === 'zone'
+            ? 208
+            : type === 'frame'
+              ? 280
             : type === 'er-entity'
               ? 210
               : type === 'budget'
@@ -3493,8 +3531,9 @@ export class CanvasPage implements AfterViewInit, OnDestroy {
         { left: 'planned', operator: '-', right: 'actual' },
       );
     const parentId = ['zone', 'workspace', 'frame'].includes(type)
-      ? null
-      : this.containerAt({ x: x + placedWidth / 2, y: point.y + height / 2 })?.id || null;
+      ? this.contextId()
+      : this.containerAt({ x: x + placedWidth / 2, y: point.y + height / 2 })?.id ||
+        this.contextId();
     const item: CanvasItem = {
       id: canvasId(),
       type,
@@ -3520,7 +3559,7 @@ export class CanvasPage implements AfterViewInit, OnDestroy {
       shapeFill: type === 'shape' ? shapeThemes[this.shapeTheme()].fill : undefined,
       shapeStrokeWidth: type === 'shape' ? 2 : undefined,
       textColor: type === 'shape' ? shapeThemes[this.shapeTheme()].text : undefined,
-      zoneType: type === 'zone' ? 'standard' : undefined,
+      zoneType: type === 'zone' ? 'nested' : undefined,
       checklist:
         type === 'checklist' || type === 'list' ? [{ label: '', completed: false }] : undefined,
       createdAt: new Date().toISOString(),
@@ -3575,11 +3614,6 @@ export class CanvasPage implements AfterViewInit, OnDestroy {
       input.accept = 'image/*';
       input.click();
     }
-  }
-  itemDoubleClick(event: MouseEvent, item: CanvasItem): void {
-    if (this.tool() !== 'select' || this.editingId() === item.id) return;
-    const edit = (event.target as Element).closest<HTMLElement>('[data-edit-field]');
-    if (edit) this.startEditing(item.id, edit.dataset['editField'] as EditField);
   }
   startEditing(id: string, field: EditField = 'title'): void {
     const item = this.items().find((entry) => entry.id === id);
@@ -4151,7 +4185,7 @@ export class CanvasPage implements AfterViewInit, OnDestroy {
     const now = new Date().toISOString();
     const base = {
       type: 'er-entity' as const,
-      parentId: null,
+      parentId: this.contextId(),
       width: 260,
       height: 202,
       rotation: 0,
@@ -4650,7 +4684,6 @@ export class CanvasPage implements AfterViewInit, OnDestroy {
   startDataCellEdit(itemId: string, rowId: string, key: string): void {
     const id = `${itemId}:${rowId}:${key}`;
     this.editingDataCell.set(id);
-    this.selectedDataCell.set(id);
     setTimeout(() => {
       if (this.editingDataCell() !== id) return;
       const input = document.querySelector<HTMLInputElement>(`[data-edit-cell="${id}"]`);
@@ -4781,7 +4814,7 @@ export class CanvasPage implements AfterViewInit, OnDestroy {
           this.containerAt({
             x: point.x + 24 * index + width / 2,
             y: point.y + 24 * index + height / 2,
-          })?.id || null,
+          })?.id || this.contextId(),
         x: point.x + 24 * index,
         y: point.y + 24 * index,
         width,
@@ -4917,6 +4950,7 @@ export class CanvasPage implements AfterViewInit, OnDestroy {
   }
   private eraseSketchAt(point: { x: number; y: number }): void {
     const radius = 18 / this.zoom();
+    const visibleIds = new Set(this.visibleItems().map((item) => item.id));
     this.activeSketchStrokes.update((strokes) =>
       strokes.filter(
         (stroke) =>
@@ -4925,7 +4959,7 @@ export class CanvasPage implements AfterViewInit, OnDestroy {
     );
     this.items.update((items) =>
       items.flatMap((item) => {
-        if (item.type !== 'sketch' || item.id === this.editingSketchId()) return [item];
+        if (item.type !== 'sketch' || !visibleIds.has(item.id) || item.id === this.editingSketchId()) return [item];
         const angle = (-(item.rotation || 0) * Math.PI) / 180,
           cos = Math.cos(angle),
           sin = Math.sin(angle);
@@ -4984,7 +5018,7 @@ export class CanvasPage implements AfterViewInit, OnDestroy {
     const item: CanvasItem = {
       id: stroke.id,
       type: 'sketch',
-      parentId: null,
+      parentId: this.contextId(),
       x: bounds.x,
       y: bounds.y,
       width: bounds.width,
@@ -5160,14 +5194,15 @@ export class CanvasPage implements AfterViewInit, OnDestroy {
     if (typeof value === 'number' && !Number.isFinite(value)) return;
     this.datasetStore.updateCell(data.id, rowId, key, value);
   }
-  addTableRow(id: string): void {
+  addTableRow(id: string): ThreadDataset['rows'][number] | undefined {
     const item = this.items().find((entry) => entry.id === id);
     if (!item?.datasetId) return;
     this.snapshot();
-    this.datasetStore.addRow(item.datasetId);
+    const row = this.datasetStore.addRow(item.datasetId);
     this.update(id, {
       height: Math.min(640, Math.max(item.height, 150 + this.tableRows(item).length * 38)),
     });
+    return row;
   }
   addTableColumn(id: string, label?: string, type?: string): void {
     const item = this.items().find((entry) => entry.id === id);
@@ -5273,90 +5308,55 @@ export class CanvasPage implements AfterViewInit, OnDestroy {
       groups.includes(id) ? groups.filter((group) => group !== id) : [...groups, id],
     );
   }
-  selectTableCell(item: CanvasItem, rowId: string, key: string): void {
-    this.selectedDataCell.set(`${item.id}:${rowId}:${key}`);
+  focusTableCell(item: CanvasItem, rowId: string, key: string): void {
+    this.editingDataCell.set(`${item.id}:${rowId}:${key}`);
+    this.beginDataEdit();
   }
-  editTableCell(item: CanvasItem, rowId: string, key: string): void {
-    const column = this.dataset(item)?.columns.find((entry) => entry.key === key);
-    if (column?.type === 'calculated') return;
-    this.startDataCellEdit(item.id, rowId, key);
-  }
-  tableCellKey(event: KeyboardEvent, item: CanvasItem, rowId: string, key: string): void {
-    const data = this.dataset(item);
-    if (!data) return;
-    if (event.key === 'Enter' || event.key === 'F2') {
-      event.preventDefault();
-      this.editTableCell(item, rowId, key);
-      return;
-    }
-    if (event.key.length === 1 && !event.ctrlKey && !event.altKey && !event.metaKey) {
-      event.preventDefault();
-      this.editTableCell(item, rowId, key);
-      queueMicrotask(() => {
-        const input = document.querySelector<HTMLInputElement>(
-          `[data-edit-cell="${item.id}:${rowId}:${key}"]`,
-        );
-        if (input) {
-          input.value = event.key;
-          input.dispatchEvent(new Event('input', { bubbles: true }));
-        }
-      });
-      return;
-    }
-    const rows = this.tableVisibleRows(item, data),
-      columns = this.tableViewColumns(item, data),
-      ri = rows.findIndex((row) => row.id === rowId),
-      ci = columns.findIndex((column) => column.key === key);
-    let nr = ri,
-      nc = ci;
-    if (event.key === 'ArrowDown') nr++;
-    else if (event.key === 'ArrowUp') nr--;
-    else if (event.key === 'ArrowRight') nc++;
-    else if (event.key === 'ArrowLeft') nc--;
-    else return;
-    event.preventDefault();
-    const target = rows[Math.max(0, Math.min(rows.length - 1, nr))],
-      column = columns[Math.max(0, Math.min(columns.length - 1, nc))];
-    if (target && column) {
-      this.selectTableCell(item, target.id, column.key);
-      queueMicrotask(() =>
-        document
-          .querySelector<HTMLElement>(`[data-select-cell="${item.id}:${target.id}:${column.key}"]`)
-          ?.focus(),
-      );
-    }
+  private focusTableInput(itemId: string, rowId: string, key: string): void {
+    setTimeout(() =>
+      document
+        .querySelector<HTMLElement>(`[data-table-cell="${itemId}:${rowId}:${key}"]`)
+        ?.focus({ preventScroll: false }),
+    );
   }
   tableEditKey(event: KeyboardEvent, item: CanvasItem, rowId: string, key: string): void {
     if (event.key === 'Escape') {
       event.preventDefault();
+      event.stopPropagation();
       if (this.dataEditBefore) {
         this.datasetStore.replace(this.dataEditBefore.datasets || []);
         this.dataEditBefore = null;
       }
-      this.editingDataCell.set(null);
-      setTimeout(() =>
-        document
-          .querySelector<HTMLElement>(`[data-select-cell="${item.id}:${rowId}:${key}"]`)
-          ?.focus(),
-      );
+      (event.target as HTMLElement).blur();
       return;
     }
     if (event.key !== 'Enter' && event.key !== 'Tab') return;
-    event.preventDefault();
+    event.stopPropagation();
     const data = this.dataset(item);
     if (!data) return;
-    const cols = this.tableViewColumns(item, data),
-      rows = this.tableVisibleRows(item, data),
-      ci = cols.findIndex((column) => column.key === key),
-      ri = rows.findIndex((row) => row.id === rowId);
-    (event.target as HTMLInputElement).blur();
-    const next =
-      event.key === 'Enter'
-        ? { r: Math.min(ri + 1, rows.length - 1), c: ci }
-        : { r: ri, c: Math.max(0, Math.min(cols.length - 1, ci + (event.shiftKey ? -1 : 1))) };
-    const target = rows[next.r],
-      column = cols[next.c];
-    if (target && column) queueMicrotask(() => this.editTableCell(item, target.id, column.key));
+    const columns = this.tableViewColumns(item, data);
+    const rows = this.tableVisibleRows(item, data);
+    const columnIndex = columns.findIndex((column) => column.key === key);
+    const rowIndex = rows.findIndex((row) => row.id === rowId);
+    if (columnIndex < 0 || rowIndex < 0) return;
+    if (event.key === 'Tab' && event.shiftKey && rowIndex === 0 && columnIndex === 0) return;
+    event.preventDefault();
+    const nextIndex = event.key === 'Enter'
+      ? (rowIndex + 1) * columns.length + columnIndex
+      : rowIndex * columns.length + columnIndex + (event.shiftKey ? -1 : 1);
+    (event.target as HTMLElement).blur();
+    const nextRow = rows[Math.floor(nextIndex / columns.length)];
+    const nextColumn = columns[(nextIndex + columns.length) % columns.length];
+    if (nextRow && nextColumn) {
+      this.focusTableInput(item.id, nextRow.id, nextColumn.key);
+      return;
+    }
+    if (event.shiftKey) return;
+    const added = this.addTableRow(item.id);
+    if (!added) return;
+    if (this.tableFilter()?.itemId === item.id) this.tableFilter.set(null);
+    this.collapsedTableGroups.update((groups) => groups.filter((group) => group !== `${item.id}:Ungrouped`));
+    this.focusTableInput(item.id, added.id, columns[event.key === 'Enter' ? columnIndex : 0].key);
   }
   setTableSort(item: CanvasItem, key: string, direction: 1 | -1): void {
     this.tableSort.set({ itemId: item.id, key, direction });

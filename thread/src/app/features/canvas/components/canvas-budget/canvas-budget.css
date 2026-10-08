@@ -54,42 +54,6 @@ button {
 .smart-action-spacer {
   flex: 1;
 }
-.smart-menu {
-  position: relative;
-  color: var(--color-text-secondary);
-  font-size: 11px;
-}
-.smart-menu summary {
-  padding: 4px 5px;
-  cursor: pointer;
-  list-style: none;
-  white-space: nowrap;
-}
-.smart-menu[open] {
-  z-index: 10;
-}
-.smart-menu > button,
-.smart-menu > label {
-  display: block;
-  min-width: 145px;
-  padding: 6px 9px;
-  background: var(--color-surface);
-  text-align: left;
-  font-size: 11px;
-}
-.smart-menu > label input,
-.smart-menu > label thread-select {
-  display: block;
-  width: 100%;
-  margin-top: 4px;
-  padding: 5px;
-  border: 1px solid var(--color-border);
-  background: var(--color-surface);
-}
-.smart-menu > button:hover {
-  color: var(--color-primary);
-  background: var(--color-primary-subtle);
-}
 .budget-content,
 .chart-content {
   color: var(--color-text-primary);
@@ -97,6 +61,7 @@ button {
   font-size: 12px;
 }
 .budget-content {
+  position: relative;
   display: flex;
   flex-direction: column;
   gap: 0;
@@ -124,27 +89,12 @@ button {
   color: var(--color-text-muted);
   font-size: 10px;
 }
-.budget-period > button,
-.budget-period summary {
+.budget-period > button {
   min-width: 16px;
   padding: 1px 3px;
   color: var(--color-text-secondary);
   font-size: 14px;
   cursor: pointer;
-  list-style: none;
-}
-.budget-period details[open] {
-  position: relative;
-  z-index: 9;
-}
-.budget-period details[open] button {
-  display: block;
-  padding: 5px 7px;
-  border: 1px solid var(--color-border-light);
-  background: var(--color-surface);
-  color: var(--color-text-secondary);
-  white-space: nowrap;
-  font-size: 10px;
 }
 .budget-summary-values {
   display: grid;
@@ -278,7 +228,7 @@ button {
   margin-top: 8px;
   border-bottom: 1px solid var(--color-border);
 }
-.budget-group-head > button {
+.budget-group-head > button:first-child {
   flex: 1;
   min-width: 0;
   overflow: hidden;
@@ -300,73 +250,9 @@ button {
   font-size: 10px;
   font-variant-numeric: tabular-nums;
 }
-.budget-row-options {
-  position: absolute;
-  z-index: 3;
-  top: 3px;
-  right: -12px;
-}
-.budget-row-options[open] {
-  position: relative;
-  grid-column: 1 / -1;
-  justify-self: stretch;
-  top: auto;
-  right: auto;
-  width: 100%;
-  max-height: 160px;
-  overflow: auto;
-}
-.budget-group-head details[open] {
-  flex-basis: 100%;
-  order: 3;
-  max-height: 160px;
-  overflow: auto;
-}
-.budget-row-options summary,
-.budget-group-head details summary {
-  width: 15px;
-  color: var(--color-text-muted);
-  cursor: pointer;
-  list-style: none;
-}
-.budget-row-options:not([open]) {
-  opacity: 0;
-}
-.budget-row:hover .budget-row-options,
-.budget-row-options:focus-within {
-  opacity: 1;
-}
-.budget-row-options[open],
-.budget-group-head details[open] {
-  padding: 7px;
-  border: 1px solid var(--color-border);
-  background: var(--color-surface);
-  box-shadow: var(--shadow-sm);
-}
-.budget-row-options label,
-.budget-group-head details label {
-  display: block;
-  min-width: 120px;
-  padding: 4px;
-  color: var(--color-text-muted);
-  font-size: 10px;
-}
-.budget-row-options thread-select,
-.budget-group-head details input {
-  display: block;
-  width: 100%;
-  margin-top: 3px;
-  padding: 5px;
-  border: 1px solid var(--color-border);
-  background: var(--color-surface);
-}
-.budget-row-options button,
-.budget-group-head details button {
-  display: block;
-  padding: 6px;
-  color: var(--color-primary);
-  font-size: 10px;
-}
+.budget-row-options-trigger { position:absolute; z-index:3; top:3px; right:-12px; width:25px; height:30px; border-radius:5px; color:var(--color-text-muted); font-size:15px; }
+.budget-group-options-trigger { flex:none; width:28px; height:28px; border-radius:5px; color:var(--color-text-muted); font-size:15px; }
+.budget-row-options-trigger:hover,.budget-group-options-trigger:hover,.budget-row-options-trigger[aria-expanded='true'],.budget-group-options-trigger[aria-expanded='true'] { background:var(--color-primary-subtle); color:var(--color-primary); }
 .budget-add-in-group {
   padding: 8px 0;
   color: var(--color-text-muted);
@@ -402,9 +288,17 @@ button {
   font-size: 11px;
   font-weight: 650;
 }
-.budget-footer .smart-menu {
-  margin-left: 0;
-}
+.budget-settings-trigger { min-width:30px; min-height:30px; padding:4px; border-radius:5px; color:var(--color-text-secondary); font-size:15px; }
+.budget-settings-trigger:hover,.budget-settings-trigger[aria-expanded='true'] { background:var(--color-primary-subtle); color:var(--color-primary); }
+.budget-settings-panel { position:absolute; z-index:12; top:52px; right:12px; bottom:50px; display:flex; flex-direction:column; gap:12px; width:min(260px,calc(100% - 24px)); min-height:0; overflow:auto; padding:12px; border:1px solid var(--color-border); border-radius:8px; background:var(--color-surface); box-shadow:var(--shadow-lg); }
+.budget-settings-panel header { display:flex; justify-content:space-between; align-items:center; gap:10px; padding-bottom:6px; border-bottom:1px solid var(--color-border-light); }
+.budget-settings-panel header strong { font-size:12px; }
+.budget-settings-panel header button { width:28px; height:28px; border-radius:5px; font-size:20px; }
+.budget-settings-panel label { display:grid; gap:5px; color:var(--color-text-secondary); font-size:11px; }
+.budget-settings-panel thread-select { display:block; width:100%; padding:0; border:0; background:transparent; }
+.budget-settings-panel input { width:100%; min-height:34px; padding:7px 8px; border:1px solid var(--color-border); border-radius:6px; background:var(--color-surface); color:var(--color-text-primary); font:inherit; }
+.budget-panel-action { min-height:34px; padding:7px 8px; border-radius:6px; color:var(--color-primary); text-align:left; font-size:11px; }
+.budget-panel-action:hover { background:var(--color-primary-subtle); }
 .budget-target {
   flex: none;
   padding: 0 15px 9px;
@@ -449,9 +343,7 @@ button {
   }
 }
 @media (pointer: coarse) {
-  .budget-row-options:not([open]) {
-    opacity: 1;
-  }
+  .budget-row-options-trigger,.budget-group-options-trigger { min-width:40px; min-height:40px; }
   .budget-cell button {
     min-height: 40px;
   }

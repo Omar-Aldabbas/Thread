@@ -75,63 +75,39 @@
               <tr>
                 @for (column of page.tableViewColumns(item, data); track column.id) {
                   <td
-                    [attr.tabindex]="
-                      page.editingDataCell() === item.id + ':' + row.id + ':' + column.key ? -1 : 0
-                    "
-                    [class.cell-selected]="
-                      page.selectedDataCell() === item.id + ':' + row.id + ':' + column.key &&
-                      page.editingDataCell() !== item.id + ':' + row.id + ':' + column.key
-                    "
-                    [attr.data-select-cell]="item.id + ':' + row.id + ':' + column.key"
                     (pointerdown)="$event.stopPropagation()"
-                    (click)="page.selectTableCell(item, row.id, column.key)"
-                    (dblclick)="page.editTableCell(item, row.id, column.key)"
-                    (keydown)="page.tableCellKey($event, item, row.id, column.key)"
+                    (click)="focusCell($event)"
                   >
-                    @if (column.type === 'checkbox') {
-                      <thread-checkbox
-                        [checked]="!!row.values[column.key]"
-                        [attr.aria-label]="'Row ' + (rowIndex + 1) + ', ' + column.label"
-                        (pointerdown)="$event.stopPropagation()"
-                        (click)="$event.stopPropagation()"
-                        (keydown)="$event.stopPropagation()"
-                        (change)="
-                          page.beginDataEdit();
-                          page.setTableCell(item, row.id, column.key, $event);
-                          page.endDataEdit()
-                        "
-                      ></thread-checkbox>
-                    } @else if (
-                      page.editingDataCell() === item.id + ':' + row.id + ':' + column.key
-                    ) {
-                      <input
-                        [attr.data-edit-cell]="item.id + ':' + row.id + ':' + column.key"
-                        [type]="
-                          column.type === 'number' || column.type === 'currency'
-                            ? 'number'
-                            : column.type === 'date'
-                              ? 'date'
-                              : 'text'
-                        "
-                        [value]="row.values[column.key] ?? ''"
-                        [attr.aria-label]="'Row ' + (rowIndex + 1) + ', ' + column.label"
-                        (pointerdown)="$event.stopPropagation()"
-                        (click)="$event.stopPropagation()"
-                        (dblclick)="$event.stopPropagation()"
-                        (focus)="page.beginDataEdit()"
-                        (input)="page.setTableCell(item, row.id, column.key, $event)"
-                        (blur)="page.stopDataCellEdit()"
-                        (keydown)="
-                          $event.stopPropagation();
-                          page.tableEditKey($event, item, row.id, column.key)
-                        "
-                      />
+                    @if (column.type === 'calculated') {
+                      <span
+                        class="calculated-cell"
+                        tabindex="0"
+                        [attr.data-table-cell]="item.id + ':' + row.id + ':' + column.key"
+                        [attr.aria-label]="'Row ' + (rowIndex + 1) + ', ' + column.label + ': ' + page.money(row.values[column.key])"
+                        (keydown)="page.tableEditKey($event, item, row.id, column.key)"
+                      >{{ page.money(row.values[column.key]) }}</span>
                     } @else {
-                      <span [class.calculated-cell]="column.type === 'calculated'">{{
-                        column.type === 'currency' || column.type === 'calculated'
-                          ? page.money(row.values[column.key])
-                          : row.values[column.key]
-                      }}</span>
+                      <input
+                        [attr.data-table-cell]="item.id + ':' + row.id + ':' + column.key"
+                        [type]="
+                          column.type === 'checkbox'
+                            ? 'checkbox'
+                            : column.type === 'number' || column.type === 'currency'
+                              ? 'number'
+                              : column.type === 'date'
+                                ? 'date'
+                                : 'text'
+                        "
+                        [value]="column.type === 'checkbox' ? null : (row.values[column.key] ?? '')"
+                        [checked]="column.type === 'checkbox' ? !!row.values[column.key] : null"
+                        [attr.aria-label]="'Row ' + (rowIndex + 1) + ', ' + column.label"
+                        (pointerdown)="$event.stopPropagation()"
+                        (focus)="page.focusTableCell(item, row.id, column.key)"
+                        (input)="column.type !== 'checkbox' && page.setTableCell(item, row.id, column.key, $event)"
+                        (change)="column.type === 'checkbox' && page.setTableCell(item, row.id, column.key, $event)"
+                        (blur)="page.stopDataCellEdit()"
+                        (keydown)="page.tableEditKey($event, item, row.id, column.key)"
+                      />
                     }
                   </td>
                 }
@@ -279,63 +255,18 @@
       <button (pointerdown)="$event.stopPropagation()" (click)="page.addTableRow(item.id)">
         + New row
       </button>
-      <details class="smart-menu" (pointerdown)="$event.stopPropagation()">
-        <summary>+ Column</summary>
-        <label>Name <input #newColumnName placeholder="Column name" /></label
-        ><label
-          >Type
-          <thread-select #newColumnType
-            ><thread-option value="text" label="Text"></thread-option
-            ><thread-option value="number" label="Number"></thread-option
-            ><thread-option value="currency" label="Currency"></thread-option
-            ><thread-option value="date" label="Date"></thread-option
-            ><thread-option value="category" label="Select"></thread-option
-            ><thread-option
-              value="checkbox"
-              label="Checkbox"
-            ></thread-option></thread-select></label
-        ><button (click)="page.addTableColumn(item.id, newColumnName.value, newColumnType.value)">
-          Create column
-        </button>
-      </details>
-      <details class="smart-menu calculation-menu" (pointerdown)="$event.stopPropagation()">
-        <summary>+ Calculation</summary>
-        <label>Name<input #calculationName placeholder="Total" /></label
-        ><label
-          >First field<thread-select #calculationLeft>
-            @for (column of data.columns; track column.id) {
-              @if (column.type === 'number' || column.type === 'currency') {
-                <thread-option [value]="column.key" label="{{ column.label }}"></thread-option>
-              }
-            }</thread-select></label
-        ><label
-          >Calculation<thread-select #calculationOperator
-            ><thread-option value="+" label="Add"></thread-option
-            ><thread-option value="-" label="Subtract"></thread-option
-            ><thread-option value="*" label="Multiply"></thread-option
-            ><thread-option value="/" label="Divide"></thread-option
-            ><thread-option value="%" label="Percentage"></thread-option></thread-select></label
-        ><label
-          >Second field<thread-select #calculationRight>
-            @for (column of data.columns; track column.id) {
-              @if (column.type === 'number' || column.type === 'currency') {
-                <thread-option [value]="column.key" label="{{ column.label }}"></thread-option>
-              }
-            }</thread-select></label
-        ><button
-          (click)="
-            page.addCalculatedColumn(
-              item,
-              calculationName.value,
-              calculationLeft.value,
-              calculationOperator.value,
-              calculationRight.value
-            )
-          "
-        >
-          Add calculation
-        </button>
-      </details>
+      <button
+        type="button"
+        [attr.aria-expanded]="activeAddMenu() === 'column'"
+        (pointerdown)="$event.stopPropagation()"
+        (click)="toggleAddMenu('column')"
+      >+ Column</button>
+      <button
+        type="button"
+        [attr.aria-expanded]="activeAddMenu() === 'calculation'"
+        (pointerdown)="$event.stopPropagation()"
+        (click)="toggleAddMenu('calculation')"
+      >+ Calculation</button>
       @if (page.canChart(data)) {
         <button
           (pointerdown)="$event.stopPropagation()"
@@ -353,5 +284,54 @@
         </button>
       }
     </div>
+    @if (activeAddMenu(); as menu) {
+      <section class="table-add-panel" data-ui [attr.aria-label]="menu === 'column' ? 'Add column' : 'Add calculation'" (pointerdown)="$event.stopPropagation()">
+        <header><strong>{{ menu === 'column' ? 'Add column' : 'Add calculation' }}</strong><button type="button" (click)="activeAddMenu.set(null)" aria-label="Close">×</button></header>
+        @if (menu === 'column') {
+          <label>Name <input #newColumnName placeholder="Column name" /></label>
+          <label>Type
+            <thread-select #newColumnType>
+              <thread-option value="text" label="Text"></thread-option>
+              <thread-option value="number" label="Number"></thread-option>
+              <thread-option value="currency" label="Currency"></thread-option>
+              <thread-option value="date" label="Date"></thread-option>
+              <thread-option value="category" label="Select"></thread-option>
+              <thread-option value="checkbox" label="Checkbox"></thread-option>
+            </thread-select>
+          </label>
+          <button class="table-add-submit" (click)="page.addTableColumn(item.id, newColumnName.value, newColumnType.value); activeAddMenu.set(null)">Create column</button>
+        } @else {
+          <label>Name <input #calculationName placeholder="Total" /></label>
+          <label>First field
+            <thread-select #calculationLeft>
+              @for (column of data.columns; track column.id) {
+                @if (column.type === 'number' || column.type === 'currency') {
+                  <thread-option [value]="column.key" [label]="column.label"></thread-option>
+                }
+              }
+            </thread-select>
+          </label>
+          <label>Calculation
+            <thread-select #calculationOperator>
+              <thread-option value="+" label="Add"></thread-option>
+              <thread-option value="-" label="Subtract"></thread-option>
+              <thread-option value="*" label="Multiply"></thread-option>
+              <thread-option value="/" label="Divide"></thread-option>
+              <thread-option value="%" label="Percentage"></thread-option>
+            </thread-select>
+          </label>
+          <label>Second field
+            <thread-select #calculationRight>
+              @for (column of data.columns; track column.id) {
+                @if (column.type === 'number' || column.type === 'currency') {
+                  <thread-option [value]="column.key" [label]="column.label"></thread-option>
+                }
+              }
+            </thread-select>
+          </label>
+          <button class="table-add-submit" [disabled]="!calculationLeft.value || !calculationRight.value" (click)="page.addCalculatedColumn(item, calculationName.value.trim() || 'Total', calculationLeft.value, calculationOperator.value, calculationRight.value); activeAddMenu.set(null)">Add calculation</button>
+        }
+      </section>
+    }
   }
 </div>

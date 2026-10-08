@@ -16,19 +16,12 @@
             <div class="budget-period">
               <button
                 (pointerdown)="$event.stopPropagation()"
-                (click)="page.changeBudgetMonth(item, -1, false)"
+                (click)="page.changeBudgetMonth(item, -1, false); periodMenuOpen.set(false)"
                 aria-label="Previous month"
               >
                 ‹</button
               ><span>{{ page.budgetMonthLabel(data) }}</span>
-              <details (pointerdown)="$event.stopPropagation()">
-                <summary aria-label="Next month">›</summary>
-                <button (click)="page.changeBudgetMonth(item, 1, true)">
-                  Next month · copy planned</button
-                ><button (click)="page.changeBudgetMonth(item, 1, false)">
-                  Next month · start at zero
-                </button>
-              </details>
+              <button type="button" aria-label="Next month options" [attr.aria-expanded]="periodMenuOpen()" (pointerdown)="$event.stopPropagation()" (click)="togglePeriodMenu()">›</button>
             </div>
           }
         </div>
@@ -85,17 +78,7 @@
                   page.money(page.budgetValue(data, page.budgetField(data, 'Planned'), group))
                 }}</span
               >
-              <details (pointerdown)="$event.stopPropagation()">
-                <summary aria-label="Group options">···</summary>
-                <label
-                  >Rename
-                  <input
-                    [value]="group"
-                    (change)="page.renameBudgetGroup(item, group, $event)" /></label
-                ><button (click)="page.moveBudgetGroup(item, group, -1)">Move up</button
-                ><button (click)="page.moveBudgetGroup(item, group, 1)">Move down</button
-                ><button (click)="page.deleteBudgetGroup(item, group)">Delete group</button>
-              </details>
+              <button class="budget-group-options-trigger" type="button" aria-label="Group options" [attr.aria-expanded]="groupMenu() === group" (pointerdown)="$event.stopPropagation()" (click)="toggleGroupMenu(group)">···</button>
             </div>
           }
           @if (!group || !page.collapsedBudgetGroups().includes(group)) {
@@ -150,18 +133,7 @@
                   "
                   >{{ page.money(row.values[page.budgetField(data, 'Remaining')]) }}</strong
                 >
-                <details class="budget-row-options" (pointerdown)="$event.stopPropagation()">
-                  <summary aria-label="Category options">···</summary>
-                  <label
-                    >Move to group<thread-select
-                      [value]="group"
-                      (change)="page.setBudgetGroup(item, row.id, $event)"
-                      ><thread-option value="" label="Ungrouped"></thread-option>
-                      @for (choice of page.budgetGroups(data); track choice) {
-                        <thread-option [value]="choice" label="{{ choice }}"></thread-option>
-                      }</thread-select></label
-                  ><button (click)="page.deleteBudgetEntry(item, row.id)">Delete category</button>
-                </details>
+                <button class="budget-row-options-trigger" type="button" aria-label="Category options" [attr.aria-expanded]="rowMenu()?.rowId === row.id" (pointerdown)="$event.stopPropagation()" (click)="toggleRowMenu(row.id, group)">···</button>
               </div>
             }
             @if (group && page.budgetRows(data, group).length) {
@@ -194,6 +166,38 @@
         <div class="smart-empty">No categories yet. Add one to start planning.</div>
       }
     </div>
+    @if (rowMenu(); as options) {
+      <section class="budget-settings-panel" data-ui aria-label="Category options" (pointerdown)="$event.stopPropagation()">
+        <header><strong>Category options</strong><button type="button" aria-label="Close options" (click)="rowMenu.set(null)">×</button></header>
+        <label>Move to group
+          <thread-select [value]="options.group" (change)="page.setBudgetGroup(item, options.rowId, $event); rowMenu.set(null)">
+            <thread-option value="" label="Ungrouped"></thread-option>
+            @for (choice of page.budgetGroups(data); track choice) {
+              <thread-option [value]="choice" [label]="choice"></thread-option>
+            }
+          </thread-select>
+        </label>
+        <button class="budget-panel-action" type="button" (click)="page.deleteBudgetEntry(item, options.rowId); rowMenu.set(null)">Delete category</button>
+      </section>
+    }
+    @if (groupMenu(); as activeGroup) {
+      <section class="budget-settings-panel" data-ui aria-label="Group options" (pointerdown)="$event.stopPropagation()">
+        <header><strong>Group options</strong><button type="button" aria-label="Close options" (click)="groupMenu.set(null)">×</button></header>
+        <label>Rename
+          <input [value]="activeGroup" (change)="page.renameBudgetGroup(item, activeGroup, $event); groupMenu.set(null)" />
+        </label>
+        <button class="budget-panel-action" type="button" (click)="page.moveBudgetGroup(item, activeGroup, -1); groupMenu.set(null)">Move up</button>
+        <button class="budget-panel-action" type="button" (click)="page.moveBudgetGroup(item, activeGroup, 1); groupMenu.set(null)">Move down</button>
+        <button class="budget-panel-action" type="button" (click)="page.deleteBudgetGroup(item, activeGroup); groupMenu.set(null)">Delete group</button>
+      </section>
+    }
+    @if (periodMenuOpen()) {
+      <section class="budget-settings-panel" data-ui aria-label="Next month options" (pointerdown)="$event.stopPropagation()">
+        <header><strong>Next month</strong><button type="button" aria-label="Close options" (click)="periodMenuOpen.set(false)">×</button></header>
+        <button class="budget-panel-action" type="button" (click)="page.changeBudgetMonth(item, 1, true); periodMenuOpen.set(false)">Copy planned amounts</button>
+        <button class="budget-panel-action" type="button" (click)="page.changeBudgetMonth(item, 1, false); periodMenuOpen.set(false)">Start at zero</button>
+      </section>
+    }
     <div class="budget-footer">
       <button
         class="smart-add"
@@ -221,26 +225,22 @@
       >
         Chart view
       </button>
-      <details class="smart-menu" (pointerdown)="$event.stopPropagation()">
-        <summary aria-label="Budget settings">···</summary>
-        <label
-          >Period
-          <thread-select
-            [value]="item.budgetPeriod || 'one-time'"
-            (change)="page.setBudgetPeriod(item, $event)"
-            ><thread-option value="one-time" label="One-time"></thread-option
-            ><thread-option value="monthly" label="Monthly"></thread-option></thread-select></label
-        ><label
-          >Target
-          <input
-            type="number"
-            min="0"
-            [value]="item.budgetTarget || ''"
-            placeholder="Optional"
-            (change)="page.setBudgetTarget(item, $event)"
-        /></label>
-      </details>
+      <button class="budget-settings-trigger" type="button" aria-label="Budget settings" [attr.aria-expanded]="settingsOpen()" (pointerdown)="$event.stopPropagation()" (click)="toggleSettings()">···</button>
     </div>
+    @if (settingsOpen()) {
+      <section class="budget-settings-panel" data-ui aria-label="Budget settings" (pointerdown)="$event.stopPropagation()">
+        <header><strong>Budget settings</strong><button type="button" aria-label="Close settings" (click)="settingsOpen.set(false)">×</button></header>
+        <label>Period
+          <thread-select [value]="item.budgetPeriod || 'one-time'" (change)="page.setBudgetPeriod(item, $event)">
+            <thread-option value="one-time" label="One-time"></thread-option>
+            <thread-option value="monthly" label="Monthly"></thread-option>
+          </thread-select>
+        </label>
+        <label>Target
+          <input type="number" min="0" [value]="item.budgetTarget || ''" placeholder="Optional" (change)="page.setBudgetTarget(item, $event)" />
+        </label>
+      </section>
+    }
     @if (item.budgetTarget) {
       <div class="budget-target">
         <span

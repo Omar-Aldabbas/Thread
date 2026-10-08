@@ -154,8 +154,8 @@ button {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.table-content td.cell-selected {
-  box-shadow: inset 0 0 0 1px var(--color-primary);
+.table-content td:focus-within {
+  box-shadow: inset 0 0 0 2px var(--color-primary);
 }
 .table-content td input {
   display: block;
@@ -170,11 +170,19 @@ button {
   font-size: 12px;
 }
 .table-content td input:focus {
-  box-shadow: inset 0 0 0 2px var(--color-primary);
+  outline: none;
+}
+.table-content td input[type='checkbox'] {
+  width: 18px;
+  height: 18px;
+  margin: auto;
+  accent-color: var(--color-primary);
+  cursor: pointer;
 }
 .table-content td .calculated-cell {
   color: var(--color-text-secondary);
   font-variant-numeric: tabular-nums;
+  outline: none;
 }
 .table-content .row-action {
   min-width: 32px;
@@ -276,6 +284,7 @@ button {
   border: 1px solid var(--color-border);
   background: var(--color-surface);
 }
+.table-column-menu thread-select { padding: 0; border: 0; background: transparent; }
 .table-column-menu > button {
   display: block;
   width: 100%;
@@ -294,11 +303,9 @@ button {
   flex-wrap: wrap;
   gap: 5px 12px;
   flex: none;
-  max-height: 45%;
-  overflow: auto;
+  min-height: 30px;
 }
-.table-actions > button,
-.table-actions > .smart-menu > summary {
+.table-actions > button {
   min-height: 30px;
   padding: 5px 0;
   color: var(--color-primary);
@@ -306,57 +313,23 @@ button {
   font-weight: 700;
 }
 .table-actions > button:hover,
-.table-actions > .smart-menu > summary:hover {
+.table-actions > button[aria-expanded='true'] {
   color: var(--color-text-primary);
 }
-.smart-menu {
-  position: relative;
-  color: var(--color-text-secondary);
-  font-size: 11px;
-}
-.smart-menu summary {
-  cursor: pointer;
-  list-style: none;
-  white-space: nowrap;
-}
-.smart-menu[open] {
-  align-self: flex-start;
-  min-width: 170px;
-  max-height: min(240px, 60vh);
-  overflow: auto;
-  padding: 0 8px 8px;
-  border: 1px solid var(--color-border);
-  border-radius: 6px;
-  background: var(--color-surface);
-  box-shadow: var(--shadow-sm);
-}
-.smart-menu > button,
-.smart-menu > label {
-  display: block;
-  width: 100%;
-  padding: 6px 2px;
-  text-align: left;
-  font-size: 11px;
-}
-.smart-menu > label input,
-.smart-menu > label thread-select {
-  display: block;
-  width: 100%;
-  margin-top: 4px;
-  padding: 5px;
-  border: 1px solid var(--color-border);
-  background: var(--color-surface);
-}
-.smart-menu > button:hover {
-  color: var(--color-primary);
-  background: var(--color-primary-subtle);
-}
+.table-add-panel { position:absolute; z-index:21; top:46px; right:13px; bottom:48px; display:flex; flex-direction:column; gap:10px; width:min(320px,calc(100% - 26px)); min-height:0; overflow:auto; padding:12px; border:1px solid var(--color-border); border-radius:8px; background:var(--color-surface); box-shadow:var(--shadow-lg); color:var(--color-text-primary); }
+.table-add-panel header { display:flex; align-items:center; justify-content:space-between; gap:10px; padding-bottom:5px; border-bottom:1px solid var(--color-border-light); }
+.table-add-panel header strong { font-size:12px; }
+.table-add-panel header button { width:28px; height:28px; border-radius:5px; font-size:20px; }
+.table-add-panel label { display:grid; gap:5px; color:var(--color-text-secondary); font-size:11px; }
+.table-add-panel input { min-width:0; width:100%; min-height:34px; padding:7px 8px; border:1px solid var(--color-border); border-radius:6px; background:var(--color-surface); color:var(--color-text-primary); font:inherit; }
+.table-add-panel thread-select { display:block; width:100%; padding:0; border:0; background:transparent; }
+.table-add-panel .table-add-submit { min-height:36px; margin-top:auto; padding:8px 10px; border-radius:6px; background:var(--color-primary); color:white; font-size:11px; font-weight:700; }
+.table-add-panel .table-add-submit:disabled { opacity:.45; cursor:default; }
 @media (pointer: coarse) {
   .table-content td {
     min-height: 40px;
   }
-  .table-actions > button,
-  .table-actions summary {
+  .table-actions > button {
     min-height: 42px;
     font-size: 13px;
   }

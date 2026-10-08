@@ -20,10 +20,6 @@
       ↶
     </button>
     <button class="icon-button" (click)="redo()" aria-label="Redo">↷</button>
-    <button class="quick-task" (click)="chooseType('task')" title="Add a task, then tap the canvas">
-      + Task
-    </button>
-    <button class="add-top" (click)="setTool('add')">+ <span>Add</span></button>
   </app-thread-header>
   @if (searchOpen()) {
     <div class="mobile-canvas-search" data-ui>
@@ -59,6 +55,43 @@
     (dragleave)="dragLeave()"
     (drop)="drop($event)"
   >
+    @if (context()) {
+      <nav
+        class="zone-route"
+        [class.expanded]="routeExpanded()"
+        data-ui
+        aria-label="Zone path"
+        (pointerenter)="routePointerEnter($event)"
+        (pointerleave)="routePointerLeave($event)"
+        (focusin)="routeFocusIn()"
+        (focusout)="routeFocusOut($event)"
+      >
+        <button
+          class="route-orb"
+          type="button"
+          (click)="toggleRoute()"
+          [attr.aria-expanded]="routeExpanded()"
+          aria-label="Show zone path"
+          title="Zone path"
+        >
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+            <path d="m3 10 9-7 9 7v10a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1z" />
+          </svg>
+        </button>
+        <div class="route-trail" [attr.aria-hidden]="!routeExpanded()">
+          <button type="button" [attr.tabindex]="routeExpanded() ? 0 : -1" (click)="navigate(null)">{{ spaceName() }}</button>
+          @for (place of breadcrumbs(); track place.id) {
+            <span aria-hidden="true">›</span>
+            <button
+              type="button"
+              [attr.tabindex]="routeExpanded() ? 0 : -1"
+              [attr.aria-current]="contextId() === place.id ? 'page' : null"
+              (click)="navigate(place.id)"
+            >{{ place.title || 'Untitled zone' }}</button>
+          }
+        </div>
+      </nav>
+    }
     <div class="world" [style.transform]="worldTransform()">
       <svg
         class="connections"
@@ -294,6 +327,7 @@
             item.type === 'gif' || item.type === 'sticker' || !!item.sketchAsset
           "
           [class.sketch-item]="item.type === 'sketch'"
+          [class.foreground-item]="item.type === 'sticker' || item.type === 'sketch' || item.sketchAsset === 'sticker'"
           [class.er-entity-item]="item.type === 'er-entity'"
           [class.shape-item]="item.type === 'shape'"
           [class.connection-target]="connectionTargetId() === item.id"
@@ -303,20 +337,42 @@
           [style.width.px]="item.width"
           [style.height.px]="item.height"
           [style.transform]="item.rotation ? 'rotate(' + item.rotation + 'deg)' : null"
-          [style.z-index]="
-            item.type === 'zone' || item.type === 'workspace' || item.type === 'frame'
-              ? 0
-              : item.zIndex || 1
-          "
+          [style.z-index]="canvasZIndex(item)"
+          [style.--menu-layer]="foregroundBase() + (item.zIndex || 1)"
           [style.background]="item.type === 'note' ? item.background || null : null"
           (pointermove)="pointerMove($event)"
           (pointerup)="pointerUp($event)"
           (pointercancel)="pointerCancel($event)"
-          (dblclick)="$event.stopPropagation(); itemDoubleClick($event, item)"
           tabindex="0"
           [attr.aria-label]="item.type + ': ' + item.title"
         >
-          @if (item.type === 'zone' || item.type === 'workspace' || item.type === 'frame') {
+          @if (isDimension(item)) {
+            <div class="zone-card">
+              <div class="zone-card-accent zone-label" data-zone-drag="true"></div>
+              <strong
+                data-edit-field="title"
+                [attr.contenteditable]="editingId() === item.id"
+                [attr.data-edit-id]="editingId() === item.id ? item.id : null"
+                (keydown)="inlineKey($event)"
+                (blur)="inlineBlur($event, item.id, 'title')"
+                [textContent]="item.title || (editingId() === item.id ? '' : 'Untitled zone')"
+              ></strong>
+              <small>{{ childCount(item.id) }} {{ childCount(item.id) === 1 ? 'item' : 'items' }}</small>
+              <button
+                class="zone-preview"
+                data-ui
+                type="button"
+                (click)="enter(item)"
+                [attr.aria-label]="'Open ' + (item.title || item.type) + ' workspace'"
+              >
+                <span class="zone-mock-note" aria-hidden="true"><i></i><i></i><i></i></span>
+                <span class="zone-mock-list" aria-hidden="true">
+                  <i><b></b><em></em></i><i><b></b><em></em></i><i><b></b><em></em></i>
+                </span>
+                <span class="zone-mock-picture" aria-hidden="true"><i></i></span>
+              </button>
+            </div>
+          } @else if (item.type === 'frame') {
             <div class="zone-label" data-zone-drag="true">
               <span>{{ item.type }}</span
               ><strong
@@ -325,7 +381,7 @@
                 [attr.data-edit-id]="editingId() === item.id ? item.id : null"
                 (keydown)="inlineKey($event)"
                 (blur)="inlineBlur($event, item.id, 'title')"
-                [textContent]="item.title || (editingId() === item.id ? '' : 'Untitled zone')"
+                [textContent]="item.title || (editingId() === item.id ? '' : 'Untitled ' + item.type)"
               ></strong>
             </div>
           } @else if (item.type === 'shape') {
@@ -424,7 +480,7 @@
                 />
               } @else {
                 @if (item.bodyHtml) {
-                  <div class="rich-display" [innerHTML]="item.bodyHtml"></div>
+                  <div class="rich-display" [innerHTML]="item.bodyHtml | richTextHtml"></div>
                 } @else {
                   <div class="rich-display" [textContent]="item.title || 'Text'"></div>
                 }
@@ -467,7 +523,7 @@
                   />
                 } @else {
                   @if (item.bodyHtml) {
-                    <div class="rich-display" [innerHTML]="item.bodyHtml"></div>
+                    <div class="rich-display" [innerHTML]="item.bodyHtml | richTextHtml"></div>
                   } @else {
                     <div class="rich-display" [textContent]="item.body || ''"></div>
                   }
@@ -878,7 +934,7 @@
     }
     @if (!visibleItems().length && !search()) {
       <div class="empty-hint" data-ui>
-        Start creating <span class="desktop-hint">Double-click for a note or press N to add</span
+        Start creating <span class="desktop-hint">Use Add or press N to add a note</span
         ><span class="mobile-hint">Tap Task or Add below</span>
       </div>
     }
@@ -974,30 +1030,6 @@
           }
         } @else {
           <p>Add media or record a voice note to play it here.</p>
-        }
-      </section>
-      <section class="activity-library spotify-library">
-        <div class="music-heading">
-          <div><strong>Spotify</strong><small>Paste a track, playlist, or album link</small></div>
-        </div>
-        <form (submit)="$event.preventDefault(); loadSpotifyEmbed()">
-          <input
-            type="url"
-            [value]="spotifyLink()"
-            (input)="spotifyLink.set($any($event.target).value)"
-            placeholder="open.spotify.com/playlist/…"
-            aria-label="Spotify link"
-          /><button type="submit">Load</button>
-        </form>
-        @if (spotifyEmbed(); as embed) {
-          <iframe
-            [src]="embed"
-            [style.height.px]="spotifyEmbedHeight()"
-            title="Spotify player"
-            allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
-            allowfullscreen
-            loading="lazy"
-          ></iframe>
         }
       </section>
       <section class="activity-music">

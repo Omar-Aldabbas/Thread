@@ -75,7 +75,7 @@
          FIGMA-STYLE TOOLBAR
     ====================== -->
 
-    <nav class="toolbox" appScroll="x" scrollbar="hover" (pointerdown)="$event.stopPropagation()">
+    <nav class="toolbox" appScroll="x" scrollbar="hover" aria-label="Spaces tools" (pointerdown)="$event.stopPropagation()">
       <!-- SELECT -->
       <button
         type="button"
@@ -87,7 +87,7 @@
           <path d="M5 3L18 12L12 13.5L9.5 20L5 3Z" />
         </svg>
 
-        <span class="tool-key"> V </span>
+        <span class="tool-key">Select</span>
       </button>
 
       <!-- HAND -->
@@ -103,28 +103,8 @@
           />
         </svg>
 
-        <span class="tool-key"> H </span>
+        <span class="tool-key">Pan</span>
       </button>
-
-      <!-- EDIT PEN -->
-      <button
-        type="button"
-        title="Edit Space (E)"
-        [class.active]="activeTool() === 'edit'"
-        (click)="setTool('edit')"
-      >
-        <svg viewBox="0 0 24 24" aria-hidden="true">
-          <path
-            d="M4 20L8.2 19L19 8.2C19.8 7.4 19.8 6.2 19 5.4L18.6 5C17.8 4.2 16.6 4.2 15.8 5L5 15.8L4 20Z"
-          />
-
-          <path d="M14.5 6.3L17.7 9.5" />
-        </svg>
-
-        <span class="tool-key"> E </span>
-      </button>
-
-      <div class="tool-divider"></div>
 
       <!-- ADD -->
       <button
@@ -137,24 +117,7 @@
           <path d="M12 5V19M5 12H19" />
         </svg>
 
-        <span class="tool-key"> N </span>
-      </button>
-      <div class="tool-divider"></div>
-      <button type="button" title="Add task in selected space" (click)="openToolInSpace('task')" aria-label="Add task in space">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="m8 12 3 3 5-6"/></svg>
-        <span class="tool-key">Task</span>
-      </button>
-      <button type="button" title="Add text in selected space" (click)="openToolInSpace('text')" aria-label="Add text in space">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M12 6v13M8 19h8"/></svg>
-        <span class="tool-key">T</span>
-      </button>
-      <button type="button" title="Sketch in selected space" (click)="openToolInSpace('sketch')" aria-label="Sketch in space">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m4 20 4.5-1 11-11a2 2 0 0 0-3-3l-11 11L4 20ZM14 7l3 3"/></svg>
-        <span class="tool-key">P</span>
-      </button>
-      <button type="button" title="Connect objects in selected space" (click)="openToolInSpace('connect')" aria-label="Connect objects in space">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="7" r="2"/><circle cx="19" cy="17" r="2"/><path d="M7 7h4c4 0 2 10 6 10"/></svg>
-        <span class="tool-key">C</span>
+        <span class="tool-key">Add</span>
       </button>
     </nav>
 
@@ -162,7 +125,7 @@
          SPACE EDITOR
     ====================== -->
 
-    @if (activeTool() === 'edit' && selectedSpace(); as space) {
+    @if (editingSpaceId() === selectedSpaceId() && selectedSpace(); as space) {
       <aside class="editor-panel" (pointerdown)="$event.stopPropagation()">
         <div class="editor-header">
           <div>
@@ -171,7 +134,7 @@
             <strong> Edit Space </strong>
           </div>
 
-          <button type="button" (click)="selectedSpaceId.set(null)">×</button>
+          <button type="button" (click)="editingSpaceId.set(null)">×</button>
         </div>
 
         <div class="editor-section">
