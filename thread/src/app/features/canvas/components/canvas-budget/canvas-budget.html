@@ -1,4 +1,4 @@
-<div class="budget-content smart-block" appScroll="y" scrollbar="hover">
+<div class="budget-content smart-block">
   @if (page.dataset(item); as data) {
     <div class="budget-summary">
       <div class="smart-head">
@@ -64,10 +64,10 @@
         </div>
       </div>
     </div>
-    <div class="budget-column-head">
-      <span>Category</span><span>Planned</span><span>Actual</span><span>Remaining</span>
-    </div>
-    <div class="budget-entries" appScroll="y" scrollbar="hover">
+    <div class="budget-entries" appScroll="both" scrollbar="auto" data-canvas-interactive>
+      <div class="budget-column-head">
+        <span>Category</span><span>Planned</span><span>Actual</span><span>Remaining</span>
+      </div>
       @for (group of page.budgetSections(data); track group) {
         @if (group || page.budgetRows(data, '').length) {
           @if (group) {

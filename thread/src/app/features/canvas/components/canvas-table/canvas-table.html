@@ -28,8 +28,8 @@
         </button>
       </div>
     }
-    <div class="table-scroll" appScroll="both" scrollbar="auto">
-      <table>
+    <div class="table-scroll" appScroll="both" scrollbar="auto" data-canvas-interactive>
+      <table [style.min-width.px]="tableWidth(data)">
         <colgroup>
           @for (column of page.tableViewColumns(item, data); track column.id) {
             <col [style.width.px]="item.tableColumnWidths?.[column.id] || 120" />
@@ -75,9 +75,12 @@
               <tr>
                 @for (column of page.tableViewColumns(item, data); track column.id) {
                   <td
-                    tabindex="0"
+                    [attr.tabindex]="
+                      page.editingDataCell() === item.id + ':' + row.id + ':' + column.key ? -1 : 0
+                    "
                     [class.cell-selected]="
-                      page.selectedDataCell() === item.id + ':' + row.id + ':' + column.key
+                      page.selectedDataCell() === item.id + ':' + row.id + ':' + column.key &&
+                      page.editingDataCell() !== item.id + ':' + row.id + ':' + column.key
                     "
                     [attr.data-select-cell]="item.id + ':' + row.id + ':' + column.key"
                     (pointerdown)="$event.stopPropagation()"
@@ -90,6 +93,8 @@
                         [checked]="!!row.values[column.key]"
                         [attr.aria-label]="'Row ' + (rowIndex + 1) + ', ' + column.label"
                         (pointerdown)="$event.stopPropagation()"
+                        (click)="$event.stopPropagation()"
+                        (keydown)="$event.stopPropagation()"
                         (change)="
                           page.beginDataEdit();
                           page.setTableCell(item, row.id, column.key, $event);
@@ -111,10 +116,15 @@
                         [value]="row.values[column.key] ?? ''"
                         [attr.aria-label]="'Row ' + (rowIndex + 1) + ', ' + column.label"
                         (pointerdown)="$event.stopPropagation()"
+                        (click)="$event.stopPropagation()"
+                        (dblclick)="$event.stopPropagation()"
                         (focus)="page.beginDataEdit()"
                         (input)="page.setTableCell(item, row.id, column.key, $event)"
                         (blur)="page.stopDataCellEdit()"
-                        (keydown)="page.tableEditKey($event, item, row.id, column.key)"
+                        (keydown)="
+                          $event.stopPropagation();
+                          page.tableEditKey($event, item, row.id, column.key)
+                        "
                       />
                     } @else {
                       <span [class.calculated-cell]="column.type === 'calculated'">{{

@@ -8,93 +8,19 @@
   Output,
   ViewChild,
   ViewEncapsulation,
-  inject,
   signal,
 } from '@angular/core';
 import { Editor } from '@tiptap/core';
 import StarterKit from '@tiptap/starter-kit';
 import { TextStyleKit } from '@tiptap/extension-text-style';
-import { ThreadSelect, ThreadOption, ThreadColor } from '../../../shared/controls/thread-controls';
 import { ScrollDirective } from '../../../shared/scroll.directive';
 
 @Component({
   selector: 'app-rich-text-editor',
   standalone: true,
-  imports: [ScrollDirective, ThreadSelect, ThreadOption, ThreadColor],
+  imports: [ScrollDirective],
   encapsulation: ViewEncapsulation.None,
   template: `
-    <div
-      #toolbar
-      class="rich-toolbar"
-      appScroll="x"
-      scrollbar="hover"
-      (pointerdown)="$event.stopPropagation()"
-    >
-      <button
-        type="button"
-        [class.active]="active('bold')"
-        (mousedown)="$event.preventDefault()"
-        (click)="command('bold')"
-        aria-label="Bold"
-      >
-        <b>B</b>
-      </button>
-      <button
-        type="button"
-        [class.active]="active('italic')"
-        (mousedown)="$event.preventDefault()"
-        (click)="command('italic')"
-        aria-label="Italic"
-      >
-        <i>I</i>
-      </button>
-      <button
-        type="button"
-        [class.active]="active('underline')"
-        (mousedown)="$event.preventDefault()"
-        (click)="command('underline')"
-        aria-label="Underline"
-      >
-        <u>U</u>
-      </button>
-      <span></span>
-      <button
-        type="button"
-        [class.active]="active('heading')"
-        (mousedown)="$event.preventDefault()"
-        (click)="command('heading')"
-        aria-label="Heading"
-      >
-        H
-      </button>
-      <button
-        type="button"
-        [class.active]="active('bulletList')"
-        (mousedown)="$event.preventDefault()"
-        (click)="command('bulletList')"
-        aria-label="Bulleted list"
-      >
-        • List
-      </button>
-      <button
-        type="button"
-        [class.active]="active('orderedList')"
-        (mousedown)="$event.preventDefault()"
-        (click)="command('orderedList')"
-        aria-label="Numbered list"
-      >
-        1. List
-      </button>
-      <thread-select size="compact" aria-label="Text size" (change)="size($event)">
-        <thread-option value="" label="Size"></thread-option>
-        <thread-option value="14px" label="14"></thread-option>
-        <thread-option value="16px" label="16"></thread-option>
-        <thread-option value="20px" label="20"></thread-option>
-        <thread-option value="24px" label="24"></thread-option>
-        <thread-option value="32px" label="32"></thread-option>
-      </thread-select>
-      <thread-color aria-label="Text color" value="#111111" (change)="color($event)"></thread-color>
-    </div>
     <div
       #mount
       class="rich-mount"
@@ -111,63 +37,6 @@ import { ScrollDirective } from '../../../shared/scroll.directive';
         min-width: 0;
         min-height: 0;
         width: 100%;
-      }
-      .rich-toolbar {
-        position: fixed;
-        z-index: 80;
-        bottom: calc(18px + env(safe-area-inset-bottom));
-        left: 50%;
-        display: flex;
-        align-items: center;
-        gap: 2px;
-        width: max-content;
-        max-width: calc(100vw - 24px);
-        overflow-x: auto;
-        overflow-y: hidden;
-        margin: 0;
-        padding: 5px;
-        transform: translateX(-50%);
-        border: 1px solid var(--color-border);
-        border-radius: 8px;
-        background: var(--color-surface);
-        box-shadow: var(--shadow-md);
-      }
-      .rich-toolbar > button {
-        min-width: 27px;
-        height: 26px;
-        padding: 0 5px;
-        border: 0;
-        background: none;
-        color: var(--color-text-secondary);
-        font-size: 11px;
-        cursor: pointer;
-      }
-      .rich-toolbar > button.active,
-      .rich-toolbar > button:hover {
-        background: var(--color-primary-subtle);
-        color: var(--color-primary);
-      }
-      .rich-toolbar > span {
-        width: 1px;
-        height: 18px;
-        margin: 0 3px;
-        background: var(--color-border);
-      }
-      .rich-toolbar thread-select {
-        flex: none;
-        width: 72px;
-        max-width: 72px;
-        border: 0;
-        background: transparent;
-        color: var(--color-text-secondary);
-        font-size: 11px;
-      }
-      .rich-toolbar input {
-        width: 26px;
-        height: 24px;
-        padding: 0;
-        border: 0;
-        background: none;
       }
       .rich-mount {
         min-width: 0;
@@ -197,27 +66,6 @@ import { ScrollDirective } from '../../../shared/scroll.directive';
         margin: 0.25em 0;
         font-size: 1.3em;
       }
-      @media (max-width: 700px) {
-        .rich-toolbar {
-          bottom: calc(73px + env(safe-area-inset-bottom));
-          width: calc(100vw - 16px);
-          justify-content: flex-start;
-        }
-        .rich-toolbar > button {
-          min-width: 38px;
-          height: 38px;
-          font-size: 14px;
-        }
-        .rich-toolbar thread-select {
-          height: 38px;
-          font-size: 14px;
-        }
-        .rich-toolbar input {
-          width: 38px;
-          height: 38px;
-          flex: none;
-        }
-      }
     `,
   ],
 })
@@ -228,9 +76,7 @@ export class RichTextEditor implements AfterViewInit, OnDestroy {
     event.stopPropagation();
     this.finished.emit();
   }
-  private readonly host = inject(ElementRef<HTMLElement>);
   @ViewChild('mount', { static: true }) mount!: ElementRef<HTMLElement>;
-  @ViewChild('toolbar', { static: true }) toolbar!: ElementRef<HTMLElement>;
   @Input() html = '';
   @Input() focusOnInit = false;
   @Output() contentChanged = new EventEmitter<{ html: string; text: string }>();
@@ -240,7 +86,6 @@ export class RichTextEditor implements AfterViewInit, OnDestroy {
   readonly revision = signal(0);
 
   ngAfterViewInit(): void {
-    document.body.appendChild(this.toolbar.nativeElement);
     this.editor = new Editor({
       element: this.mount.nativeElement,
       extensions: [StarterKit, TextStyleKit],
@@ -255,24 +100,12 @@ export class RichTextEditor implements AfterViewInit, OnDestroy {
           this.lastSelection = { from: editor.state.selection.from, to: editor.state.selection.to };
         this.revision.update((value) => value + 1);
       },
-      onBlur: () =>
-        setTimeout(() => {
-          const active = document.activeElement;
-          const node = this.host.nativeElement.closest('[data-node-id]');
-          if (
-            !this.toolbar.nativeElement.contains(active) &&
-            !this.host.nativeElement.contains(active) &&
-            (!node || !node.contains(active))
-          )
-            this.finished.emit();
-        }),
     });
     if (this.focusOnInit) queueMicrotask(() => this.editor?.commands.focus('end'));
   }
   ngOnDestroy(): void {
     this.editor?.destroy();
     this.editor = null;
-    this.toolbar.nativeElement.remove();
   }
   active(mark: string): boolean {
     this.revision();
@@ -281,6 +114,7 @@ export class RichTextEditor implements AfterViewInit, OnDestroy {
   command(name: string): void {
     const chain = this.editor?.chain().focus();
     if (!chain) return;
+    if (this.lastSelection) chain.setTextSelection(this.lastSelection);
     switch (name) {
       case 'bold':
         chain.toggleBold().run();
@@ -304,12 +138,15 @@ export class RichTextEditor implements AfterViewInit, OnDestroy {
   }
   size(event: Event): void {
     const value = (event.target as HTMLSelectElement).value;
-    if (value) this.editor?.chain().focus().setFontSize(value).run();
+    if (!value || !this.editor) return;
+    const chain = this.editor.chain().focus();
+    if (this.lastSelection) chain.setTextSelection(this.lastSelection);
+    chain.setFontSize(`${value}px`).run();
   }
-  color(event: Event): void {
+  color(value: string): void {
     if (!this.editor) return;
     const chain = this.editor.chain().focus();
     if (this.lastSelection) chain.setTextSelection(this.lastSelection);
-    chain.setColor((event.target as HTMLInputElement).value).run();
+    chain.setColor(value).run();
   }
 }

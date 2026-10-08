@@ -185,8 +185,11 @@ button {
   align-items: center;
 }
 .budget-column-head {
-  flex: none;
-  padding: 10px 15px 7px;
+  position: sticky;
+  z-index: 2;
+  top: 0;
+  padding: 10px 0 7px;
+  background: var(--color-surface);
   color: var(--color-text-muted);
   font-size: 9px;
   font-weight: 750;
@@ -198,9 +201,17 @@ button {
 }
 .budget-entries {
   flex: 1;
+  min-width: 0;
   min-height: 0;
   overflow: auto;
+  overscroll-behavior: contain;
   padding: 0 15px;
+}
+.budget-column-head,
+.budget-row,
+.budget-subtotal,
+.budget-group-head {
+  width: max(100%, 260px);
 }
 .budget-row {
   position: relative;
@@ -261,6 +272,7 @@ button {
 .budget-group-head {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 7px;
   min-height: 31px;
   margin-top: 8px;
@@ -280,6 +292,10 @@ button {
   text-transform: uppercase;
 }
 .budget-group-head > span {
+  max-width: 45%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   color: var(--color-text-muted);
   font-size: 10px;
   font-variant-numeric: tabular-nums;
@@ -289,6 +305,22 @@ button {
   z-index: 3;
   top: 3px;
   right: -12px;
+}
+.budget-row-options[open] {
+  position: relative;
+  grid-column: 1 / -1;
+  justify-self: stretch;
+  top: auto;
+  right: auto;
+  width: 100%;
+  max-height: 160px;
+  overflow: auto;
+}
+.budget-group-head details[open] {
+  flex-basis: 100%;
+  order: 3;
+  max-height: 160px;
+  overflow: auto;
 }
 .budget-row-options summary,
 .budget-group-head details summary {
@@ -358,6 +390,8 @@ button {
   flex-wrap: wrap;
   gap: 6px 14px;
   flex: none;
+  max-height: 38%;
+  overflow: auto;
   padding: 10px 15px;
   border-top: 1px solid var(--color-border-light);
 }
@@ -396,9 +430,6 @@ button {
   }
   .budget-summary {
     padding: 12px;
-  }
-  .budget-column-head {
-    padding-inline: 12px;
   }
   .budget-entries {
     padding-inline: 12px;

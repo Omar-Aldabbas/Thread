@@ -12,6 +12,7 @@ import {
   inject,
   signal,
   viewChild,
+  viewChildren,
 } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import {
@@ -109,6 +110,7 @@ export class CanvasPage implements AfterViewInit, OnDestroy {
   private readonly spaceId = this.route.snapshot.paramMap.get('id') || 'thread';
   private readonly storageKey = `thread-canvas-${this.spaceId}`;
   readonly viewport = viewChild<ElementRef<HTMLElement>>('viewport');
+  readonly richEditors = viewChildren(RichTextEditor);
   private readonly initial = this.upgradeDataState(this.read());
   readonly items = signal<CanvasItem[]>(this.initial.items);
   readonly connections = signal<CanvasConnection[]>(this.initial.connections);
@@ -250,7 +252,7 @@ export class CanvasPage implements AfterViewInit, OnDestroy {
     const node = target.closest<HTMLElement>('[data-node-id]');
     const item = this.items().find((entry) => entry.id === node?.dataset['nodeId']);
     const control = target.closest(
-      'button, input, select, textarea, a, summary, thread-select, thread-checkbox, thread-color, [role="button"], [contenteditable="true"], app-rich-text-editor, td, th, [data-ui]',
+      'button, input, select, textarea, a, summary, thread-select, thread-checkbox, thread-color, [role="button"], [contenteditable="true"], app-rich-text-editor, td, th, [data-ui], [data-canvas-interactive]',
     );
     const handle = target.closest(
       '.resize-handle, .rotate-handle, .shape-port, .connect-handle, .table-resize, .connections',
@@ -3574,11 +3576,6 @@ export class CanvasPage implements AfterViewInit, OnDestroy {
       input.click();
     }
   }
-  canvasDoubleClick(event: MouseEvent): void {
-    if (this.tool() !== 'select' || this.pendingType() || this.pendingAsset()) return;
-    if ((event.target as HTMLElement).closest('[data-item], [data-ui]')) return;
-    this.createAt('note', this.point(event.clientX, event.clientY));
-  }
   itemDoubleClick(event: MouseEvent, item: CanvasItem): void {
     if (this.tool() !== 'select' || this.editingId() === item.id) return;
     const edit = (event.target as Element).closest<HTMLElement>('[data-edit-field]');
@@ -4294,7 +4291,21 @@ export class CanvasPage implements AfterViewInit, OnDestroy {
     this.selectedConnectionId.set(connection.id);
   }
   setTextSize(id: string, event: Event): void {
+    if (this.richFocusId() === id) {
+      this.richEditors()[0]?.size(event);
+      return;
+    }
     this.setStyle(id, { fontSize: Number((event.target as HTMLSelectElement).value) });
+  }
+  richActive(mark: string): boolean {
+    return this.richEditors()[0]?.active(mark) || false;
+  }
+  richCommand(name: string): void {
+    this.richEditors()[0]?.command(name);
+  }
+  toolbarTextColor(id: string, color: string): void {
+    if (this.richFocusId() === id) this.richEditors()[0]?.color(color);
+    else this.setStyle(id, { textColor: color });
   }
   setFontFamily(id: string, event: Event): void {
     this.setStyle(id, {
@@ -4640,11 +4651,12 @@ export class CanvasPage implements AfterViewInit, OnDestroy {
     const id = `${itemId}:${rowId}:${key}`;
     this.editingDataCell.set(id);
     this.selectedDataCell.set(id);
-    queueMicrotask(() => {
+    setTimeout(() => {
+      if (this.editingDataCell() !== id) return;
       const input = document.querySelector<HTMLInputElement>(`[data-edit-cell="${id}"]`);
       input?.focus();
       input?.select();
-    });
+    }, 0);
   }
   stopDataCellEdit(): void {
     this.editingDataCell.set(null);
@@ -5322,6 +5334,11 @@ export class CanvasPage implements AfterViewInit, OnDestroy {
         this.dataEditBefore = null;
       }
       this.editingDataCell.set(null);
+      setTimeout(() =>
+        document
+          .querySelector<HTMLElement>(`[data-select-cell="${item.id}:${rowId}:${key}"]`)
+          ?.focus(),
+      );
       return;
     }
     if (event.key !== 'Enter' && event.key !== 'Tab') return;

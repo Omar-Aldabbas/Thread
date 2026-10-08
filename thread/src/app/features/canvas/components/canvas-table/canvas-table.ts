@@ -1,5 +1,5 @@
 import { Component, Input, signal } from '@angular/core';
-import { CanvasItem } from '../../canvas.model';
+import { CanvasItem, ThreadDataset } from '../../canvas.model';
 import { ScrollDirective } from '../../../../shared/scroll.directive';
 import {
   ThreadCheckbox,
@@ -12,6 +12,7 @@ import type { CanvasPage } from '../../pages/canvas-page/canvas-page';
   selector: 'app-canvas-table',
   standalone: true,
   imports: [ScrollDirective, ThreadCheckbox, ThreadOption, ThreadSelect],
+  host: { '[class.menu-open]': 'activeColumnId() !== null' },
   templateUrl: './canvas-table.html',
   styleUrl: './canvas-table.css',
 })
@@ -22,5 +23,14 @@ export class CanvasTable {
 
   toggleColumnMenu(columnId: string): void {
     this.activeColumnId.update((current) => (current === columnId ? null : columnId));
+  }
+
+  tableWidth(data: ThreadDataset): number {
+    return this.page
+      .tableViewColumns(this.item, data)
+      .reduce(
+        (width, column) => width + Math.max(90, this.item.tableColumnWidths?.[column.id] || 120),
+        32,
+      );
   }
 }

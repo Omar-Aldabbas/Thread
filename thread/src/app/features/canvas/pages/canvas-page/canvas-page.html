@@ -54,7 +54,6 @@
     (pointermove)="pointerMove($event)"
     (pointerup)="pointerUp($event)"
     (pointercancel)="pointerCancel($event)"
-    (dblclick)="canvasDoubleClick($event)"
     (wheel)="wheel($event)"
     (dragover)="dragOver($event)"
     (dragleave)="dragLeave()"
@@ -1380,13 +1379,16 @@
     </div>
   }
   @if (
-    tool() === 'select' && selectedIds().length && (!editingId() || selected()?.type === 'text')
+    tool() === 'select' &&
+    selectedIds().length &&
+    (!editingId() || selected()?.type === 'text' || selected()?.type === 'note')
   ) {
     <div
       class="selection-toolbar canvas-action-bar"
       appScroll="x"
       scrollbar="hover"
-      [class.editing-text]="!!editingId()"
+      role="toolbar"
+      aria-label="Selected item actions"
       data-ui
     >
       <span>{{ selectedIds().length }} selected</span>
@@ -1416,6 +1418,13 @@
           </button>
         }
         @if (selectedIds().length === 1 && (item.type === 'text' || item.type === 'note')) {
+          @if (editingId() !== item.id) {
+            <button
+              class="toolbar-edit"
+              (click)="startEditing(item.id, item.type === 'note' ? 'body' : 'content')"
+              [attr.aria-label]="item.type === 'note' ? 'Edit note body' : 'Edit text'"
+            >Edit text</button>
+          }
           <thread-select
             aria-label="Font family"
             [value]="item.fontFamily || 'sans'"
@@ -1439,12 +1448,45 @@
             <thread-option value="48" label="Hero"></thread-option>
             <thread-option value="64" label="Display"></thread-option></thread-select
           ><button
-            (click)="toggleBold(item.id)"
-            [class.active]="(item.fontWeight || 600) >= 700"
+            (mousedown)="$event.preventDefault()"
+            (click)="richFocusId() === item.id ? richCommand('bold') : toggleBold(item.id)"
+            [class.active]="richFocusId() === item.id ? richActive('bold') : (item.fontWeight || 600) >= 700"
             aria-label="Bold"
           >
             <b>B</b></button
-          ><thread-select
+          >@if (richFocusId() === item.id) {
+            <button
+              (mousedown)="$event.preventDefault()"
+              (click)="richCommand('italic')"
+              [class.active]="richActive('italic')"
+              aria-label="Italic"
+            ><i>I</i></button>
+            <button
+              (mousedown)="$event.preventDefault()"
+              (click)="richCommand('underline')"
+              [class.active]="richActive('underline')"
+              aria-label="Underline"
+            ><u>U</u></button>
+            <button
+              (mousedown)="$event.preventDefault()"
+              (click)="richCommand('heading')"
+              [class.active]="richActive('heading')"
+              aria-label="Heading"
+            >H</button>
+            <button
+              (mousedown)="$event.preventDefault()"
+              (click)="richCommand('bulletList')"
+              [class.active]="richActive('bulletList')"
+              aria-label="Bulleted list"
+            >• List</button>
+            <button
+              (mousedown)="$event.preventDefault()"
+              (click)="richCommand('orderedList')"
+              [class.active]="richActive('orderedList')"
+              aria-label="Numbered list"
+            >1. List</button>
+          }
+          <thread-select
             aria-label="Text alignment"
             [value]="item.textAlign || 'left'"
             (change)="setAlignment(item.id, $event)"
@@ -1456,47 +1498,19 @@
           <thread-color
             aria-label="Text color"
             [value]="item.textColor || '#111111'"
-            (change)="setStyle(item.id, { textColor: $any($event.target).value })"
+            (change)="toolbarTextColor(item.id, $any($event.target).value)"
           ></thread-color>
-          <div class="swatches" aria-label="Text color">
-            @for (
-              color of [
-                '#111111',
-                '#62615e',
-                '#d4111c',
-                '#ffffff',
-                '#d9a20b',
-                '#315b89',
-                '#35735b',
-              ];
-              track color
-            ) {
-              <button
-                [style.background]="color"
-                [class.active]="item.textColor === color"
-                (click)="setStyle(item.id, { textColor: color })"
-                [attr.aria-label]="'Text color ' + color"
-              ></button>
-            }
-          </div>
           @if (item.type === 'note') {
             <thread-color
               aria-label="Note background"
               [value]="item.background || '#fff3d6'"
               (change)="setStyle(item.id, { background: $any($event.target).value })"
             ></thread-color>
-            <div class="swatches" aria-label="Note background">
-              @for (color of ['#ffffff', '#fff5d9', '#fcecee', '#eaf2ed', '#eaf0f8']; track color) {
-                <button
-                  [style.background]="color"
-                  [class.active]="item.background === color"
-                  (click)="setStyle(item.id, { background: color })"
-                  [attr.aria-label]="'Note background ' + color"
-                ></button>
-              }
-            </div>
           }
         }
+      }
+      @if (editingId()) {
+        <button class="toolbar-done" (click)="finishEditing()">Done</button>
       }
       <button (click)="duplicate()">Duplicate</button
       ><button (click)="erExpandedFieldId.set(null); inspectorOpen.set(!inspectorOpen())">

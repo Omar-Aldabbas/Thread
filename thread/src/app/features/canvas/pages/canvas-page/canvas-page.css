@@ -19,6 +19,7 @@ button { cursor:pointer; border:0; background:none; color:inherit; }
 .connections .connection-hit { pointer-events:stroke; cursor:grab; }
 .connections .connection-hit:active { cursor:grabbing; }
 .canvas-item { position:absolute; min-width:0; min-height:0; box-sizing:border-box; cursor:grab; touch-action:none; user-select:none; }
+.canvas-item:has(> app-canvas-table.menu-open),.canvas-item:has(> app-canvas-chart.menu-open) { z-index:10000!important; }
 .canvas-item.zone,.canvas-item.frame-item { cursor:default; }
 .zone-label[data-zone-drag] { cursor:grab; }
 .zone-label[data-zone-drag]:active { cursor:grabbing; }
@@ -208,8 +209,6 @@ button { cursor:pointer; border:0; background:none; color:inherit; }
 .alignment-guide.horizontal { background:repeating-linear-gradient(to right,var(--color-primary) 0 6px,transparent 6px 12px); }
 .text-content app-rich-text-editor { min-width:0; }
 .canvas-item.text-item:not(.selected) .text-content { overflow-wrap:anywhere; }
-.selection-toolbar.editing-text { bottom:72px; }
-@media (max-width:700px) { .selection-toolbar.editing-text { bottom:calc(125px + env(safe-area-inset-bottom)); } }
 .tool-rail.canvas-action-bar { left:1.25rem; gap:.25rem; padding:.35rem; border-radius:var(--radius-md); box-shadow:var(--shadow-md); }
 .tool-rail.canvas-action-bar button { position:relative; width:3rem; height:3rem; border-radius:var(--radius-sm); color:var(--color-text-primary); }
 .tool-rail.canvas-action-bar button.active { color:var(--color-text-inverse); }
@@ -448,5 +447,41 @@ button { cursor:pointer; border:0; background:none; color:inherit; }
   .activity-panel { top:auto; right:10px; bottom:calc(65px + env(safe-area-inset-bottom)); left:10px; width:auto; max-height:calc(100dvh - 150px); border-radius:16px; }
   .recording-indicator { top:158px; right:10px; gap:6px; padding-left:9px; font-size:10px; }
   .recording-indicator button { padding:7px; }
-  .recording-error-toast { top:158px; right:10px; left:10px; max-width:none; }
+.recording-error-toast { top:158px; right:10px; left:10px; max-width:none; }
+}
+
+/* One selection toolbar serves both card styling and rich text editing. */
+.selection-toolbar.canvas-action-bar {
+  box-sizing:border-box;
+  width:max-content;
+  max-width:calc(100% - 150px);
+  min-width:0;
+  overflow-x:auto;
+  overflow-y:hidden;
+  white-space:nowrap;
+  overscroll-behavior-x:contain;
+  scroll-padding-inline:8px;
+}
+.selection-toolbar.canvas-action-bar > * { flex:none; }
+.selection-toolbar.canvas-action-bar > button { min-width:34px; padding-inline:9px; }
+.selection-toolbar.canvas-action-bar > button:focus-visible { outline:2px solid var(--color-primary); outline-offset:-2px; }
+.selection-toolbar.canvas-action-bar .toolbar-edit,
+.selection-toolbar.canvas-action-bar .toolbar-done { color:var(--color-primary); font-weight:700; }
+.selection-toolbar.canvas-action-bar thread-color { flex:none; min-width:38px; }
+@media (max-width:700px) {
+  .selection-toolbar.canvas-action-bar {
+    right:8px;
+    bottom:calc(72px + env(safe-area-inset-bottom));
+    left:8px;
+    width:auto;
+    max-width:none;
+    min-height:52px;
+    padding:5px;
+    transform:none;
+    touch-action:pan-x;
+  }
+  .selection-toolbar.canvas-action-bar > button { min-width:42px; height:42px; min-height:42px; font-size:12px; }
+  .selection-toolbar.canvas-action-bar thread-select { min-width:88px; height:42px; }
+  .selection-toolbar.canvas-action-bar thread-color { min-width:42px; height:42px; }
+  .selection-toolbar.canvas-action-bar > span { position:sticky; left:0; z-index:1; padding-inline:8px; background:var(--color-surface); }
 }
