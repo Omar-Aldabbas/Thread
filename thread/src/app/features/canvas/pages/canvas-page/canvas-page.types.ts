@@ -21,6 +21,7 @@ export type CanvasSession = {
     | 'pan'
     | 'move'
     | 'resize'
+    | 'group-resize'
     | 'rotate'
     | 'marquee'
     | 'place'
@@ -48,5 +49,6 @@ export type CanvasSession = {
   origins?: Map<string, { x: number; y: number }>;
   groupCenter?: { x: number; y: number };
   groupIds?: string[];
+  groupBounds?: { x: number; y: number; width: number; height: number };
   moved?: boolean;
 };

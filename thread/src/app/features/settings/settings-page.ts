@@ -59,10 +59,26 @@ import { ScrollDirective } from '../../shared/scroll.directive';
             System follows your device appearance. Your choice applies to every Thread screen.
           </p>
         </section>
+        <section class="settings-section" aria-labelledby="canvas-heading">
+          <div class="section-heading">
+            <div>
+              <small>03 / CANVAS</small>
+              <h2 id="canvas-heading">Canvas zoom</h2>
+            </div>
+          </div>
+          <label class="setting-label" for="min-zoom">Minimum zoom</label>
+          <div class="zoom-setting">
+            <input id="min-zoom" type="range" min="5" max="100" step="1"
+              [value]="preferences.minZoomPercent()"
+              (input)="saveMinZoom($event)" />
+            <output for="min-zoom">{{ preferences.minZoomPercent() }}%</output>
+          </div>
+          <p class="setting-help">The canvas will not zoom out below this level. Default: 12%.</p>
+        </section>
         <section class="settings-section about">
           <div class="section-heading">
             <div>
-              <small>03 / ABOUT</small>
+              <small>04 / ABOUT</small>
               <h2>Thread</h2>
             </div>
           </div>
@@ -195,6 +211,9 @@ import { ScrollDirective } from '../../shared/scroll.directive';
       .setting-help {
         margin: 10px 0 0;
       }
+      .zoom-setting { display:flex; align-items:center; gap:16px; width:min(360px,100%); }
+      .zoom-setting input { flex:1; min-width:0; accent-color:var(--color-primary); cursor:pointer; }
+      .zoom-setting output { min-width:42px; font-size:13px; font-weight:750; font-variant-numeric:tabular-nums; }
       .theme-options {
         display: grid;
         grid-template-columns: repeat(3, 1fr);
@@ -264,5 +283,8 @@ export class SettingsPage {
   }
   saveName(event: Event): void {
     this.preferences.setProfileName((event.target as HTMLInputElement).value);
+  }
+  saveMinZoom(event: Event): void {
+    this.preferences.setMinZoomPercent(Number((event.target as HTMLInputElement).value));
   }
 }

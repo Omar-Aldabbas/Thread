@@ -97,6 +97,28 @@ function canvasHit(viewport: HTMLElement, target: Element) {
 }
 
 describe('shared canvas gesture ownership', () => {
+  it('pans with the middle button over cards and their controls', () => {
+    for (const useControl of [false, true]) {
+      const { page, viewport } = canvas();
+      const card = document.createElement('article');
+      card.dataset['nodeId'] = 'note';
+      const control = document.createElement('button');
+      card.append(control);
+      viewport.append(card);
+      page.items.set([{ id: 'note', type: 'note', title: 'Note', parentId: null, x: 0, y: 0, width: 200, height: 100 }]);
+      const down = { ...canvasHit(viewport, useControl ? control : card), button: 1 };
+
+      page.canvasPointerDown(down);
+      expect(down.preventDefault).toHaveBeenCalled();
+      expect(page.isPanning()).toBe(true);
+      expect(viewport.setPointerCapture).toHaveBeenCalledWith(1);
+
+      page.pointerMove({ ...down, clientX: 340, clientY: 260 });
+      expect(page.panX()).toBe(60);
+      expect(page.panY()).toBe(10);
+    }
+  });
+
   it('selects an object on click and moves it only after the drag threshold', () => {
     const { page, viewport } = canvas();
     const item = {

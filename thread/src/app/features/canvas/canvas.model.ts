@@ -95,6 +95,7 @@ export interface CanvasItem {
   shapeStrokeWidth?: number;
   shapeStrokeStyle?: 'solid' | 'dashed';
   groupId?: string;
+  groupName?: string;
   sketchAsset?: 'sticker' | 'gif';
   assetId?: string;
   flipX?: boolean;

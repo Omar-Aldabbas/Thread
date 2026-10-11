@@ -33,6 +33,7 @@ import {
 } from '../../canvas.model';
 import { DatasetStore } from '../../data/dataset-store';
 import { canvasId } from '../../canvas-id';
+import { matchesCanvasSearch } from '../../canvas-search';
 import { arrangeErEntities, routeErConnections } from '../../er-layout';
 import { erDataTypes, enumValues, erFieldIssue, exportErDbml } from '../../er-schema';
 import { shapeKinds, shapeNames, shapePaths, shapeThemes } from '../../shapes';
@@ -40,6 +41,11 @@ import { CanvasTable } from '../../components/canvas-table/canvas-table';
 import { CanvasErEntity } from '../../components/canvas-er-entity/canvas-er-entity';
 import { CanvasChart } from '../../components/canvas-chart/canvas-chart';
 import { CanvasBudget } from '../../components/canvas-budget/canvas-budget';
+import { CanvasNavigation } from '../../components/canvas-navigation';
+import { CanvasToolRail } from '../../components/canvas-tool-rail';
+import { CanvasZoomControls } from '../../components/canvas-zoom-controls';
+import { CanvasAddPalette } from '../../components/canvas-add-palette';
+import { CanvasMusicPlayer } from '../../components/canvas-music-player';
 import {
   containsShape,
   nearestPerimeter,
@@ -59,7 +65,6 @@ import {
   ThreadCheckbox,
   ThreadColor,
 } from '../../../../shared/controls/thread-controls';
-import { ThreadHeader } from '../../../../shared/thread-header';
 import { ScrollDirective } from '../../../../shared/scroll.directive';
 import {
   brushDiameter,
@@ -86,7 +91,11 @@ import type {
     RichTextHtmlPipe,
     MediaPicker,
     SketchRenderer,
-    ThreadHeader,
+    CanvasNavigation,
+    CanvasToolRail,
+    CanvasZoomControls,
+    CanvasAddPalette,
+    CanvasMusicPlayer,
     ScrollDirective,
     CanvasTable,
     CanvasErEntity,
@@ -234,10 +243,10 @@ export class CanvasPage implements AfterViewInit, OnDestroy {
     () => this.items().find((item) => item.id === this.connectionSourceId()) || null,
   );
   readonly search = signal('');
-  readonly searchOpen = signal(false);
   readonly panX = signal(0);
   readonly panY = signal(0);
   readonly zoom = signal(1);
+  readonly gridHoverIntensity = computed(() => Math.min(0.55, Math.max(0.08, this.zoom() * 0.55)));
   readonly isPanning = signal(false);
   readonly marquee = signal<{ x: number; y: number; width: number; height: number } | null>(null);
   private session: Session | null = null;
@@ -249,6 +258,12 @@ export class CanvasPage implements AfterViewInit, OnDestroy {
     const target = event.target as Element;
     const viewport = this.viewport()?.nativeElement;
     if (!viewport || !target || !viewport.contains(target)) return;
+    if (event.button === 1) {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      this.beginPan(event, viewport);
+      return;
+    }
     const node = target.closest<HTMLElement>('[data-node-id]');
     const item = this.items().find((entry) => entry.id === node?.dataset['nodeId']);
     const control = target.closest(
@@ -364,13 +379,41 @@ export class CanvasPage implements AfterViewInit, OnDestroy {
   readonly visibleItems = computed(() => {
     const items = this.items();
     const byId = new Map(items.map((item) => [item.id, item]));
-    return items.filter(
-      (item) =>
-        this.itemContextId(item, byId) === this.contextId() &&
-        (!this.search() ||
-          `${item.title} ${item.body || ''}`.toLowerCase().includes(this.search().toLowerCase())),
-    );
+    return items.filter((item) => this.itemContextId(item, byId) === this.contextId());
   });
+  readonly searching = computed(() => !!this.search().trim());
+  readonly searchMatches = computed(() =>
+    this.searching() ? this.visibleItems().filter((item) => this.matchesSearch(item)) : [],
+  );
+  readonly searchMatchCount = computed(() => this.searchMatches().length);
+  private searchResultIndex = -1;
+  setSearchQuery(query: string): void {
+    this.searchResultIndex = -1;
+    this.search.set(query);
+  }
+  focusNextSearchMatch(): void {
+    const matches = this.searchMatches();
+    const viewport = this.viewport()?.nativeElement;
+    if (!matches.length || !viewport) return;
+    this.searchResultIndex = (this.searchResultIndex + 1) % matches.length;
+    const item = matches[this.searchResultIndex];
+    const zoom = Math.max(
+      this.zoom(),
+      Math.min(1, (viewport.clientWidth - 48) / item.width, (viewport.clientHeight - 180) / item.height),
+    );
+    this.zoom.set(Math.max(this.preferences.minZoomPercent() / 100, zoom));
+    this.panX.set(viewport.clientWidth / 2 - (item.x + item.width / 2) * this.zoom());
+    this.panY.set(viewport.clientHeight / 2 - (item.y + item.height / 2) * this.zoom());
+  }
+  matchesSearch(item: CanvasItem): boolean {
+    return matchesCanvasSearch(item, this.search());
+  }
+  connectionMatchesSearch(connection: CanvasConnection): boolean {
+    if (!this.searching()) return true;
+    return this.visibleItems().some((item) =>
+      (item.id === connection.sourceId || item.id === connection.targetId) && this.matchesSearch(item),
+    );
+  }
   isDimension(item: CanvasItem): boolean {
     return item.type === 'zone' || item.type === 'workspace';
   }
@@ -428,6 +471,13 @@ export class CanvasPage implements AfterViewInit, OnDestroy {
       width: Math.max(...corners.map((point) => point.x)) - x,
       height: Math.max(...corners.map((point) => point.y)) - y,
     };
+  });
+  readonly selectedGroupName = computed(() => {
+    const selected = this.items().filter((item) => this.selectedIds().includes(item.id));
+    const groupId = selected[0]?.groupId;
+    return groupId && selected.every((item) => item.groupId === groupId)
+      ? selected[0].groupName || 'Group'
+      : null;
   });
   readonly worldTransform = computed(
     () => `translate(${this.panX()}px, ${this.panY()}px) scale(${this.zoom()})`,
@@ -1624,6 +1674,11 @@ export class CanvasPage implements AfterViewInit, OnDestroy {
   }
   pointerDown(event: PointerEvent): void {
     if (event.button !== 0 && event.button !== 1) return;
+    if (event.button === 1) {
+      event.preventDefault();
+      this.beginPan(event, this.viewport()?.nativeElement || (event.currentTarget as Element));
+      return;
+    }
     if (this.pendingAsset()) {
       this.placeMedia(this.pendingAsset()!, this.point(event.clientX, event.clientY));
       return;
@@ -1631,7 +1686,7 @@ export class CanvasPage implements AfterViewInit, OnDestroy {
     if (this.beginTouch(event)) return;
     if (this.session) return;
     const point = this.point(event.clientX, event.clientY);
-    if (event.button === 1 || this.spaceHeld() || this.tool() === 'hand') {
+    if (this.spaceHeld() || this.tool() === 'hand') {
       this.session = {
         kind: 'pan',
         pointerId: event.pointerId,
@@ -1821,6 +1876,19 @@ export class CanvasPage implements AfterViewInit, OnDestroy {
       itemId: item.id,
       corner,
       before: this.state(),
+    };
+    (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
+  }
+  resizeGroupDown(event: PointerEvent, corner: 'nw' | 'ne' | 'sw' | 'se'): void {
+    event.preventDefault();
+    event.stopPropagation();
+    const bounds = this.groupBounds();
+    if (!bounds) return;
+    this.session = {
+      kind: 'group-resize', pointerId: event.pointerId,
+      clientX: event.clientX, clientY: event.clientY,
+      x: bounds.width, y: bounds.height, corner,
+      groupBounds: bounds, groupIds: [...this.selectedIds()], before: this.state(),
     };
     (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
   }
@@ -2253,6 +2321,7 @@ export class CanvasPage implements AfterViewInit, OnDestroy {
     (event.currentTarget as Element).setPointerCapture(event.pointerId);
   }
   pointerMove(event: PointerEvent): void {
+    this.updateGridHover(event);
     if (this.pendingAsset()) this.assetPreview.set(this.point(event.clientX, event.clientY));
     if (this.pointers.has(event.pointerId)) {
       this.pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
@@ -2331,6 +2400,33 @@ export class CanvasPage implements AfterViewInit, OnDestroy {
           return start ? { ...item, x: start.x + offsetX, y: start.y + offsetY } : item;
         }),
       );
+      this.queueTransformSync();
+    }
+    if (session.kind === 'group-resize' && session.groupBounds && session.groupIds && session.before) {
+      const bounds = session.groupBounds;
+      const corner = session.corner || 'se';
+      const sx = corner.endsWith('e') ? 1 : -1;
+      const sy = corner.startsWith('s') ? 1 : -1;
+      const width = Math.max(40, bounds.width + sx * dx / this.zoom());
+      const height = Math.max(40, bounds.height + sy * dy / this.zoom());
+      const scaleX = width / bounds.width;
+      const scaleY = height / bounds.height;
+      const anchorX = bounds.x + (sx > 0 ? 0 : bounds.width);
+      const anchorY = bounds.y + (sy > 0 ? 0 : bounds.height);
+      const selected = new Set(session.groupIds);
+      const before = new Map(session.before.items.map((item) => [item.id, item]));
+      this.items.update((items) => items.map((item) => {
+        const original = before.get(item.id);
+        if (!selected.has(item.id) || !original) return item;
+        return {
+          ...item,
+          x: anchorX + (original.x - anchorX) * scaleX,
+          y: anchorY + (original.y - anchorY) * scaleY,
+          width: original.width * scaleX,
+          height: original.height * scaleY,
+        };
+      }));
+      this.setTransformGuide(`${Math.round(width)} × ${Math.round(height)}`);
       this.queueTransformSync();
     }
     if (session.kind === 'resize') {
@@ -2519,6 +2615,18 @@ export class CanvasPage implements AfterViewInit, OnDestroy {
     }
     if (session.kind === 'erase') this.eraseSketchAt(this.point(event.clientX, event.clientY));
   }
+  updateGridHover(event: PointerEvent): void {
+    if (event.pointerType === 'touch') return;
+    const viewport = this.viewport()?.nativeElement;
+    if (!viewport) return;
+    const rect = viewport.getBoundingClientRect();
+    viewport.style.setProperty('--hover-x', `${event.clientX - rect.left}px`);
+    viewport.style.setProperty('--hover-y', `${event.clientY - rect.top}px`);
+    viewport.classList.add('grid-hover');
+  }
+  clearGridHover(): void {
+    this.viewport()?.nativeElement.classList.remove('grid-hover');
+  }
   pointerUp(event: PointerEvent): void {
     const wasPinching = !!this.pinch;
     this.pointers.delete(event.pointerId);
@@ -2698,7 +2806,7 @@ export class CanvasPage implements AfterViewInit, OnDestroy {
         }
       }
     }
-    if (session?.before && ['move', 'resize', 'rotate'].includes(session.kind)) {
+    if (session?.before && ['move', 'resize', 'group-resize', 'rotate'].includes(session.kind)) {
       if (
         session.kind === 'resize' &&
         session.itemId &&
@@ -2759,11 +2867,14 @@ export class CanvasPage implements AfterViewInit, OnDestroy {
       this.panY.update((y) => y - event.deltaY);
     }
   }
+  preventMiddleAutoScroll(event: MouseEvent): void {
+    if (event.button === 1) event.preventDefault();
+  }
   zoomAt(clientX: number, clientY: number, value: number): void {
     const rect = this.viewport()?.nativeElement.getBoundingClientRect();
     if (!rect) return;
     const point = this.point(clientX, clientY);
-    const zoom = Math.min(3, Math.max(0.08, value));
+    const zoom = Math.min(3, Math.max(this.preferences.minZoomPercent() / 100, value));
     this.zoom.set(zoom);
     this.panX.set(clientX - rect.left - point.x * zoom);
     this.panY.set(clientY - rect.top - point.y * zoom);
@@ -2792,7 +2903,7 @@ export class CanvasPage implements AfterViewInit, OnDestroy {
     const zoom = Math.min(
       1.15,
       Math.max(
-        0.08,
+        this.preferences.minZoomPercent() / 100,
         Math.min(
           horizontalSpace / Math.max(1, maxX - minX),
           verticalSpace / Math.max(1, maxY - minY),
@@ -2944,7 +3055,7 @@ export class CanvasPage implements AfterViewInit, OnDestroy {
       selected = new Set(this.selectedIds());
     this.snapshot();
     this.items.update((items) =>
-      items.map((item) => (selected.has(item.id) ? { ...item, groupId: id } : item)),
+      items.map((item) => (selected.has(item.id) ? { ...item, groupId: id, groupName: 'Group' } : item)),
     );
   }
   ungroupSelected(): void {
@@ -2957,7 +3068,7 @@ export class CanvasPage implements AfterViewInit, OnDestroy {
     this.snapshot();
     this.items.update((items) =>
       items.map((item) =>
-        item.groupId && groups.has(item.groupId) ? { ...item, groupId: undefined } : item,
+        item.groupId && groups.has(item.groupId) ? { ...item, groupId: undefined, groupName: undefined } : item,
       ),
     );
   }
@@ -3583,9 +3694,10 @@ export class CanvasPage implements AfterViewInit, OnDestroy {
     }
     if (mobile && viewport) {
       const focusZoom = Math.min(1, (viewport.clientWidth - 32) / Math.max(1, placedWidth));
-      this.zoom.set(focusZoom);
-      this.panX.set(viewport.clientWidth / 2 - (item.x + item.width / 2) * focusZoom);
-      this.panY.set((viewport.clientHeight - 130) / 2 - (item.y + item.height / 2) * focusZoom);
+      const zoom = Math.max(this.preferences.minZoomPercent() / 100, focusZoom);
+      this.zoom.set(zoom);
+      this.panX.set(viewport.clientWidth / 2 - (item.x + item.width / 2) * zoom);
+      this.panY.set((viewport.clientHeight - 130) / 2 - (item.y + item.height / 2) * zoom);
     }
     if (
       [
@@ -4012,7 +4124,7 @@ export class CanvasPage implements AfterViewInit, OnDestroy {
         width = Math.max(...arranged.map((item) => item.x + item.width)) - left,
         height = Math.max(...arranged.map((item) => item.y + item.height)) - top;
       const zoom = Math.max(
-        0.08,
+        this.preferences.minZoomPercent() / 100,
         Math.min(
           1,
           (viewport.clientWidth - (viewport.clientWidth <= 700 ? 32 : 180)) / width,
@@ -4241,7 +4353,7 @@ export class CanvasPage implements AfterViewInit, OnDestroy {
         (viewport.clientWidth - 36) / 600,
         (viewport.clientHeight - 150) / 250,
       );
-      this.zoom.set(Math.max(0.08, zoom));
+      this.zoom.set(Math.max(this.preferences.minZoomPercent() / 100, zoom));
       this.panX.set(viewport.clientWidth / 2 - center.x * this.zoom());
       this.panY.set(
         (viewport.clientHeight - (viewport.clientWidth <= 700 ? 100 : 0)) / 2 -
@@ -4589,14 +4701,14 @@ export class CanvasPage implements AfterViewInit, OnDestroy {
       [this.budgetField(data, 'Actual')]: 0,
       [this.budgetCategoryField(data)]: group,
     });
-    this.update(id, { height: this.budgetHeight(item) });
+    this.update(id, { height: Math.max(item.height, this.budgetHeight(item)) });
     queueMicrotask(() => this.startDataCellEdit(item.id, row.id, this.budgetItemField(data)));
   }
   deleteBudgetEntry(item: CanvasItem, rowId: string): void {
     if (!item.datasetId) return;
     this.snapshot();
     this.datasetStore.deleteRow(item.datasetId, rowId);
-    this.update(item.id, { height: this.budgetHeight(item) });
+    this.update(item.id, { height: Math.max(item.height, this.budgetHeight(item)) });
   }
   setBudgetCurrency(item: CanvasItem, event: Event): void {
     this.setStyle(item.id, {
@@ -4654,7 +4766,7 @@ export class CanvasPage implements AfterViewInit, OnDestroy {
     const value = Number((event.target as HTMLInputElement).value);
     this.setStyle(item.id, {
       budgetTarget: value > 0 ? value : undefined,
-      height: value > 0 ? Math.min(420, item.height + 38) : Math.max(172, item.height - 38),
+      height: value > 0 ? item.height + 38 : Math.max(172, item.height - 38),
     });
   }
   setBudgetPeriod(item: CanvasItem, event: Event): void {
@@ -4948,6 +5060,38 @@ export class CanvasPage implements AfterViewInit, OnDestroy {
     this.snapshot();
     targets.forEach((item) => this.update(item.id, { [axis]: value }));
   }
+  renameGroup(event: Event): void {
+    const name = (event.target as HTMLInputElement).value.trim() || 'Group';
+    const groupId = this.selected()?.groupId;
+    if (!groupId) return;
+    this.snapshot();
+    this.items.update((items) => items.map((item) => item.groupId === groupId ? { ...item, groupName: name } : item));
+  }
+  alignFrameChildren(frame: CanvasItem, mode: 'left' | 'center' | 'right' | 'top' | 'middle' | 'bottom' | 'horizontal' | 'vertical'): void {
+    const children = this.items().filter((item) => item.parentId === frame.id && !item.locked);
+    if (!children.length) return;
+    this.snapshot();
+    const ordered = [...children].sort((a, b) => mode === 'horizontal' ? a.x - b.x : a.y - b.y);
+    const edge = mode === 'horizontal' ? 'x' : 'y';
+    const size = mode === 'horizontal' ? 'width' : 'height';
+    const start = frame[edge] + 16;
+    const end = frame[edge] + frame[size] - 16;
+    const total = ordered.reduce((sum, item) => sum + item[size], 0);
+    const gap = ordered.length > 1 ? Math.max(0, (end - start - total) / (ordered.length - 1)) : 0;
+    const positions = new Map<string, number>();
+    let cursor = start;
+    ordered.forEach((item) => { positions.set(item.id, cursor); cursor += item[size] + gap; });
+    this.items.update((items) => items.map((item) => {
+      if (!children.some((child) => child.id === item.id)) return item;
+      if (mode === 'horizontal' || mode === 'vertical') return { ...item, [edge]: positions.get(item.id)! };
+      if (mode === 'left') return { ...item, x: frame.x + 16 };
+      if (mode === 'center') return { ...item, x: frame.x + (frame.width - item.width) / 2 };
+      if (mode === 'right') return { ...item, x: frame.x + frame.width - item.width - 16 };
+      if (mode === 'top') return { ...item, y: frame.y + 36 };
+      if (mode === 'middle') return { ...item, y: frame.y + (frame.height - item.height) / 2 };
+      return { ...item, y: frame.y + frame.height - item.height - 16 };
+    }));
+  }
   private eraseSketchAt(point: { x: number; y: number }): void {
     const radius = 18 / this.zoom();
     const visibleIds = new Set(this.visibleItems().map((item) => item.id));
@@ -5200,7 +5344,7 @@ export class CanvasPage implements AfterViewInit, OnDestroy {
     this.snapshot();
     const row = this.datasetStore.addRow(item.datasetId);
     this.update(id, {
-      height: Math.min(640, Math.max(item.height, 150 + this.tableRows(item).length * 38)),
+      height: Math.max(item.height, Math.min(640, 150 + this.tableRows(item).length * 38)),
     });
     return row;
   }

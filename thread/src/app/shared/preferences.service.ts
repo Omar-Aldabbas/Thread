@@ -9,6 +9,7 @@ export class PreferencesService {
   private readonly document = inject(DOCUMENT);
   readonly theme = signal<ThemeChoice>(this.readTheme());
   readonly profileName = signal(this.readName());
+  readonly minZoomPercent = signal(this.readMinZoom());
   readonly systemDark = signal(this.browser && typeof matchMedia === 'function' && matchMedia('(prefers-color-scheme: dark)').matches);
   readonly dark = computed(
     () => this.theme() === 'dark' || (this.theme() === 'system' && this.systemDark()),
@@ -37,6 +38,9 @@ export class PreferencesService {
     effect(() => {
       if (this.browser) localStorage.setItem('thread-profile-name', this.profileName());
     });
+    effect(() => {
+      if (this.browser) localStorage.setItem('thread-min-zoom-percent', String(this.minZoomPercent()));
+    });
   }
   private readTheme(): ThemeChoice {
     if (!this.browser) return 'system';
@@ -48,10 +52,18 @@ export class PreferencesService {
       ? localStorage.getItem('thread-profile-name') || 'Thread user'
       : 'Thread user';
   }
+  private readMinZoom(): number {
+    if (!this.browser) return 12;
+    const value = Number(localStorage.getItem('thread-min-zoom-percent'));
+    return Number.isFinite(value) && value >= 5 && value <= 100 ? Math.round(value) : 12;
+  }
   setTheme(value: ThemeChoice): void {
     this.theme.set(value);
   }
   setProfileName(value: string): void {
     this.profileName.set(value.trim() || 'Thread user');
+  }
+  setMinZoomPercent(value: number): void {
+    if (Number.isFinite(value)) this.minZoomPercent.set(Math.max(5, Math.min(100, Math.round(value))));
   }
 }

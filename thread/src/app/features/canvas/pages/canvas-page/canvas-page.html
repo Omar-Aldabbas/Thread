@@ -1,41 +1,5 @@
 ﻿<section class="thread-app">
-  <app-thread-header [title]="spaceName()">
-    <label class="search-box"
-      ><span>⌕</span
-      ><input
-        aria-label="Search canvas"
-        placeholder="Search"
-        [value]="search()"
-        (input)="search.set($any($event.target).value)"
-    /></label>
-    <button
-      class="search-toggle"
-      (click)="searchOpen.set(!searchOpen())"
-      [attr.aria-expanded]="searchOpen()"
-      aria-label="Search canvas"
-    >
-      ⌕
-    </button>
-    <button class="icon-button mobile-undo" (click)="undo()" aria-label="Undo" title="Undo">
-      ↶
-    </button>
-    <button class="icon-button" (click)="redo()" aria-label="Redo">↷</button>
-  </app-thread-header>
-  @if (searchOpen()) {
-    <div class="mobile-canvas-search" data-ui>
-      <input
-        type="search"
-        autofocus
-        aria-label="Search canvas"
-        placeholder="Find an item on this canvas"
-        [value]="search()"
-        (input)="search.set($any($event.target).value)"
-      />
-      <button (click)="search.set(''); searchOpen.set(false)" aria-label="Close and clear search">
-        ×
-      </button>
-    </div>
-  }
+  <app-canvas-navigation [title]="spaceName()" [query]="search()" (queryChange)="setSearchQuery($event)" (nextMatch)="focusNextSearchMatch()" (undo)="undo()" (redo)="redo()" />
   <main
     #viewport
     class="canvas-viewport"
@@ -47,14 +11,29 @@
     [class.sketch-cursor]="tool() === 'sketch'"
     [style.background-size]="gridSize()"
     [style.background-position]="gridPosition()"
+    [style.--hover-intensity]="gridHoverIntensity()"
     (pointermove)="pointerMove($event)"
+    (pointerleave)="clearGridHover()"
     (pointerup)="pointerUp($event)"
     (pointercancel)="pointerCancel($event)"
     (wheel)="wheel($event)"
+    (auxclick)="preventMiddleAutoScroll($event)"
     (dragover)="dragOver($event)"
     (dragleave)="dragLeave()"
     (drop)="drop($event)"
   >
+    @if (searching()) {
+      <button class="search-feedback" type="button" data-ui
+        [disabled]="!searchMatchCount()"
+        (click)="focusNextSearchMatch()"
+        [attr.aria-label]="searchMatchCount() ? 'Jump to next search match' : 'No search matches'"
+        title="Jump to next match">
+        <span role="status">{{ searchMatchCount() }} {{ searchMatchCount() === 1 ? 'match' : 'matches' }} on this canvas</span>
+        @if (searchMatchCount()) {
+          <span class="search-feedback-arrow" aria-hidden="true">↗</span>
+        }
+      </button>
+    }
     @if (context()) {
       <nav
         class="zone-route"
@@ -210,6 +189,7 @@
         </defs>
         @for (connection of visibleConnections(); track connection.id) {
           <path
+            [class.search-dimmed]="searching() && !connectionMatchesSearch(connection)"
             [attr.d]="connectionPath(connection)"
             fill="none"
             stroke="var(--color-primary)"
@@ -288,6 +268,7 @@
         @if (connection.label || connection.sourceCardinality || connection.targetCardinality) {
           <button
             class="relationship-label"
+            [class.search-dimmed]="searching() && !connectionMatchesSearch(connection)"
             type="button"
             [style.left.px]="connectionLabelX(connection)"
             [style.top.px]="connectionLabelY(connection)"
@@ -314,6 +295,8 @@
           data-item
           [attr.data-node-id]="item.id"
           class="canvas-item"
+          [class.search-dimmed]="searching() && !matchesSearch(item)"
+          [class.search-match]="searching() && matchesSearch(item)"
           [class.selected]="selectedIds().includes(item.id)"
           [class.connection-source]="tool() === 'connect' && connectionSourceId() === item.id"
           [class.zone]="item.type === 'zone' || item.type === 'workspace'"
@@ -382,7 +365,7 @@
                 (keydown)="inlineKey($event)"
                 (blur)="inlineBlur($event, item.id, 'title')"
                 [textContent]="item.title || (editingId() === item.id ? '' : 'Untitled ' + item.type)"
-              ></strong>
+              ></strong><small>{{ childCount(item.id) }} inside · drag to move</small>
             </div>
           } @else if (item.type === 'shape') {
             <svg
@@ -832,6 +815,19 @@
           [style.width.px]="bounds.width"
           [style.height.px]="bounds.height"
         >
+          @if (selectedGroupName(); as name) { <span class="group-name">{{ name }}</span> }
+          @for (corner of ['nw', 'ne', 'sw', 'se']; track corner) {
+            <button
+              class="resize-handle"
+              [style.transform]="'scale(' + 1 / zoom() + ')'"
+              [class.corner-nw]="corner === 'nw'"
+              [class.corner-ne]="corner === 'ne'"
+              [class.corner-sw]="corner === 'sw'"
+              [class.corner-se]="corner === 'se'"
+              (pointerdown)="resizeGroupDown($event, $any(corner))"
+              [attr.aria-label]="'Resize selected group from ' + corner"
+            ></button>
+          }
           <button
             class="rotate-handle"
             [style.top.px]="-32 / zoom()"
@@ -932,7 +928,7 @@
         {{ guide.label }}
       </div>
     }
-    @if (!visibleItems().length && !search()) {
+    @if (!visibleItems().length) {
       <div class="empty-hint" data-ui>
         Start creating <span class="desktop-hint">Use Add or press N to add a note</span
         ><span class="mobile-hint">Tap Task or Add below</span>
@@ -1032,6 +1028,7 @@
           <p>Add media or record a voice note to play it here.</p>
         }
       </section>
+      <app-canvas-music-player />
       <section class="activity-music">
         <div class="music-heading">
           <div>
@@ -1089,126 +1086,14 @@
       {{ activityError() }} <span>×</span>
     </button>
   }
-  <nav class="tool-rail canvas-action-bar" data-ui aria-label="Canvas tools">
-    <button
-      [class.active]="tool() === 'select' && !pendingType()"
-      data-shortcut="V"
-      (click)="setTool('select')"
-      aria-label="Select"
-      title="Select (V): select, edit, and move objects"
-      [attr.aria-pressed]="tool() === 'select' && !pendingType()"
-    >
-      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 3 13 9-6 1.3L9 20 5 3Z" /></svg
-      ><small>Select</small>
-    </button>
-    <div class="tool-divider navigation-divider" aria-hidden="true"></div>
-    <button
-      class="pan-tool"
-      [class.active]="tool() === 'hand'"
-      [attr.aria-pressed]="tool() === 'hand'"
-      (click)="setTool('hand')"
-      aria-label="Pan board"
-      title="Pan (H): move the board. Hold Space for temporary pan."
-      data-shortcut="H"
-    >
-      <svg viewBox="0 0 24 24" aria-hidden="true">
-        <path
-          d="M7 12V8a1.5 1.5 0 0 1 3 0v3-6a1.5 1.5 0 0 1 3 0v6-4a1.5 1.5 0 0 1 3 0v4-2a1.5 1.5 0 0 1 3 0v6c0 3-2 5-5 5h-3c-2 0-3-1-4-2l-3-4a1.6 1.6 0 0 1 2.5-2L7 13"
-        /></svg
-      ><small>Pan</small>
-    </button>
-    <div class="tool-divider"></div>
-    <button
-      [class.active]="paletteOpen() || !!pendingType()"
-      data-shortcut="N"
-      (click)="setTool('add')"
-      aria-label="Add content"
-    >
-      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v16M4 12h16" /></svg
-      ><small>Add</small></button
-    ><button
-      [class.active]="
-        tool() === 'sketch' || tool() === 'shape' || tool() === 'connect' || tool() === 'text'
-      "
-      (click)="setTool('sketch')"
-      aria-label="Sketch"
-      data-shortcut="P"
-    >
-      <svg viewBox="0 0 24 24" aria-hidden="true">
-        <path d="m4 20 4.5-1 11-11a2 2 0 0 0-3-3l-11 11L4 20ZM14 7l3 3" /></svg
-      ><small>Sketch</small>
-    </button>
-  </nav>
+  <app-canvas-tool-rail [tool]="tool()" [pendingType]="pendingType()" [paletteOpen]="paletteOpen()" (toolChange)="setTool($event)" />
   @if (tool() === 'hand') {
     <div class="hint-pill tool-instruction navigation-hint" data-ui>
       Pan board · Drag anywhere · V to select objects
     </div>
   }
   @if (paletteOpen()) {
-    <div class="create-palette" appScroll="y" scrollbar="auto" data-ui>
-      <div class="palette-title">
-        ADD <button (click)="setTool('select')" aria-label="Close">×</button>
-      </div>
-      <div class="palette-section">Quick</div>
-      <div class="palette-grid">
-        @for (
-          entry of [
-            { type: 'note', icon: '▤' },
-            { type: 'text', icon: 'T' },
-            { type: 'task', icon: '✓' },
-            { type: 'list', icon: '☷' },
-          ];
-          track entry.type
-        ) {
-          <button (click)="chooseType($any(entry.type))">
-            <span>{{ entry.icon }}</span
-            >{{ entry.type }}
-          </button>
-        }
-      </div>
-      <div class="palette-section">Media</div>
-      <button class="palette-upload-audio" (click)="openMediaFiles()">
-        <span aria-hidden="true">＋</span> Add media <small>Image · audio · video · document</small>
-      </button>
-      <button class="palette-upload-audio" (click)="toggleVoiceRecording()">
-        <span aria-hidden="true">●</span> Record voice
-        <small>Start a new microphone recording</small>
-      </button>
-      <div class="palette-grid palette-secondary-media">
-        <button (click)="openMedia('gif')"><span>▣</span> GIF</button
-        ><button (click)="openMedia('sticker')"><span>✳</span> Sticker</button
-        ><button (click)="chooseType('link')"><span>↗</span> Link</button>
-      </div>
-      <div class="palette-section">Organize</div>
-      <div class="palette-grid">
-        @for (
-          entry of [
-            { type: 'zone', icon: '□' },
-            { type: 'frame', icon: '▧' },
-            { type: 'budget', icon: '$' },
-            { type: 'table', icon: '▦' },
-            { type: 'chart', icon: '▥' },
-            { type: 'er-entity', icon: '◇' },
-          ];
-          track entry.type
-        ) {
-          <button (click)="chooseType($any(entry.type))">
-            <span>{{ entry.icon }}</span
-            >{{ entry.type === 'er-entity' ? 'ER entity' : entry.type }}
-          </button>
-        }
-      </div>
-      <button class="palette-sketch" (click)="setTool('sketch')">
-        <span>✎</span> Sketch directly on canvas
-      </button>
-      <button class="palette-sketch palette-er-starter" (click)="createErStarter()">
-        <span>◇</span
-        ><span
-          ><strong>ER diagram starter</strong
-          ><small>Two linked entities with example keys</small></span
-        >
-      </button>
-    </div>
+    <app-canvas-add-palette (close)="setTool('select')" (chooseType)="chooseType($event)" (openFiles)="openMediaFiles()" (recordVoice)="toggleVoiceRecording()" (openMedia)="openMedia($event)" (sketch)="setTool('sketch')" (erStarter)="createErStarter()" />
   }
   @if (mediaPicker(); as kind) {
     <app-media-picker [kind]="kind" (closed)="mediaPicker.set(null)" (picked)="pickMedia($event)" />
@@ -1395,12 +1280,7 @@
       }
     }
   }
-  <div class="zoom-controls canvas-action-bar" data-ui>
-    <button (click)="zoomBy(0.8)" aria-label="Zoom out">−</button
-    ><button class="zoom-value" (click)="fitView()" title="Fit view">{{ zoomLabel() }}</button
-    ><button (click)="zoomBy(1.25)" aria-label="Zoom in">+</button
-    ><button (click)="fitView()" aria-label="Fit all">⛶</button>
-  </div>
+  <app-canvas-zoom-controls [label]="zoomLabel()" (zoomChange)="zoomBy($event)" (fit)="fitView()" />
   @if (tool() === 'select' && selectedConnectionId() && !editingId()) {
     <div class="connection-toolbar canvas-action-bar" data-ui>
       <span>Drag line to reroute · drag + to branch</span>
@@ -1426,7 +1306,7 @@
       <span>{{ selectedIds().length }} selected</span>
       @if (selected(); as item) {
         @if (selectedIds().length > 1) {
-          <button (click)="groupSelected()">Group</button>
+          @if (!item.groupId) { <button (click)="groupSelected()">Group</button> }
         }
         @if (item.groupId) {
           <button (click)="ungroupSelected()">Ungroup</button>
@@ -1916,6 +1796,24 @@
             <button class="inspector-action" (click)="align('x')">Align left</button
             ><button class="inspector-action" (click)="align('y')">Align top</button>
           </div>
+        }
+        @if (selected()?.groupId) {
+          <label>Group name<input [value]="selected()?.groupName || 'Group'" (change)="renameGroup($event)" /></label>
+        }
+        @if (selected(); as frame) {
+        @if (frame.type === 'frame') {
+          <div class="frame-arrange"><strong>Arrange items in frame</strong><small>{{ childCount(frame.id) }} items · drag the frame title to move them together</small></div>
+          <div class="inspector-grid frame-align">
+            <button class="inspector-action" (click)="alignFrameChildren(frame, 'left')">Left</button>
+            <button class="inspector-action" (click)="alignFrameChildren(frame, 'center')">Center</button>
+            <button class="inspector-action" (click)="alignFrameChildren(frame, 'right')">Right</button>
+            <button class="inspector-action" (click)="alignFrameChildren(frame, 'top')">Top</button>
+            <button class="inspector-action" (click)="alignFrameChildren(frame, 'middle')">Middle</button>
+            <button class="inspector-action" (click)="alignFrameChildren(frame, 'bottom')">Bottom</button>
+            <button class="inspector-action" (click)="alignFrameChildren(frame, 'horizontal')">Space across</button>
+            <button class="inspector-action" (click)="alignFrameChildren(frame, 'vertical')">Space down</button>
+          </div>
+        }
         }
         <div class="inspector-grid">
           <button class="inspector-action" (click)="layer('front')">Bring forward</button
