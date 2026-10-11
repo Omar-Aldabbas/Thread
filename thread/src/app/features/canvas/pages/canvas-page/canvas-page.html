@@ -1,4 +1,4 @@
-﻿<section class="thread-app">
+<section class="thread-app">
   <app-canvas-navigation [title]="spaceName()" [query]="search()" (queryChange)="setSearchQuery($event)" (nextMatch)="focusNextSearchMatch()" (undo)="undo()" (redo)="redo()" />
   <main
     #viewport
@@ -1799,21 +1799,6 @@
         }
         @if (selected()?.groupId) {
           <label>Group name<input [value]="selected()?.groupName || 'Group'" (change)="renameGroup($event)" /></label>
-        }
-        @if (selected(); as frame) {
-        @if (frame.type === 'frame') {
-          <div class="frame-arrange"><strong>Position frame contents</strong><small>Move the items together, keeping their layout</small></div>
-          <div class="frame-position" role="group" aria-label="Position frame contents">
-            @for (position of ['top-left', 'top-center', 'top-right', 'middle-left', 'middle-center', 'middle-right', 'bottom-left', 'bottom-center', 'bottom-right']; track position) {
-              <button type="button" [class]="'position-' + position" [attr.aria-label]="'Move contents to ' + position.replace('-', ' ')" [title]="position.replace('-', ' ')" (click)="alignFrameChildren(frame, $any(position))"><span></span></button>
-            }
-          </div>
-          <div class="frame-space" role="group" aria-label="Space frame items">
-            <button (click)="alignFrameChildren(frame, 'horizontal')" [disabled]="childCount(frame.id) < 2">↔ <span>Space across</span></button>
-            <button (click)="alignFrameChildren(frame, 'vertical')" [disabled]="childCount(frame.id) < 2">↕ <span>Space down</span></button>
-          </div>
-          @if (frameArrangeMessage()) { <small class="frame-arrange-message" role="status">{{ frameArrangeMessage() }}</small> }
-        }
         }
         <div class="inspector-grid">
           <button class="inspector-action" (click)="layer('front')">Bring forward</button
