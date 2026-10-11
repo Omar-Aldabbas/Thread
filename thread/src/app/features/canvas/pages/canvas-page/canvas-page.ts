@@ -165,6 +165,11 @@ export class CanvasPage implements AfterViewInit, OnDestroy {
   readonly tool = signal<Tool>('select');
   readonly spaceHeld = signal(false);
   readonly paletteOpen = signal(false);
+  readonly linkComposerOpen = signal(false);
+  readonly linkTitleDraft = signal('');
+  readonly linkUrlDraft = signal('');
+  readonly linkDraftError = signal('');
+  private pendingLink: { title: string; url: string } | null = null;
   readonly activityOpen = signal(false);
   readonly timerSeconds = signal(25 * 60);
   readonly timerMinutes = signal(25);
@@ -723,6 +728,8 @@ export class CanvasPage implements AfterViewInit, OnDestroy {
   private upgradeDataState(state: State): State {
     const datasets = structuredClone(state.datasets || []);
     const items = state.items.map((item) => {
+      if (item.type === 'link' && item.width === 320 && item.height === 115)
+        return { ...item, width: 240, height: 70 };
       if (item.type !== 'budget' && item.type !== 'table') return item;
       if (item.datasetId && datasets.some((data) => data.id === item.datasetId)) {
         if (item.type === 'budget')
@@ -1001,9 +1008,40 @@ export class CanvasPage implements AfterViewInit, OnDestroy {
       this.openMedia(type);
       return;
     }
+    if (type === 'link') {
+      this.paletteOpen.set(false);
+      this.linkTitleDraft.set('');
+      this.linkUrlDraft.set('');
+      this.linkDraftError.set('');
+      this.linkComposerOpen.set(true);
+      return;
+    }
     this.pendingType.set(type);
     this.paletteOpen.set(false);
     this.tool.set('select');
+  }
+  cancelLinkComposer(): void { this.linkComposerOpen.set(false); }
+  prepareLink(event: Event): void {
+    event.preventDefault();
+    const title = this.linkTitleDraft().trim();
+    const raw = this.linkUrlDraft().trim();
+    if (!title || !raw) { this.linkDraftError.set('Enter a title and URL.'); return; }
+    const url = this.normalizeLinkUrl(raw);
+    if (!url) { this.linkDraftError.set('Enter a valid http or https URL.'); return; }
+    this.pendingLink = { title, url };
+    this.linkComposerOpen.set(false);
+    this.linkDraftError.set('');
+    this.pendingType.set('link');
+    this.tool.set('select');
+  }
+  private normalizeLinkUrl(raw: string): string | null {
+    try {
+      const url = new URL(/^https?:\/\//i.test(raw) ? raw : `https://${raw}`);
+      return ['http:', 'https:'].includes(url.protocol) && url.hostname.includes('.') ? url.href : null;
+    } catch { return null; }
+  }
+  linkHost(url?: string): string {
+    try { return url ? new URL(url).hostname : ''; } catch { return ''; }
   }
   formatTimer(): string {
     const seconds = this.timerSeconds();
@@ -1535,7 +1573,12 @@ export class CanvasPage implements AfterViewInit, OnDestroy {
       }
       if (this.pendingType()) {
         this.pendingType.set(null);
+        this.pendingLink = null;
         this.tool.set('select');
+        return;
+      }
+      if (this.linkComposerOpen()) {
+        this.cancelLinkComposer();
         return;
       }
       if (this.paletteOpen()) {
@@ -3567,7 +3610,7 @@ export class CanvasPage implements AfterViewInit, OnDestroy {
                         : type === 'task'
                           ? 280
                           : type === 'link'
-                            ? 320
+                            ? 240
                             : type === 'text'
                               ? 180
                               : 260),
@@ -3600,7 +3643,7 @@ export class CanvasPage implements AfterViewInit, OnDestroy {
                         : type === 'list'
                           ? 150
                           : type === 'link'
-                            ? 115
+                            ? 70
                             : type === 'text'
                               ? 46
                               : 170),
@@ -3653,7 +3696,8 @@ export class CanvasPage implements AfterViewInit, OnDestroy {
       y: point.y,
       width: placedWidth,
       height,
-      title: type === 'er-entity' ? 'New entity' : '',
+      title: type === 'er-entity' ? 'New entity' : type === 'link' ? this.pendingLink?.title || '' : '',
+      url: type === 'link' ? this.pendingLink?.url : undefined,
       body: '',
       erFields:
         type === 'er-entity'
@@ -3680,6 +3724,7 @@ export class CanvasPage implements AfterViewInit, OnDestroy {
     this.selectedIds.set([item.id]);
     this.selectedConnectionId.set(null);
     this.pendingType.set(null);
+    if (type === 'link') this.pendingLink = null;
     this.paletteOpen.set(false);
     this.tool.set('select');
     if (type === 'er-entity') {
@@ -3706,7 +3751,6 @@ export class CanvasPage implements AfterViewInit, OnDestroy {
         'task',
         'zone',
         'frame',
-        'link',
         'list',
         'budget',
         'table',
@@ -4828,8 +4872,15 @@ export class CanvasPage implements AfterViewInit, OnDestroy {
     if (fields[next]) queueMicrotask(() => this.startDataCellEdit(item.id, rowId, fields[next]));
   }
   setLinkUrl(id: string, event: Event): void {
-    const url = (event.target as HTMLInputElement).value.trim();
-    this.setStyle(id, { url, title: this.items().find((entry) => entry.id === id)?.title || url });
+    const raw = (event.target as HTMLInputElement).value.trim();
+    const url = this.normalizeLinkUrl(raw);
+    if (!url) { this.activityError.set('Enter a valid http or https URL.'); return; }
+    this.activityError.set('');
+    this.setStyle(id, { url });
+  }
+  setLinkTitle(id: string, event: Event): void {
+    const title = (event.target as HTMLInputElement).value.trim();
+    if (title) this.setStyle(id, { title });
   }
   copy(): void {
     const ids = new Set(this.selectedIds());

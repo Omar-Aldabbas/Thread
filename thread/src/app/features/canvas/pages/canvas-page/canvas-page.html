@@ -609,37 +609,12 @@
           } @else if (item.type === 'sketch') {
             <app-sketch-renderer [item]="item" />
           } @else if (item.type === 'link') {
-            <div class="link-content" appScroll="y" scrollbar="hover">
+            <div class="link-content">
               <span class="link-icon">↗</span>
-              <div
-                class="card-title"
-                data-edit-field="title"
-                appScroll="y"
-                scrollbar="hover"
-                [attr.contenteditable]="editingId() === item.id"
-                [attr.data-edit-id]="editingId() === item.id ? item.id : null"
-                (keydown)="inlineKey($event)"
-                (blur)="inlineBlur($event, item.id, 'title')"
-                [textContent]="item.title || (editingId() === item.id ? '' : 'New link')"
-              ></div>
-              @if (editingId() === item.id) {
-                <input
-                  [attr.data-edit-id]="item.id"
-                  type="url"
-                  [value]="item.url || ''"
-                  placeholder="Paste a URL"
-                  (pointerdown)="$event.stopPropagation()"
-                  (change)="setLinkUrl(item.id, $event)"
-                />
-              } @else if (item.url) {
-                <a
-                  [href]="item.url"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  (pointerdown)="$event.stopPropagation()"
-                  >{{ item.url }}</a
-                >
-              }
+              @if (item.url) {
+                <a class="link-title" [href]="item.url" target="_blank" rel="noopener noreferrer"
+                  (pointerdown)="$event.stopPropagation()" (click)="$event.stopPropagation()">{{ item.title || item.url }}</a>
+              } @else { <span class="link-title">{{ item.title || 'New link' }}</span> }
             </div>
           } @else {
             <div class="card-content">
@@ -1094,6 +1069,17 @@
   }
   @if (paletteOpen()) {
     <app-canvas-add-palette (close)="setTool('select')" (chooseType)="chooseType($event)" (openFiles)="openMediaFiles()" (recordVoice)="toggleVoiceRecording()" (openMedia)="openMedia($event)" (sketch)="setTool('sketch')" (erStarter)="createErStarter()" />
+  }
+  @if (linkComposerOpen()) {
+    <div class="link-dialog-backdrop" data-ui (pointerdown)="cancelLinkComposer()">
+      <form class="link-dialog" (pointerdown)="$event.stopPropagation()" (keydown.escape)="cancelLinkComposer(); $event.stopPropagation()" (submit)="prepareLink($event)" aria-label="Add link">
+        <header><strong>Add link</strong><button type="button" (click)="cancelLinkComposer()" aria-label="Close">×</button></header>
+        <label>Title<input type="text" required autofocus placeholder="What should the link say?" [value]="linkTitleDraft()" (input)="linkTitleDraft.set($any($event.target).value)" /></label>
+        <label>URL<input type="text" inputmode="url" required placeholder="https://example.com" [value]="linkUrlDraft()" (input)="linkUrlDraft.set($any($event.target).value)" /></label>
+        @if (linkDraftError()) { <small role="alert">{{ linkDraftError() }}</small> }
+        <footer><button type="button" (click)="cancelLinkComposer()">Cancel</button><button type="submit">Place link</button></footer>
+      </form>
+    </div>
   }
   @if (mediaPicker(); as kind) {
     <app-media-picker [kind]="kind" (closed)="mediaPicker.set(null)" (picked)="pickMedia($event)" />
@@ -1786,9 +1772,14 @@
             <button class="inspector-action" (click)="arrangeErDiagram()">Arrange diagram</button>
           }
           @if (item.type === 'link') {
+            <label>Title<input type="text" [value]="item.title" (change)="setLinkTitle(item.id, $event)" /></label>
             <label
               >URL<input type="url" [value]="item.url || ''" (change)="setLinkUrl(item.id, $event)"
             /></label>
+            @if (item.url) {
+              <div class="link-details"><small>Destination</small><strong>{{ linkHost(item.url) }}</strong></div>
+              <a class="inspector-action link-open" [href]="item.url" target="_blank" rel="noopener noreferrer">Open link ↗</a>
+            }
           }
         }
         @if (selectedIds().length > 1) {
