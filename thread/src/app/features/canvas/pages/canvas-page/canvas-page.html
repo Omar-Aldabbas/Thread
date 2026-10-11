@@ -1802,17 +1802,17 @@
         }
         @if (selected(); as frame) {
         @if (frame.type === 'frame') {
-          <div class="frame-arrange"><strong>Arrange items in frame</strong><small>{{ childCount(frame.id) }} items · drag the frame title to move them together</small></div>
-          <div class="inspector-grid frame-align">
-            <button class="inspector-action" (click)="alignFrameChildren(frame, 'left')">Left</button>
-            <button class="inspector-action" (click)="alignFrameChildren(frame, 'center')">Center</button>
-            <button class="inspector-action" (click)="alignFrameChildren(frame, 'right')">Right</button>
-            <button class="inspector-action" (click)="alignFrameChildren(frame, 'top')">Top</button>
-            <button class="inspector-action" (click)="alignFrameChildren(frame, 'middle')">Middle</button>
-            <button class="inspector-action" (click)="alignFrameChildren(frame, 'bottom')">Bottom</button>
-            <button class="inspector-action" (click)="alignFrameChildren(frame, 'horizontal')">Space across</button>
-            <button class="inspector-action" (click)="alignFrameChildren(frame, 'vertical')">Space down</button>
+          <div class="frame-arrange"><strong>Position frame contents</strong><small>Move the items together, keeping their layout</small></div>
+          <div class="frame-position" role="group" aria-label="Position frame contents">
+            @for (position of ['top-left', 'top-center', 'top-right', 'middle-left', 'middle-center', 'middle-right', 'bottom-left', 'bottom-center', 'bottom-right']; track position) {
+              <button type="button" [class]="'position-' + position" [attr.aria-label]="'Move contents to ' + position.replace('-', ' ')" [title]="position.replace('-', ' ')" (click)="alignFrameChildren(frame, $any(position))"><span></span></button>
+            }
           </div>
+          <div class="frame-space" role="group" aria-label="Space frame items">
+            <button (click)="alignFrameChildren(frame, 'horizontal')" [disabled]="childCount(frame.id) < 2">↔ <span>Space across</span></button>
+            <button (click)="alignFrameChildren(frame, 'vertical')" [disabled]="childCount(frame.id) < 2">↕ <span>Space down</span></button>
+          </div>
+          @if (frameArrangeMessage()) { <small class="frame-arrange-message" role="status">{{ frameArrangeMessage() }}</small> }
         }
         }
         <div class="inspector-grid">

@@ -184,6 +184,7 @@ export class CanvasPage implements AfterViewInit, OnDestroy {
   >({});
   private readonly voiceFrames = new Map<string, number>();
   readonly activityError = signal('');
+  readonly frameArrangeMessage = signal('');
   readonly pendingType = signal<ItemType | null>(null);
   readonly editingId = signal<string | null>(null);
   readonly richFocusId = signal<string | null>(null);
@@ -5067,29 +5068,66 @@ export class CanvasPage implements AfterViewInit, OnDestroy {
     this.snapshot();
     this.items.update((items) => items.map((item) => item.groupId === groupId ? { ...item, groupName: name } : item));
   }
-  alignFrameChildren(frame: CanvasItem, mode: 'left' | 'center' | 'right' | 'top' | 'middle' | 'bottom' | 'horizontal' | 'vertical'): void {
+  alignFrameChildren(frame: CanvasItem, mode: 'top-left' | 'top-center' | 'top-right' | 'middle-left' | 'middle-center' | 'middle-right' | 'bottom-left' | 'bottom-center' | 'bottom-right' | 'horizontal' | 'vertical'): void {
     const children = this.items().filter((item) => item.parentId === frame.id && !item.locked);
     if (!children.length) return;
+    const rect = (item: CanvasItem) => {
+      const angle = ((item.rotation || 0) * Math.PI) / 180;
+      const width = Math.abs(item.width * Math.cos(angle)) + Math.abs(item.height * Math.sin(angle));
+      const height = Math.abs(item.width * Math.sin(angle)) + Math.abs(item.height * Math.cos(angle));
+      return { id: item.id, x: item.x + (item.width - width) / 2, y: item.y + (item.height - height) / 2, width, height };
+    };
+    const bounds = children.map(rect);
+    const inner = { x: frame.x + 16, y: frame.y + 42, width: Math.max(0, frame.width - 32), height: Math.max(0, frame.height - 58) };
+    const target = new Map<string, { x: number; y: number }>();
+    if (mode === 'horizontal' || mode === 'vertical') {
+      if (children.length < 2) return;
+      const horizontal = mode === 'horizontal';
+      const axis = horizontal ? 'x' : 'y';
+      const length = horizontal ? 'width' : 'height';
+      const ordered = [...bounds].sort((a, b) => a[axis] - b[axis]);
+      const available = inner[length];
+      const total = ordered.reduce((sum, item) => sum + item[length], 0);
+      if (total > available) {
+        this.frameArrangeMessage.set(`Items are too ${horizontal ? 'wide' : 'tall'} to space inside this frame. Enlarge the frame first.`);
+        return;
+      }
+      const gap = (available - total) / (ordered.length - 1);
+      const cross = horizontal ? 'y' : 'x';
+      const crossLength = horizontal ? 'height' : 'width';
+      const crossStart = Math.min(...bounds.map((item) => item[cross]));
+      const crossEnd = Math.max(...bounds.map((item) => item[cross] + item[crossLength]));
+      if (crossEnd - crossStart > inner[crossLength]) {
+        this.frameArrangeMessage.set('The contents are larger than this frame. Enlarge the frame first.');
+        return;
+      }
+      const crossShift = Math.max(inner[cross] - crossStart, Math.min(0, inner[cross] + inner[crossLength] - crossEnd));
+      let cursor = inner[axis];
+      for (const item of ordered) {
+        target.set(item.id, horizontal ? { x: cursor - item.x, y: crossShift } : { x: crossShift, y: cursor - item.y });
+        cursor += item[length] + gap;
+      }
+    } else {
+      const left = Math.min(...bounds.map((item) => item.x));
+      const top = Math.min(...bounds.map((item) => item.y));
+      const right = Math.max(...bounds.map((item) => item.x + item.width));
+      const bottom = Math.max(...bounds.map((item) => item.y + item.height));
+      const width = right - left;
+      const height = bottom - top;
+      if (width > inner.width || height > inner.height) {
+        this.frameArrangeMessage.set('The contents are larger than this frame. Enlarge the frame first.');
+        return;
+      }
+      const [vertical, horizontal] = mode.split('-');
+      const x = horizontal === 'left' ? inner.x : horizontal === 'right' ? inner.x + inner.width - width : inner.x + (inner.width - width) / 2;
+      const y = vertical === 'top' ? inner.y : vertical === 'bottom' ? inner.y + inner.height - height : inner.y + (inner.height - height) / 2;
+      for (const child of children) target.set(child.id, { x: x - left, y: y - top });
+    }
+    this.frameArrangeMessage.set('');
     this.snapshot();
-    const ordered = [...children].sort((a, b) => mode === 'horizontal' ? a.x - b.x : a.y - b.y);
-    const edge = mode === 'horizontal' ? 'x' : 'y';
-    const size = mode === 'horizontal' ? 'width' : 'height';
-    const start = frame[edge] + 16;
-    const end = frame[edge] + frame[size] - 16;
-    const total = ordered.reduce((sum, item) => sum + item[size], 0);
-    const gap = ordered.length > 1 ? Math.max(0, (end - start - total) / (ordered.length - 1)) : 0;
-    const positions = new Map<string, number>();
-    let cursor = start;
-    ordered.forEach((item) => { positions.set(item.id, cursor); cursor += item[size] + gap; });
     this.items.update((items) => items.map((item) => {
-      if (!children.some((child) => child.id === item.id)) return item;
-      if (mode === 'horizontal' || mode === 'vertical') return { ...item, [edge]: positions.get(item.id)! };
-      if (mode === 'left') return { ...item, x: frame.x + 16 };
-      if (mode === 'center') return { ...item, x: frame.x + (frame.width - item.width) / 2 };
-      if (mode === 'right') return { ...item, x: frame.x + frame.width - item.width - 16 };
-      if (mode === 'top') return { ...item, y: frame.y + 36 };
-      if (mode === 'middle') return { ...item, y: frame.y + (frame.height - item.height) / 2 };
-      return { ...item, y: frame.y + frame.height - item.height - 16 };
+      const shift = target.get(item.id);
+      return shift ? { ...item, x: item.x + shift.x, y: item.y + shift.y } : item;
     }));
   }
   private eraseSketchAt(point: { x: number; y: number }): void {
