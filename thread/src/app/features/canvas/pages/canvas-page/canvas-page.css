@@ -17,6 +17,7 @@ button { cursor:pointer; border:0; background:none; color:inherit; }
 .canvas-viewport.grid-hover::before { opacity:var(--hover-intensity,.55); }
 .canvas-viewport.no-grid { background-image:none; }
 .canvas-viewport.no-grid::before { display:none; }
+.shape-label { white-space:pre-line; }
 .canvas-item.search-dimmed,.relationship-label.search-dimmed { opacity:.22; filter:grayscale(.65); transition:opacity 180ms ease,filter 180ms ease; }
 .canvas-item.search-dimmed:hover,.canvas-item.search-dimmed:focus-visible { opacity:.7; filter:none; }
 .canvas-item.search-match:not(.selected) { outline:2px solid var(--color-primary); outline-offset:3px; }

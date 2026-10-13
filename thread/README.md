@@ -31,12 +31,12 @@ Thread brings different kinds of work into the same canvas. Start with a thought
 | :--- | :--- |
 | **Ideas** | Sticky notes, rich text, freehand drawing, images, links, and files. |
 | **Plans** | Tasks, checklists, frames, and zones to organize the board. |
-| **Diagrams** | Flowchart shapes, themed fills, and straight, curved, or elbow connectors. |
+| **Diagrams** | Flowchart shapes, themed fills, straight/curved/elbow connectors, and 15 editable diagram starters. |
 | **Database design** | ER entities, editable fields, keys, relationships, automatic layout, and DBML export. |
 | **Data** | Tables, charts, shared datasets, and budget cards. |
 | **Personality** | A searchable sticker picker with 66 Wevi stickers, SVG essentials, and recent picks. |
 
-The interface includes light, dark, and system themes, custom Thread controls, responsive panels, and touch gestures for moving around the board.
+The interface includes light, dark, and system themes, custom Thread controls, responsive panels, and touch gestures for moving around the board. Settings also include canvas behavior, new-item defaults, accessibility options, workspace opening, and local backup/restore.
 
 **Storage:** spaces and canvas content are saved in the current browser's local storage. This version does not sync boards between devices or provide live collaboration. Clearing browser storage removes saved work.
 
@@ -61,6 +61,10 @@ Open [localhost:4200](http://localhost:4200), create a space, and start adding t
 ### Optional GIF search
 
 The included stickers work without an API key. To enable live GIPHY GIF and sticker search, set `GIPHY_API_KEY` in [giphy.config.ts](src/app/features/canvas/giphy.config.ts). Requests are made directly from the browser.
+
+## Diagram starters
+
+Open **Add > More diagram starters** for mind maps, flows, timelines, journey maps, organization charts, architecture maps, sequence and state diagrams, and other editable starting layouts. These starters use regular Thread shapes and connections, so you can move, rename, reconnect, duplicate, and delete their parts. They do not enforce specialist standards or calculate schedules.
 
 ## ER diagrams
 

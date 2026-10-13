@@ -77,11 +77,12 @@ import { createWorkspaceBackup, parseWorkspaceBackup, restoreWorkspaceBackup } f
           </div>
           <p class="setting-help">The canvas will not zoom out below this level. Default: 12%.</p>
           <div class="settings-grid">
-            <label class="setting-label">Opening zoom <input type="number" min="25" max="200" [value]="preferences.defaultZoomPercent()" (change)="setNumber('defaultZoomPercent', $event, 25, 200)" /></label>
+            <label class="setting-label">Opening zoom <input type="number" min="25" max="200" [disabled]="preferences.fitOnOpen()" [value]="preferences.defaultZoomPercent()" (change)="setNumber('defaultZoomPercent', $event, 25, 200)" /></label>
             <label class="setting-label">Zoom speed <input type="range" min="5" max="20" [value]="preferences.zoomSpeed()" (input)="setNumber('zoomSpeed', $event, 5, 20)" /><span>{{ preferences.zoomSpeed() }}</span></label>
             <label class="setting-label">New connector style <select [value]="preferences.defaultConnector()" (change)="setChoice('defaultConnector', $event)"><option value="elbow">Elbow</option><option value="straight">Straight</option><option value="curved">Curved</option></select></label>
           </div>
           <div class="toggle-list">
+            <label><span><strong>Fit canvas on open</strong><small>Show the whole board when opening a space.</small></span><input type="checkbox" [checked]="preferences.fitOnOpen()" (change)="preferences.fitOnOpen.set(checked($event))" /></label>
             <label><span><strong>Show grid</strong><small>Display canvas dots.</small></span><input type="checkbox" [checked]="preferences.showGrid()" (change)="preferences.showGrid.set(checked($event))" /></label>
             <label><span><strong>Snap to objects</strong><small>Align moved items with nearby items.</small></span><input type="checkbox" [checked]="preferences.snapToObjects()" (change)="preferences.snapToObjects.set(checked($event))" /></label>
             <label><span><strong>Snap to grid</strong><small>Place moved items on the 24 px grid.</small></span><input type="checkbox" [checked]="preferences.snapToGrid()" (change)="preferences.snapToGrid.set(checked($event))" /></label>
@@ -93,6 +94,8 @@ import { createWorkspaceBackup, parseWorkspaceBackup, restoreWorkspaceBackup } f
             <label class="setting-label">Note accent <input type="color" [value]="preferences.defaultNoteColor()" (input)="setChoice('defaultNoteColor', $event)" /></label>
             <label class="setting-label">Text size <input type="number" min="12" max="40" [value]="preferences.defaultFontSize()" (change)="setNumber('defaultFontSize', $event, 12, 40)" /></label>
             <label class="setting-label">Budget currency <select [value]="preferences.defaultCurrency()" (change)="setChoice('defaultCurrency', $event)"><option>JOD</option><option>USD</option><option>EUR</option><option>GBP</option></select></label>
+            <label class="setting-label">Chart type <select [value]="preferences.defaultChart()" (change)="setChoice('defaultChart', $event)"><option value="auto">Automatic</option><option value="bar">Bar</option><option value="line">Line</option><option value="donut">Donut</option><option value="comparison">Comparison</option></select></label>
+            <label class="setting-label">Shape <select [value]="preferences.defaultShape()" (change)="setChoice('defaultShape', $event)"><option value="rectangle">Rectangle</option><option value="rounded">Rounded</option><option value="circle">Circle</option><option value="diamond">Diamond</option></select></label>
           </div>
         </section>
         <section class="settings-section" aria-labelledby="access-heading">
@@ -107,6 +110,7 @@ import { createWorkspaceBackup, parseWorkspaceBackup, restoreWorkspaceBackup } f
         <section class="settings-section" aria-labelledby="workspace-heading">
           <div class="section-heading"><div><small>06 / WORKSPACE</small><h2 id="workspace-heading">Opening Thread</h2></div></div>
           <div class="toggle-list"><label><span><strong>Reopen last space</strong><small>Open the last visited canvas when Thread starts.</small></span><input type="checkbox" [checked]="preferences.reopenLastSpace()" (change)="preferences.reopenLastSpace.set(checked($event))" /></label></div>
+          @if (spaces().length) { <label class="setting-label preferred-space">Default space <select [value]="preferences.preferredSpaceId()" (change)="setChoice('preferredSpaceId', $event)"><option value="">Spaces overview</option>@for (space of spaces(); track space.id) { <option [value]="space.id">{{ space.title }}</option> }</select></label> }
         </section>
         <section class="settings-section" aria-labelledby="data-heading">
           <div class="section-heading"><div><small>07 / DATA</small><h2 id="data-heading">Backup and storage</h2></div></div>
@@ -272,6 +276,7 @@ import { createWorkspaceBackup, parseWorkspaceBackup, restoreWorkspaceBackup } f
       .data-actions button,.stored-spaces button { padding:9px 13px; border:1px solid var(--color-border); background:var(--color-surface); color:var(--color-text-primary); font:inherit; font-size:12px; font-weight:700; cursor:pointer; }
       .data-actions button:hover,.stored-spaces button:hover { border-color:var(--color-primary); color:var(--color-primary); }
       .stored-spaces { margin-top:22px; }
+      .preferred-space { margin-top:20px; }
       .stored-spaces > div { display:flex; justify-content:space-between; align-items:center; gap:12px; padding:8px 0; border-bottom:1px solid var(--color-border-light); font-size:12px; }
       .stored-spaces button { color:var(--color-primary); }
       .setting-help {
@@ -365,13 +370,19 @@ export class SettingsPage {
     this.preferences[key].set(next);
     input.value = String(next);
   }
-  setChoice(key: 'defaultConnector' | 'defaultNoteColor' | 'defaultCurrency', event: Event): void {
+  setChoice(key: 'defaultConnector' | 'defaultNoteColor' | 'defaultCurrency' | 'defaultChart' | 'defaultShape' | 'preferredSpaceId', event: Event): void {
     const value = (event.target as HTMLInputElement).value;
     if (key === 'defaultConnector' && ['straight', 'elbow', 'curved'].includes(value))
       this.preferences.defaultConnector.set(value as 'straight' | 'elbow' | 'curved');
     if (key === 'defaultCurrency' && ['JOD', 'USD', 'EUR', 'GBP'].includes(value))
       this.preferences.defaultCurrency.set(value as 'JOD' | 'USD' | 'EUR' | 'GBP');
     if (key === 'defaultNoteColor' && /^#[0-9a-f]{6}$/i.test(value)) this.preferences.defaultNoteColor.set(value);
+    if (key === 'defaultChart' && ['auto', 'bar', 'line', 'donut', 'comparison'].includes(value))
+      this.preferences.defaultChart.set(value as 'auto' | 'bar' | 'line' | 'donut' | 'comparison');
+    if (key === 'defaultShape' && ['rectangle', 'rounded', 'circle', 'diamond'].includes(value))
+      this.preferences.defaultShape.set(value as 'rectangle' | 'rounded' | 'circle' | 'diamond');
+    if (key === 'preferredSpaceId' && (!value || this.spaces().some((space) => space.id === value)))
+      this.preferences.preferredSpaceId.set(value);
   }
   private readSpaces(): { id: string; title: string }[] {
     try {
@@ -417,6 +428,7 @@ export class SettingsPage {
     try {
       localStorage.setItem('thread-spaces', JSON.stringify(remaining));
       localStorage.removeItem(`thread-canvas-${id}`);
+      if (this.preferences.preferredSpaceId() === id) this.preferences.preferredSpaceId.set('');
       this.spaces.set(remaining);
       this.dataMessage.set(`Deleted ${title}.`);
     } catch { this.dataMessage.set('Could not delete this space.'); }

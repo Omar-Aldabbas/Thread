@@ -204,7 +204,7 @@ export class CanvasPage implements AfterViewInit, OnDestroy {
   readonly sketchColor = signal('#d4111c');
   readonly sketchEraser = signal(false);
   readonly brush = signal<SketchBrush>('pen');
-  readonly shapeKind = signal<ShapeKind>('rectangle');
+  readonly shapeKind = signal<ShapeKind>(this.preferences.defaultShape());
   shapeIcon(kind: ShapeKind): string {
     return shapeNames[kind];
   }
@@ -529,7 +529,7 @@ export class CanvasPage implements AfterViewInit, OnDestroy {
     viewport?.addEventListener('click', this.captureCanvasClick, true);
     setTimeout(() => {
       this.fitView();
-      if (this.preferences.defaultZoomPercent() !== 100 && viewport) {
+      if (!this.preferences.fitOnOpen() && viewport) {
         const rect = viewport.getBoundingClientRect();
         this.zoomAt(rect.left + rect.width / 2, rect.top + rect.height / 2, this.preferences.defaultZoomPercent() / 100);
       }
@@ -4655,8 +4655,10 @@ export class CanvasPage implements AfterViewInit, OnDestroy {
       planned && actual
         ? [planned.key, actual.key]
         : numbers.slice(0, 2).map((column) => column.key);
+    const automatic = label?.type === 'date' ? 'line' : numbers.length > 1 ? 'comparison' : 'bar';
+    const preferred = this.preferences.defaultChart();
     return {
-      type: label?.type === 'date' ? 'line' : numbers.length > 1 ? 'comparison' : 'bar',
+      type: preferred === 'auto' || (preferred === 'comparison' && numbers.length < 2) ? automatic : preferred,
       categoryField: label?.key,
       valueField: planned?.key || numbers[0]?.key,
       series: numbers.length > 1 ? series : undefined,

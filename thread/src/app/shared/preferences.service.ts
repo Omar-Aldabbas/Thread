@@ -4,6 +4,8 @@ import { Injectable, PLATFORM_ID, computed, effect, inject, signal } from '@angu
 export type ThemeChoice = 'light' | 'dark' | 'system';
 export type ConnectorChoice = 'straight' | 'elbow' | 'curved';
 export type CurrencyChoice = 'JOD' | 'USD' | 'EUR' | 'GBP';
+export type ChartChoice = 'auto' | 'bar' | 'line' | 'donut' | 'comparison';
+export type ShapeChoice = 'rectangle' | 'rounded' | 'circle' | 'diamond';
 
 @Injectable({ providedIn: 'root' })
 export class PreferencesService {
@@ -13,6 +15,7 @@ export class PreferencesService {
   readonly profileName = signal(this.readName());
   readonly minZoomPercent = signal(this.readMinZoom());
   readonly defaultZoomPercent = signal(this.readNumber('thread-default-zoom', 100, 25, 200));
+  readonly fitOnOpen = signal(this.readBoolean('thread-fit-on-open', true));
   readonly zoomSpeed = signal(this.readNumber('thread-zoom-speed', 10, 5, 20));
   readonly showGrid = signal(this.readBoolean('thread-show-grid', true));
   readonly snapToObjects = signal(this.readBoolean('thread-snap-objects', true));
@@ -21,6 +24,9 @@ export class PreferencesService {
   readonly defaultNoteColor = signal(this.readColor('thread-default-note-color', '#d4111c'));
   readonly defaultFontSize = signal(this.readNumber('thread-default-font-size', 21, 12, 40));
   readonly defaultCurrency = signal<CurrencyChoice>(this.readChoice('thread-default-currency', ['JOD', 'USD', 'EUR', 'GBP'], 'JOD'));
+  readonly defaultChart = signal<ChartChoice>(this.readChoice('thread-default-chart', ['auto', 'bar', 'line', 'donut', 'comparison'], 'auto'));
+  readonly defaultShape = signal<ShapeChoice>(this.readChoice('thread-default-shape', ['rectangle', 'rounded', 'circle', 'diamond'], 'rectangle'));
+  readonly preferredSpaceId = signal(this.browser ? localStorage.getItem('thread-preferred-space') || '' : '');
   readonly reducedMotion = signal(this.readBoolean('thread-reduced-motion', false));
   readonly largerControls = signal(this.readBoolean('thread-larger-controls', false));
   readonly highContrast = signal(this.readBoolean('thread-high-contrast', false));
@@ -58,6 +64,7 @@ export class PreferencesService {
     });
     const entries: [string, () => string][] = [
       ['thread-default-zoom', () => String(this.defaultZoomPercent())],
+      ['thread-fit-on-open', () => String(this.fitOnOpen())],
       ['thread-zoom-speed', () => String(this.zoomSpeed())],
       ['thread-show-grid', () => String(this.showGrid())],
       ['thread-snap-objects', () => String(this.snapToObjects())],
@@ -66,6 +73,9 @@ export class PreferencesService {
       ['thread-default-note-color', () => this.defaultNoteColor()],
       ['thread-default-font-size', () => String(this.defaultFontSize())],
       ['thread-default-currency', () => this.defaultCurrency()],
+      ['thread-default-chart', () => this.defaultChart()],
+      ['thread-default-shape', () => this.defaultShape()],
+      ['thread-preferred-space', () => this.preferredSpaceId()],
       ['thread-reduced-motion', () => String(this.reducedMotion())],
       ['thread-larger-controls', () => String(this.largerControls())],
       ['thread-high-contrast', () => String(this.highContrast())],

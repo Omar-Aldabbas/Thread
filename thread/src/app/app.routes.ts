@@ -13,6 +13,9 @@ export const routes: Routes = [
             const spaces = JSON.parse(localStorage.getItem('thread-spaces') || '[]');
             if (localStorage.getItem('thread-reopen-last-space') === 'true' && id && Array.isArray(spaces) && spaces.some((space) => space.id === id))
               return `/space/${encodeURIComponent(id)}`;
+            const preferred = localStorage.getItem('thread-preferred-space');
+            if (preferred && Array.isArray(spaces) && spaces.some((space) => space.id === preferred))
+              return `/space/${encodeURIComponent(preferred)}`;
           } catch {}
           return 'spaces';
         },
