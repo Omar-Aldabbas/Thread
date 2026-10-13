@@ -31,7 +31,8 @@ Thread brings different kinds of work into the same canvas. Start with a thought
 | :--- | :--- |
 | **Ideas** | Sticky notes, rich text, freehand drawing, images, links, and files. |
 | **Plans** | Tasks, checklists, frames, and zones to organize the board. |
-| **Diagrams** | Flowchart shapes, themed fills, straight/curved/elbow connectors, and 15 editable diagram starters. |
+| **Mapping** | Mind, process, and business maps built from editable shapes and connectors. |
+| **Infrastructure** | Structured components, cloud or on-premises details, business capabilities, connection metadata, and a basic map review. |
 | **Database design** | ER entities, editable fields, keys, relationships, automatic layout, and DBML export. |
 | **Data** | Tables, charts, shared datasets, and budget cards. |
 | **Personality** | A searchable sticker picker with 66 Wevi stickers, SVG essentials, and recent picks. |
@@ -62,9 +63,11 @@ Open [localhost:4200](http://localhost:4200), create a space, and start adding t
 
 The included stickers work without an API key. To enable live GIPHY GIF and sticker search, set `GIPHY_API_KEY` in [giphy.config.ts](src/app/features/canvas/giphy.config.ts). Requests are made directly from the browser.
 
-## Diagram starters
+## Mapping and infrastructure
 
-Open **Add > More diagram starters** for mind maps, flows, timelines, journey maps, organization charts, architecture maps, sequence and state diagrams, and other editable starting layouts. These starters use regular Thread shapes and connections, so you can move, rename, reconnect, duplicate, and delete their parts. They do not enforce specialist standards or calculate schedules.
+Open **Add > Mapping** for a mind map, process map, or business map. These are editable starting layouts made from shapes and connectors.
+
+Use **Add > Infrastructure > Start infrastructure map** to model a business capability, client, gateway, service, database, and monitoring flow. Add more typed components as needed. Each component can record its platform, environment, location, owner, business capability, criticality, estimated monthly cost, and notes. Infrastructure connections can record a protocol and data classification. **Review infrastructure** lists missing owners, links, and business purposes. This is a planning and documentation aid; it does not inspect deployed resources or certify an architecture.
 
 ## ER diagrams
 

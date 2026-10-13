@@ -18,6 +18,12 @@ button { cursor:pointer; border:0; background:none; color:inherit; }
 .canvas-viewport.no-grid { background-image:none; }
 .canvas-viewport.no-grid::before { display:none; }
 .shape-label { white-space:pre-line; }
+.architecture-badge,.architecture-caption { position:absolute; z-index:1; left:12px; max-width:calc(100% - 24px); overflow:hidden; white-space:nowrap; text-overflow:ellipsis; pointer-events:none; font-size:10px; font-weight:750; }
+.architecture-badge { top:-12px; padding:3px 6px; border:1px solid var(--color-border); border-radius:4px; background:var(--color-surface); color:var(--color-text-secondary); }
+.architecture-caption { bottom:-14px; color:var(--color-text-muted); font-weight:600; }
+.architecture-fields { display:flex; flex-direction:column; gap:11px; padding:12px 0 16px; border-bottom:1px solid var(--color-border); }
+.architecture-fields > strong { color:var(--color-primary); font-size:11px; text-transform:uppercase; letter-spacing:.08em; }
+.inspector-body select { width:100%; min-height:34px; padding:6px; border:1px solid var(--color-border); background:var(--color-surface); color:var(--color-text-primary); font-size:12px; }
 .canvas-item.search-dimmed,.relationship-label.search-dimmed { opacity:.22; filter:grayscale(.65); transition:opacity 180ms ease,filter 180ms ease; }
 .canvas-item.search-dimmed:hover,.canvas-item.search-dimmed:focus-visible { opacity:.7; filter:none; }
 .canvas-item.search-match:not(.selected) { outline:2px solid var(--color-primary); outline-offset:3px; }

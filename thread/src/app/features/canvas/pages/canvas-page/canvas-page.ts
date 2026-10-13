@@ -19,6 +19,8 @@ import {
   CanvasConnection,
   CanvasItem,
   CanvasJunction,
+  ArchitectureKind,
+  ArchitectureDetails,
   ChartConfig,
   ConnectorKind,
   ConnectorSide,
@@ -75,6 +77,7 @@ import {
 import { elbowRoute } from '../../sketch/elbow-route';
 import { connectorSides, isConnectableItem, validConnections } from '../../connector-rules';
 import { createDiagramTemplate, DiagramType } from '../../diagram-templates';
+import { architectureKinds, architectureShape, architectureStarter, reviewArchitecture } from '../../architecture-map';
 import type {
   CanvasSession as Session,
   CanvasState as State,
@@ -166,6 +169,21 @@ export class CanvasPage implements AfterViewInit, OnDestroy {
   readonly tool = signal<Tool>('select');
   readonly spaceHeld = signal(false);
   readonly paletteOpen = signal(false);
+  readonly architectureReviewOpen = signal(false);
+  readonly architectureKinds = architectureKinds;
+  readonly architectureReview = computed(() => reviewArchitecture(this.items(), this.connections()));
+  architectureLabel(kind: ArchitectureKind): string {
+    return architectureKinds.find((entry) => entry.kind === kind)?.label || 'Component';
+  }
+  isArchitectureConnection(connection: CanvasConnection): boolean {
+    return this.items().some((item) => (item.id === connection.sourceId || item.id === connection.targetId) && !!item.architecture);
+  }
+  openArchitectureReview(): void {
+    this.paletteOpen.set(false);
+    this.tool.set('select');
+    this.inspectorOpen.set(false);
+    this.architectureReviewOpen.set(true);
+  }
   readonly linkComposerOpen = signal(false);
   readonly linkTitleDraft = signal('');
   readonly linkUrlDraft = signal('');
@@ -4348,7 +4366,53 @@ export class CanvasPage implements AfterViewInit, OnDestroy {
   }
   createDiagram(type: DiagramType): void {
     this.finishEditing();
-    const diagram = createDiagramTemplate(type, this.centerPoint(), this.contextId());
+    this.addPreparedDiagram(createDiagramTemplate(type, this.centerPoint(), this.contextId()));
+  }
+  startArchitectureMap(): void {
+    this.finishEditing();
+    this.addPreparedDiagram(architectureStarter(this.centerPoint(), this.contextId()));
+    this.selectedIds.set([]);
+    this.architectureReviewOpen.set(true);
+  }
+  addArchitecture(kind: ArchitectureKind): void {
+    this.finishEditing();
+    const item = architectureShape(kind, this.centerPoint(), this.contextId());
+    this.snapshot();
+    this.items.update((items) => [...items, item]);
+    this.selectedIds.set([item.id]);
+    this.selectedConnectionId.set(null);
+    this.paletteOpen.set(false);
+    this.tool.set('select');
+    this.inspectorOpen.set(true);
+    this.architectureReviewOpen.set(false);
+  }
+  setArchitectureKind(item: CanvasItem, kind: ArchitectureKind): void {
+    const option = architectureKinds.find((entry) => entry.kind === kind);
+    if (!option) return;
+    this.setStyle(item.id, {
+      architecture: { ...item.architecture!, kind },
+      shapeKind: option.shape, shapeFill: option.fill, shapeStroke: option.stroke,
+    });
+  }
+  setArchitectureField(item: CanvasItem, key: keyof ArchitectureDetails, event: Event): void {
+    const value = (event.target as HTMLInputElement).value;
+    this.setStyle(item.id, { architecture: { ...item.architecture!, [key]: key === 'monthlyCost' ? Math.max(0, Number(value) || 0) : value } });
+  }
+  focusArchitectureIssue(id: string): void {
+    const item = this.items().find((entry) => entry.id === id);
+    if (!item) return;
+    if (item.parentId !== this.contextId()) this.navigate(item.parentId);
+    this.selectedIds.set([id]);
+    this.selectedConnectionId.set(null);
+    this.inspectorOpen.set(true);
+    this.architectureReviewOpen.set(false);
+    const viewport = this.viewport()?.nativeElement;
+    if (viewport) {
+      this.panX.set(viewport.clientWidth / 2 - (item.x + item.width / 2) * this.zoom());
+      this.panY.set(viewport.clientHeight / 2 - (item.y + item.height / 2) * this.zoom());
+    }
+  }
+  private addPreparedDiagram(diagram: { items: CanvasItem[]; connections: CanvasConnection[] }): void {
     this.snapshot();
     this.items.update((items) => [...items, ...diagram.items]);
     this.connections.update((connections) => [...connections, ...diagram.connections]);

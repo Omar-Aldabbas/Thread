@@ -1,6 +1,8 @@
 import { Component, output } from '@angular/core';
 import type { ItemType } from '../canvas.model';
 import { diagramCatalog, DiagramType } from '../diagram-templates';
+import { architectureKinds } from '../architecture-map';
+import type { ArchitectureKind } from '../canvas.model';
 
 @Component({
   selector: 'app-canvas-add-palette',
@@ -20,6 +22,9 @@ import { diagramCatalog, DiagramType } from '../diagram-templates';
       >
         ×
       </button>
+      <div class="palette-section">Infrastructure</div>
+      <button class="palette-feature" type="button" (click)="startArchitecture.emit()"><span aria-hidden="true">◇</span><span><strong>Start infrastructure map</strong><small>Business need, app, network, data, and monitoring</small></span></button>
+      <button class="palette-feature" type="button" (click)="reviewArchitecture.emit()"><span aria-hidden="true">✓</span><span><strong>Review infrastructure</strong><small>Find missing links, owners, and business purpose</small></span></button>
       <div class="palette-section">Quick</div>
       <div class="palette-grid">
         @for (entry of quick; track entry.type) {
@@ -29,7 +34,9 @@ import { diagramCatalog, DiagramType } from '../diagram-templates';
           </button>
         }
       </div>
-      <div class="palette-section">Media</div>
+      <details class="palette-group">
+      <summary>Media <span aria-hidden="true">⌄</span></summary>
+      <div class="palette-group-content">
       <button class="palette-media" type="button" (click)="openFiles.emit()">
         <span aria-hidden="true">＋</span>Add media<small>Image · audio · video · document</small>
       </button>
@@ -47,7 +54,11 @@ import { diagramCatalog, DiagramType } from '../diagram-templates';
           <span aria-hidden="true">↗</span>Link
         </button>
       </div>
-      <div class="palette-section">Organize</div>
+      </div>
+      </details>
+      <details class="palette-group">
+      <summary>Organize <span aria-hidden="true">⌄</span></summary>
+      <div class="palette-group-content">
       <div class="palette-grid">
         @for (entry of organize; track entry.type) {
           <button type="button" (click)="chooseType.emit(entry.type)">
@@ -66,16 +77,25 @@ import { diagramCatalog, DiagramType } from '../diagram-templates';
           ><small>Two linked entities with example keys</small></span
         >
       </button>
-      <details class="diagram-picker">
-        <summary>More diagram starters <span aria-hidden="true">⌄</span></summary>
-        @for (group of diagramGroups; track group) {
-          <div class="diagram-group">{{ group }}</div>
-          @for (diagram of diagramCatalog; track diagram.type) {
-            @if (diagram.group === group) {
-              <button type="button" (click)="chooseDiagram.emit(diagram.type)"><strong>{{ diagram.name }}</strong><small>{{ diagram.description }}</small></button>
-            }
-          }
+      </div>
+      </details>
+      <details class="palette-group">
+      <summary>Mapping <span aria-hidden="true">⌄</span></summary>
+      <div class="palette-group-content">
+      <div class="diagram-picker">
+        @for (diagram of diagramCatalog; track diagram.type) {
+          <button type="button" (click)="chooseDiagram.emit(diagram.type)"><strong>{{ diagram.name }}</strong><small>{{ diagram.description }}</small></button>
         }
+      </div>
+      </div>
+      </details>
+      <details class="palette-group">
+        <summary>Infrastructure components <span aria-hidden="true">⌄</span></summary>
+        <div class="palette-group-content diagram-picker">
+        @for (kind of architectureKinds; track kind.kind) {
+          <button type="button" (click)="chooseArchitecture.emit(kind.kind)"><strong>{{ kind.label }}</strong><small>{{ kind.description }}</small></button>
+        }
+        </div>
       </details>
     </section>
   `,
@@ -260,12 +280,14 @@ import { diagramCatalog, DiagramType } from '../diagram-templates';
         top: 50%;
         left: 82px;
         width: 260px;
-        max-height: calc(100dvh - 32px);
+        max-height: min(72dvh, 620px);
         padding: 12px;
         overflow-x: hidden;
         overflow-y: auto;
+        scrollbar-width: none;
         transform: translateY(-50%);
       }
+      .create-palette::-webkit-scrollbar { display: none; }
       .palette-close {
         position: absolute;
         top: 7px;
@@ -321,8 +343,14 @@ import { diagramCatalog, DiagramType } from '../diagram-templates';
       .secondary-media {
         margin-top: 5px;
       }
-      .diagram-picker { margin-top:8px; border-top:1px solid var(--color-border-light); padding-top:8px; }
-      .diagram-picker summary { display:flex; justify-content:space-between; padding:8px 4px; color:var(--color-primary); font-size:12px; font-weight:750; cursor:pointer; }
+      .palette-group { margin-top:5px; border:1px solid var(--color-border-light); border-radius:7px; }
+      .palette-group summary { display:flex; align-items:center; justify-content:space-between; min-height:36px; padding:7px 9px; color:var(--color-text-primary); font-size:11px; font-weight:700; cursor:pointer; list-style:none; }
+      .palette-group summary::-webkit-details-marker { display:none; }
+      .palette-group summary:focus-visible { outline:2px solid var(--color-primary); outline-offset:2px; }
+      .palette-group summary span { color:var(--color-primary); font-size:16px; line-height:1; transition:transform .15s ease; }
+      .palette-group[open] summary span { transform:rotate(180deg); }
+      .palette-group-content { padding:0 6px 7px; border-top:1px solid var(--color-border-light); }
+      .diagram-picker { padding-top:5px; }
       .diagram-group { margin:9px 4px 3px; color:var(--color-text-muted); font-size:9px; font-weight:800; letter-spacing:.1em; text-transform:uppercase; }
       .diagram-picker button { display:flex; flex-direction:column; gap:2px; width:100%; padding:7px 8px; text-align:left; border-radius:5px; }
       .diagram-picker button:hover,.diagram-picker button:focus-visible { background:var(--color-primary-subtle); }
@@ -341,8 +369,8 @@ import { diagramCatalog, DiagramType } from '../diagram-templates';
           bottom: calc(70px + env(safe-area-inset-bottom));
           left: 8px;
           width: auto;
-          max-height: calc(100dvh - 86px - env(safe-area-inset-bottom));
-          padding: 12px;
+          max-height: min(62dvh, 490px);
+          padding: 10px;
           transform: none;
         }
         .palette-close {
@@ -351,6 +379,8 @@ import { diagramCatalog, DiagramType } from '../diagram-templates';
         .palette-grid button {
           min-height: 38px;
         }
+        .palette-feature small { display:none; }
+        .palette-feature { min-height:34px; }
       }
     `,
   ],
@@ -365,7 +395,10 @@ export class CanvasAddPalette {
   readonly erStarter = output<void>();
   readonly chooseDiagram = output<DiagramType>();
   readonly diagramCatalog = diagramCatalog;
-  readonly diagramGroups = ['Ideas', 'Product', 'Process', 'Technical'];
+  readonly chooseArchitecture = output<ArchitectureKind>();
+  readonly startArchitecture = output<void>();
+  readonly reviewArchitecture = output<void>();
+  readonly architectureKinds = architectureKinds;
   readonly quick: { type: ItemType; icon: string; label: string }[] = [
     { type: 'note', icon: '▤', label: 'Note' },
     { type: 'text', icon: 'T', label: 'Text' },

@@ -33,6 +33,18 @@ export type SketchBrush = 'pen' | 'marker' | 'highlighter' | 'neon';
 export type ShapeKind = 'rectangle' | 'rounded' | 'circle' | 'diamond' | 'triangle' | 'cloud' | 'pill' | 'cylinder' | 'hexagon' | 'parallelogram' | 'document';
 export type ConnectorKind = 'straight' | 'elbow' | 'curved';
 export type ConnectorSide = 'top' | 'right' | 'bottom' | 'left';
+export type ArchitectureKind = 'business' | 'client' | 'service' | 'database' | 'network' | 'security' | 'external' | 'observability';
+export interface ArchitectureDetails {
+  kind: ArchitectureKind;
+  provider?: 'agnostic' | 'aws' | 'azure' | 'gcp' | 'on-prem' | 'saas';
+  environment?: 'shared' | 'development' | 'staging' | 'production';
+  region?: string;
+  owner?: string;
+  capability?: string;
+  criticality?: 'low' | 'medium' | 'high';
+  monthlyCost?: number;
+  notes?: string;
+}
 export interface ConnectorBinding {
   mode: 'auto' | 'precise';
   anchor?: { x: number; y: number };
@@ -90,6 +102,7 @@ export interface CanvasItem {
   strokes?: { x: number; y: number; pressure?: number }[][];
   sketchStrokes?: SketchStroke[];
   shapeKind?: ShapeKind;
+  architecture?: ArchitectureDetails;
   shapeFill?: string;
   shapeStroke?: string;
   shapeStrokeWidth?: number;
@@ -132,6 +145,8 @@ export interface CanvasConnection {
   routeAxis?: 'x' | 'y';
   sourceJunctionId?: string;
   targetJunctionId?: string;
+  protocol?: string;
+  dataClassification?: 'public' | 'internal' | 'confidential' | 'restricted';
 }
 export interface CanvasJunction {
   id: string;

@@ -274,4 +274,19 @@ a {
 :root.reduced-motion *, :root.reduced-motion *::before, :root.reduced-motion *::after { animation-duration:0.01ms !important; transition-duration:0.01ms !important; scroll-behavior:auto !important; }
 :root.larger-controls button, :root.larger-controls select, :root.larger-controls input:not([type=checkbox]):not([type=radio]) { min-height:40px; }
 :root.high-contrast { --color-text-secondary:var(--color-text-primary); --color-text-muted:var(--color-text-primary); --color-border-light:var(--color-border); }
+.architecture-review { position:absolute; z-index:44; top:70px; right:14px; width:min(330px,calc(100% - 28px)); max-height:calc(100% - 145px); overflow:auto; padding:16px; border:1px solid var(--color-border); border-radius:10px; background:var(--color-surface); box-shadow:var(--shadow-md); }
+.architecture-review header { display:flex; align-items:flex-start; justify-content:space-between; gap:12px; padding-bottom:12px; border-bottom:1px solid var(--color-border-light); }
+.architecture-review header small { color:var(--color-primary); font-size:9px; font-weight:800; letter-spacing:.12em; }
+.architecture-review h2 { margin:4px 0 0; font-size:18px; }
+.architecture-review header button { font-size:20px; }
+.architecture-review p { color:var(--color-text-secondary); font-size:12px; line-height:1.5; }
+.architecture-summary { display:grid; grid-template-columns:auto 1fr; align-items:baseline; gap:3px 10px; margin-top:14px; }
+.architecture-summary strong { color:var(--color-primary); font-size:18px; }
+.architecture-summary span { color:var(--color-text-secondary); font-size:11px; }
+.architecture-issues { display:flex; flex-direction:column; gap:5px; margin-top:15px; }
+.architecture-issues > strong { margin-bottom:5px; font-size:12px; }
+.architecture-issues button,.architecture-start { display:flex; justify-content:space-between; gap:8px; width:100%; padding:9px; border:1px solid var(--color-border-light); border-radius:6px; text-align:left; font-size:11px; }
+.architecture-issues button:hover,.architecture-start:hover { border-color:var(--color-primary); background:var(--color-primary-subtle); }
+.architecture-clear { color:#378566!important; font-weight:700; }
+@media(max-width:700px) { .architecture-review { top:auto; right:8px; bottom:68px; left:8px; width:auto; max-height:55%; } }
 

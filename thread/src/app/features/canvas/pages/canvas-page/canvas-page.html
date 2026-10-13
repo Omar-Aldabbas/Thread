@@ -408,6 +408,10 @@
               (blur)="inlineBlur($event, item.id, 'title')"
               [textContent]="item.title"
             ></div>
+            @if (item.architecture; as architecture) {
+              <span class="architecture-badge">{{ architectureLabel(architecture.kind) }}</span>
+              <span class="architecture-caption">{{ architecture.provider === 'agnostic' ? 'Any platform' : architecture.provider }}{{ architecture.region ? ' · ' + architecture.region : '' }}</span>
+            }
           } @else if (item.type === 'image') {
             @if (item.image) {
               <div class="image-frame">
@@ -1069,7 +1073,21 @@
     </div>
   }
   @if (paletteOpen()) {
-    <app-canvas-add-palette (close)="setTool('select')" (chooseType)="chooseType($event)" (openFiles)="openMediaFiles()" (recordVoice)="toggleVoiceRecording()" (openMedia)="openMedia($event)" (sketch)="setTool('sketch')" (erStarter)="createErStarter()" (chooseDiagram)="createDiagram($event)" />
+    <app-canvas-add-palette (close)="setTool('select')" (chooseType)="chooseType($event)" (openFiles)="openMediaFiles()" (recordVoice)="toggleVoiceRecording()" (openMedia)="openMedia($event)" (sketch)="setTool('sketch')" (erStarter)="createErStarter()" (chooseDiagram)="createDiagram($event)" (chooseArchitecture)="addArchitecture($event)" (startArchitecture)="startArchitectureMap()" (reviewArchitecture)="openArchitectureReview()" />
+  }
+  @if (architectureReviewOpen()) {
+    <aside class="architecture-review" data-ui aria-label="Infrastructure review">
+      <header><div><small>INFRASTRUCTURE</small><h2>Map review</h2></div><button type="button" (click)="architectureReviewOpen.set(false)" aria-label="Close infrastructure review">×</button></header>
+      @if (architectureReview().count) {
+        <div class="architecture-summary"><strong>{{ architectureReview().count }}</strong><span>components</span><strong>{{ architectureReview().monthlyCost | number:'1.0-0' }}</strong><span>estimated monthly cost</span></div>
+        <p>Check ownership, connections, and the business purpose of services.</p>
+        @if (architectureReview().issues.length) {
+          <div class="architecture-issues"><strong>{{ architectureReview().issues.length }} things to review</strong>
+            @for (issue of architectureReview().issues; track $index) { <button type="button" (click)="focusArchitectureIssue(issue.itemId)">{{ issue.message }} <span aria-hidden="true">↗</span></button> }
+          </div>
+        } @else { <p class="architecture-clear">No missing details found by this basic review.</p> }
+      } @else { <p>Add a component or start an infrastructure map to review it here.</p><button type="button" class="architecture-start" (click)="startArchitectureMap()">Start infrastructure map</button> }
+    </aside>
   }
   @if (linkComposerOpen()) {
     <div class="link-dialog-backdrop" data-ui (pointerdown)="cancelLinkComposer()">
@@ -1585,7 +1603,7 @@
         <div>
           <small>OBJECT DETAILS</small>
           <h2>
-            {{ selectedIds().length > 1 ? selectedIds().length + ' selected' : selected()?.type }}
+            {{ selectedIds().length > 1 ? selectedIds().length + ' selected' : selected()?.architecture ? 'Infrastructure component' : selected()?.type }}
           </h2>
         </div>
         <button (click)="inspectorOpen.set(false)" aria-label="Close">×</button>
@@ -1681,6 +1699,24 @@
             ></label>
           }
           @if (item.type === 'shape') {
+            @if (item.architecture; as architecture) {
+              <div class="architecture-fields">
+                <strong>Infrastructure details</strong>
+                <label>Component type<select (change)="setArchitectureKind(item, $any($event.target).value)">@for (option of architectureKinds; track option.kind) { <option [value]="option.kind" [selected]="option.kind === architecture.kind">{{ option.label }}</option> }</select></label>
+                <div class="inspector-grid">
+                  <label>Platform<select [value]="architecture.provider || 'agnostic'" (change)="setArchitectureField(item, 'provider', $event)"><option value="agnostic">Any platform</option><option value="aws">AWS</option><option value="azure">Azure</option><option value="gcp">Google Cloud</option><option value="on-prem">On premises</option><option value="saas">SaaS</option></select></label>
+                  <label>Environment<select [value]="architecture.environment || 'shared'" (change)="setArchitectureField(item, 'environment', $event)"><option value="shared">Shared</option><option value="development">Development</option><option value="staging">Staging</option><option value="production">Production</option></select></label>
+                </div>
+                <label>Region or location<input [value]="architecture.region || ''" placeholder="e.g. eu-west-1 or Amman office" (change)="setArchitectureField(item, 'region', $event)" /></label>
+                <label>Owner<input [value]="architecture.owner || ''" placeholder="Team or person" (change)="setArchitectureField(item, 'owner', $event)" /></label>
+                <label>Business capability<input [value]="architecture.capability || ''" placeholder="What business work does it support?" (change)="setArchitectureField(item, 'capability', $event)" /></label>
+                <div class="inspector-grid">
+                  <label>Criticality<select [value]="architecture.criticality || 'medium'" (change)="setArchitectureField(item, 'criticality', $event)"><option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option></select></label>
+                  <label>Est. monthly cost<input type="number" min="0" step="0.01" [value]="architecture.monthlyCost || 0" (change)="setArchitectureField(item, 'monthlyCost', $event)" /></label>
+                </div>
+                <label>Notes<textarea [value]="architecture.notes || ''" placeholder="Constraints, decisions, or links" (change)="setArchitectureField(item, 'notes', $event)"></textarea></label>
+              </div>
+            }
             <label
               >Shape<thread-select
                 [value]="item.shapeKind || 'rectangle'"
@@ -1825,6 +1861,10 @@
               placeholder="e.g. places"
               (change)="setConnection(connection.id, { label: $any($event.target).value })"
           /></label>
+          @if (isArchitectureConnection(connection)) {
+            <label>Protocol or integration<input [value]="connection.protocol || ''" placeholder="HTTPS, SQL, events…" (change)="setConnection(connection.id, { protocol: $any($event.target).value })" /></label>
+            <label>Data classification<select [value]="connection.dataClassification || 'internal'" (change)="setConnection(connection.id, { dataClassification: $any($event.target).value })"><option value="public">Public</option><option value="internal">Internal</option><option value="confidential">Confidential</option><option value="restricted">Restricted</option></select></label>
+          }
           <div class="inspector-grid">
             <label
               >From<thread-select
