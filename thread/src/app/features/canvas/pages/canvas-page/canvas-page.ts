@@ -171,6 +171,7 @@ export class CanvasPage implements AfterViewInit, OnDestroy {
   readonly paletteOpen = signal(false);
   readonly architectureReviewOpen = signal(false);
   readonly architectureKinds = architectureKinds;
+  readonly systemKind = signal<ArchitectureKind>('service');
   readonly architectureReview = computed(() => reviewArchitecture(this.items(), this.connections()));
   architectureLabel(kind: ArchitectureKind): string {
     return architectureKinds.find((entry) => entry.kind === kind)?.label || 'Component';
@@ -181,6 +182,7 @@ export class CanvasPage implements AfterViewInit, OnDestroy {
   openArchitectureReview(): void {
     this.paletteOpen.set(false);
     this.tool.set('select');
+    this.pendingType.set(null);
     this.inspectorOpen.set(false);
     this.architectureReviewOpen.set(true);
   }
@@ -1012,7 +1014,7 @@ export class CanvasPage implements AfterViewInit, OnDestroy {
     this.finishEditing();
     this.tool.set(tool);
     this.paletteOpen.set(tool === 'add');
-    this.pendingType.set(tool === 'shape' ? 'shape' : null);
+    this.pendingType.set(tool === 'shape' || tool === 'system' ? 'shape' : null);
     if (tool !== 'select') {
       this.inspectorOpen.set(false);
       this.selectedConnectionId.set(null);
@@ -1815,7 +1817,7 @@ export class CanvasPage implements AfterViewInit, OnDestroy {
     event.stopPropagation();
     if (this.beginTouch(event)) return;
     this.selectedConnectionId.set(null);
-    if (this.tool() === 'shape') return;
+    if (this.tool() === 'shape' || this.tool() === 'system') return;
     if (item.type === 'sketch' && this.tool() === 'select') {
       const point = this.point(event.clientX, event.clientY),
         angle = (-(item.rotation || 0) * Math.PI) / 180;
@@ -2747,7 +2749,7 @@ export class CanvasPage implements AfterViewInit, OnDestroy {
         },
         box?.width && box.width > 10 ? box : undefined,
       );
-      this.pendingType.set(null);
+      if (this.tool() !== 'system') this.pendingType.set(null);
     }
     if (session?.kind === 'connect' && session.itemId) {
       const point = this.point(event.clientX, event.clientY);
@@ -3614,11 +3616,15 @@ export class CanvasPage implements AfterViewInit, OnDestroy {
     const viewport = this.viewport()?.nativeElement;
     const mobile = !!viewport && viewport.clientWidth <= 700;
     const visibleWidth = viewport ? viewport.clientWidth / this.zoom() : 390;
+    const systemOption = type === 'shape' && this.tool() === 'system'
+      ? architectureKinds.find((entry) => entry.kind === this.systemKind())
+      : undefined;
+    const placementShape = systemOption?.shape || this.shapeKind();
     const width = Math.max(
       100,
       box?.width ||
         (type === 'shape'
-          ? this.shapeKind() === 'circle'
+          ? placementShape === 'circle'
             ? 160
             : 200
           : type === 'zone'
@@ -3649,9 +3655,9 @@ export class CanvasPage implements AfterViewInit, OnDestroy {
       40,
       box?.height ||
         (type === 'shape'
-          ? this.shapeKind() === 'circle'
+          ? placementShape === 'circle'
             ? 160
-            : ['diamond', 'triangle', 'cylinder'].includes(this.shapeKind())
+            : ['diamond', 'triangle', 'cylinder'].includes(placementShape)
               ? 150
               : 120
           : type === 'zone'
@@ -3726,7 +3732,7 @@ export class CanvasPage implements AfterViewInit, OnDestroy {
       y: point.y,
       width: placedWidth,
       height,
-      title: type === 'er-entity' ? 'New entity' : type === 'link' ? this.pendingLink?.title || '' : '',
+      title: systemOption?.label || (type === 'er-entity' ? 'New entity' : type === 'link' ? this.pendingLink?.title || '' : ''),
       url: type === 'link' ? this.pendingLink?.url : undefined,
       body: '',
       erFields:
@@ -3740,11 +3746,13 @@ export class CanvasPage implements AfterViewInit, OnDestroy {
       budgetPeriod: type === 'budget' ? 'one-time' : undefined,
       textAutoSize: type === 'text',
       accent: this.preferences.defaultNoteColor(),
-      fontSize: type === 'text' ? this.preferences.defaultFontSize() : undefined,
-      shapeKind: type === 'shape' ? this.shapeKind() : undefined,
-      shapeFill: type === 'shape' ? shapeThemes[this.shapeTheme()].fill : undefined,
+      fontSize: systemOption ? 16 : type === 'text' ? this.preferences.defaultFontSize() : undefined,
+      shapeKind: type === 'shape' ? systemOption?.shape || this.shapeKind() : undefined,
+      shapeFill: type === 'shape' ? systemOption?.fill || shapeThemes[this.shapeTheme()].fill : undefined,
+      shapeStroke: systemOption?.stroke,
       shapeStrokeWidth: type === 'shape' ? 2 : undefined,
-      textColor: type === 'shape' ? shapeThemes[this.shapeTheme()].text : undefined,
+      textColor: type === 'shape' ? systemOption ? '#1e293b' : shapeThemes[this.shapeTheme()].text : undefined,
+      architecture: systemOption ? { kind: systemOption.kind, provider: 'agnostic', environment: 'shared', criticality: 'medium' } : undefined,
       zoneType: type === 'zone' ? 'nested' : undefined,
       checklist:
         type === 'checklist' || type === 'list' ? [{ label: '', completed: false }] : undefined,
@@ -3754,10 +3762,10 @@ export class CanvasPage implements AfterViewInit, OnDestroy {
     this.items.update((items) => [...items, item]);
     this.selectedIds.set([item.id]);
     this.selectedConnectionId.set(null);
-    this.pendingType.set(null);
+    this.pendingType.set(systemOption ? 'shape' : null);
     if (type === 'link') this.pendingLink = null;
     this.paletteOpen.set(false);
-    this.tool.set('select');
+    this.tool.set(systemOption ? 'system' : 'select');
     if (type === 'er-entity') {
       this.inspectorOpen.set(false);
       setTimeout(() => {
@@ -4420,6 +4428,7 @@ export class CanvasPage implements AfterViewInit, OnDestroy {
     this.selectedConnectionId.set(null);
     this.paletteOpen.set(false);
     this.tool.set('select');
+    this.pendingType.set(null);
     const viewport = this.viewport()?.nativeElement;
     if (viewport) {
       const left = Math.min(...diagram.items.map((item) => item.x));

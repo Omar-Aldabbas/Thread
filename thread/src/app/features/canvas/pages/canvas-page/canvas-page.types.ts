@@ -6,7 +6,7 @@ import type {
   ThreadDataset,
 } from '../../canvas.model';
 
-export type Tool = 'select' | 'hand' | 'text' | 'add' | 'connect' | 'sketch' | 'shape';
+export type Tool = 'select' | 'hand' | 'text' | 'add' | 'connect' | 'sketch' | 'shape' | 'system';
 export type EditField = 'title' | 'body' | 'content';
 
 export type CanvasState = {

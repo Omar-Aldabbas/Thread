@@ -14,10 +14,10 @@ import type { Tool } from '../pages/canvas-page/canvas-page.types';
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 12V8a1.5 1.5 0 0 1 3 0v3-6a1.5 1.5 0 0 1 3 0v6-4a1.5 1.5 0 0 1 3 0v4-2a1.5 1.5 0 0 1 3 0v6c0 3-2 5-5 5h-3c-2 0-3-1-4-2l-3-4a1.6 1.6 0 0 1 2.5-2L7 13" /></svg><small>Pan</small>
       </button>
       <span class="divider" aria-hidden="true"></span>
-      <button type="button" [class.active]="paletteOpen() || !!pendingType()" [attr.aria-pressed]="paletteOpen() || !!pendingType()" (click)="toolChange.emit('add')" aria-label="Add content" title="Add content (N)" data-shortcut="N">
+      <button type="button" [class.active]="paletteOpen() || (!!pendingType() && tool() !== 'system')" [attr.aria-pressed]="paletteOpen() || (!!pendingType() && tool() !== 'system')" (click)="toolChange.emit('add')" aria-label="Add content" title="Add content (N)" data-shortcut="N">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v16M4 12h16" /></svg><small>Add</small>
       </button>
-      <button type="button" [class.active]="tool() === 'sketch' || tool() === 'shape' || tool() === 'connect' || tool() === 'text'" [attr.aria-pressed]="tool() === 'sketch' || tool() === 'shape' || tool() === 'connect' || tool() === 'text'" (click)="toolChange.emit('sketch')" aria-label="Sketch" title="Sketch (P)" data-shortcut="P">
+      <button type="button" [class.active]="tool() === 'sketch' || tool() === 'shape' || tool() === 'connect' || tool() === 'text' || tool() === 'system'" [attr.aria-pressed]="tool() === 'sketch' || tool() === 'shape' || tool() === 'connect' || tool() === 'text' || tool() === 'system'" (click)="toolChange.emit('sketch')" aria-label="Sketch" title="Sketch (P)" data-shortcut="P">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m4 20 4.5-1 11-11a2 2 0 0 0-3-3l-11 11L4 20ZM14 7l3 3" /></svg><small>Sketch</small>
       </button>
     </nav>

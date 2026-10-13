@@ -1,8 +1,6 @@
 import { Component, output } from '@angular/core';
 import type { ItemType } from '../canvas.model';
 import { diagramCatalog, DiagramType } from '../diagram-templates';
-import { architectureKinds } from '../architecture-map';
-import type { ArchitectureKind } from '../canvas.model';
 
 @Component({
   selector: 'app-canvas-add-palette',
@@ -22,9 +20,7 @@ import type { ArchitectureKind } from '../canvas.model';
       >
         ×
       </button>
-      <div class="palette-section">Infrastructure</div>
-      <button class="palette-feature" type="button" (click)="startArchitecture.emit()"><span aria-hidden="true">◇</span><span><strong>Start infrastructure map</strong><small>Business need, app, network, data, and monitoring</small></span></button>
-      <button class="palette-feature" type="button" (click)="reviewArchitecture.emit()"><span aria-hidden="true">✓</span><span><strong>Review infrastructure</strong><small>Find missing links, owners, and business purpose</small></span></button>
+      <button class="palette-feature palette-system" type="button" (click)="designSystem.emit()"><span aria-hidden="true">◇</span><span><strong>Design a system</strong><small>Components, connections, and review</small></span></button>
       <div class="palette-section">Quick</div>
       <div class="palette-grid">
         @for (entry of quick; track entry.type) {
@@ -88,14 +84,6 @@ import type { ArchitectureKind } from '../canvas.model';
         }
       </div>
       </div>
-      </details>
-      <details class="palette-group">
-        <summary>Infrastructure components <span aria-hidden="true">⌄</span></summary>
-        <div class="palette-group-content diagram-picker">
-        @for (kind of architectureKinds; track kind.kind) {
-          <button type="button" (click)="chooseArchitecture.emit(kind.kind)"><strong>{{ kind.label }}</strong><small>{{ kind.description }}</small></button>
-        }
-        </div>
       </details>
     </section>
   `,
@@ -254,6 +242,7 @@ import type { ArchitectureKind } from '../canvas.model';
         color: var(--color-text-muted);
         font-size: 10px;
       }
+      .palette-system { border-color:var(--color-primary); background:var(--color-primary-subtle); }
       @media (min-width: 701px) and (max-width: 1024px) {
         :host {
           left: 72px;
@@ -379,7 +368,7 @@ import type { ArchitectureKind } from '../canvas.model';
         .palette-grid button {
           min-height: 38px;
         }
-        .palette-feature small { display:none; }
+        .palette-feature:not(.palette-system) small { display:none; }
         .palette-feature { min-height:34px; }
       }
     `,
@@ -395,10 +384,7 @@ export class CanvasAddPalette {
   readonly erStarter = output<void>();
   readonly chooseDiagram = output<DiagramType>();
   readonly diagramCatalog = diagramCatalog;
-  readonly chooseArchitecture = output<ArchitectureKind>();
-  readonly startArchitecture = output<void>();
-  readonly reviewArchitecture = output<void>();
-  readonly architectureKinds = architectureKinds;
+  readonly designSystem = output<void>();
   readonly quick: { type: ItemType; icon: string; label: string }[] = [
     { type: 'note', icon: '▤', label: 'Note' },
     { type: 'text', icon: 'T', label: 'Text' },

@@ -1073,7 +1073,7 @@
     </div>
   }
   @if (paletteOpen()) {
-    <app-canvas-add-palette (close)="setTool('select')" (chooseType)="chooseType($event)" (openFiles)="openMediaFiles()" (recordVoice)="toggleVoiceRecording()" (openMedia)="openMedia($event)" (sketch)="setTool('sketch')" (erStarter)="createErStarter()" (chooseDiagram)="createDiagram($event)" (chooseArchitecture)="addArchitecture($event)" (startArchitecture)="startArchitectureMap()" (reviewArchitecture)="openArchitectureReview()" />
+    <app-canvas-add-palette (close)="setTool('select')" (chooseType)="chooseType($event)" (openFiles)="openMediaFiles()" (recordVoice)="toggleVoiceRecording()" (openMedia)="openMedia($event)" (sketch)="setTool('sketch')" (erStarter)="createErStarter()" (chooseDiagram)="createDiagram($event)" (designSystem)="setTool('system')" />
   }
   @if (architectureReviewOpen()) {
     <aside class="architecture-review" data-ui aria-label="Infrastructure review">
@@ -1108,7 +1108,7 @@
       Tap the canvas to place {{ pendingAsset()?.name }} · Esc to cancel
     </div>
   }
-  @if (pendingType()) {
+  @if (pendingType() && tool() !== 'system') {
     <div class="hint-pill" [class.tool-instruction]="tool() === 'shape'" data-ui>
       Tap the canvas to place {{ pendingType() === 'er-entity' ? 'an ER entity' : pendingType() }} ·
       Esc to cancel
@@ -1121,6 +1121,9 @@
       </button>
       <button class="sketch-tab" [class.active]="tool() === 'shape'" (click)="setTool('shape')">
         Shapes
+      </button>
+      <button class="sketch-tab" [class.active]="tool() === 'system'" (click)="setTool('system')">
+        System
       </button>
       <button class="sketch-tab" [class.active]="tool() === 'connect'" (click)="setTool('connect')">
         Connector
@@ -1252,6 +1255,28 @@
       <button class="action-done" (click)="setTool('select')" aria-label="Finish using this tool">
         Done
       </button>
+    </div>
+  }
+  @if (tool() === 'system') {
+    <div class="system-tools" data-ui aria-label="Design a system tools">
+      <div class="system-tools-heading">
+        <div><strong>Design a system</strong><small>Choose a component, then tap the canvas</small></div>
+        <button type="button" (click)="setTool('shape')">Shapes</button>
+        <button type="button" (click)="setTool('select')" aria-label="Finish designing system">Done</button>
+      </div>
+      <div class="system-tools-components" appScroll="x" scrollbar="hover" aria-label="System components">
+        @for (kind of architectureKinds; track kind.kind) {
+          <button type="button" class="system-choice" [class.active]="systemKind() === kind.kind" (click)="systemKind.set(kind.kind)" [attr.aria-label]="'Place ' + kind.label" [title]="kind.description">
+            <svg viewBox="0 0 100 100" aria-hidden="true"><path [attr.d]="shapePaths[kind.shape]" /></svg>
+            <small>{{ kind.shortLabel }}</small>
+          </button>
+        }
+      </div>
+      <div class="system-tools-actions">
+        <button type="button" (click)="startArchitectureMap()">Starter map</button>
+        <button type="button" (click)="setTool('connect')">Connect</button>
+        <button type="button" (click)="openArchitectureReview()">Review</button>
+      </div>
     </div>
   }
   @if (tool() === 'connect') {

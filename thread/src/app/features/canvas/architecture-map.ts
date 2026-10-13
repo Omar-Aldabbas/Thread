@@ -1,15 +1,15 @@
 import { ArchitectureDetails, ArchitectureKind, CanvasConnection, CanvasItem, ShapeKind } from './canvas.model';
 import { canvasId } from './canvas-id';
 
-export const architectureKinds: { kind: ArchitectureKind; label: string; description: string; shape: ShapeKind; fill: string; stroke: string }[] = [
-  { kind: 'business', label: 'Business capability', description: 'Outcome the system supports', shape: 'hexagon', fill: '#f5efff', stroke: '#7955aa' },
-  { kind: 'client', label: 'Client / user', description: 'Where requests begin', shape: 'rounded', fill: '#eaf5ff', stroke: '#397ca8' },
-  { kind: 'service', label: 'Application / service', description: 'Runs business logic', shape: 'rounded', fill: '#fff5e8', stroke: '#bf7930' },
-  { kind: 'database', label: 'Database / storage', description: 'Stores data', shape: 'cylinder', fill: '#eaf7f0', stroke: '#378566' },
-  { kind: 'network', label: 'Network / gateway', description: 'Routes or protects traffic', shape: 'hexagon', fill: '#eff3ff', stroke: '#5b70a7' },
-  { kind: 'security', label: 'Identity / security', description: 'Controls access', shape: 'diamond', fill: '#fff0f2', stroke: '#b94d62' },
-  { kind: 'external', label: 'External system', description: 'Outside dependency', shape: 'cloud', fill: '#f1f3f5', stroke: '#64717d' },
-  { kind: 'observability', label: 'Monitoring', description: 'Logs, metrics, alerts', shape: 'rounded', fill: '#f6f2e9', stroke: '#9c8254' },
+export const architectureKinds: { kind: ArchitectureKind; label: string; shortLabel: string; description: string; shape: ShapeKind; fill: string; stroke: string }[] = [
+  { kind: 'business', label: 'Business capability', shortLabel: 'Business', description: 'Outcome the system supports', shape: 'hexagon', fill: '#f5efff', stroke: '#7955aa' },
+  { kind: 'client', label: 'Client / user', shortLabel: 'Client', description: 'Where requests begin', shape: 'rounded', fill: '#eaf5ff', stroke: '#397ca8' },
+  { kind: 'service', label: 'Application / service', shortLabel: 'Service', description: 'Runs business logic', shape: 'rounded', fill: '#fff5e8', stroke: '#bf7930' },
+  { kind: 'database', label: 'Database / storage', shortLabel: 'Database', description: 'Stores data', shape: 'cylinder', fill: '#eaf7f0', stroke: '#378566' },
+  { kind: 'network', label: 'Network / gateway', shortLabel: 'Network', description: 'Routes or protects traffic', shape: 'hexagon', fill: '#eff3ff', stroke: '#5b70a7' },
+  { kind: 'security', label: 'Identity / security', shortLabel: 'Identity', description: 'Controls access', shape: 'diamond', fill: '#fff0f2', stroke: '#b94d62' },
+  { kind: 'external', label: 'External system', shortLabel: 'External', description: 'Outside dependency', shape: 'cloud', fill: '#f1f3f5', stroke: '#64717d' },
+  { kind: 'observability', label: 'Monitoring', shortLabel: 'Monitor', description: 'Logs, metrics, alerts', shape: 'rounded', fill: '#f6f2e9', stroke: '#9c8254' },
 ];
 
 export function architectureShape(kind: ArchitectureKind, point: { x: number; y: number }, parentId: string | null, title?: string): CanvasItem {
