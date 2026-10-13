@@ -74,6 +74,7 @@ import {
 } from '../../sketch/sketch-geometry';
 import { elbowRoute } from '../../sketch/elbow-route';
 import { connectorSides, isConnectableItem, validConnections } from '../../connector-rules';
+import { createDiagramTemplate, DiagramType } from '../../diagram-templates';
 import type {
   CanvasSession as Session,
   CanvasState as State,
@@ -216,7 +217,7 @@ export class CanvasPage implements AfterViewInit, OnDestroy {
         textColor: theme.text,
       });
   }
-  readonly connectorKind = signal<ConnectorKind>('elbow');
+  readonly connectorKind = signal<ConnectorKind>(this.preferences.defaultConnector());
   readonly connectorSides = connectorSides;
   readonly connectionTargetId = signal<string | null>(null);
   readonly junctionCandidate = signal<{
@@ -528,6 +529,11 @@ export class CanvasPage implements AfterViewInit, OnDestroy {
     viewport?.addEventListener('click', this.captureCanvasClick, true);
     setTimeout(() => {
       this.fitView();
+      if (this.preferences.defaultZoomPercent() !== 100 && viewport) {
+        const rect = viewport.getBoundingClientRect();
+        this.zoomAt(rect.left + rect.width / 2, rect.top + rect.height / 2, this.preferences.defaultZoomPercent() / 100);
+      }
+      if (this.browser) localStorage.setItem('thread-last-space', this.spaceId);
       this.queueTransformSync();
       const entryTool = this.route.snapshot.queryParamMap.get('tool');
       if (entryTool === 'task') this.chooseType('task');
@@ -2410,7 +2416,7 @@ export class CanvasPage implements AfterViewInit, OnDestroy {
           bestY = 6 / this.zoom(),
           snapX = 0,
           snapY = 0;
-        for (const other of this.items()) {
+        for (const other of this.preferences.snapToObjects() ? this.items() : []) {
           if (session.origins.has(other.id)) continue;
           for (const target of [other.x, other.x + other.width / 2, other.x + other.width])
             for (const value of ownX) {
@@ -2433,6 +2439,12 @@ export class CanvasPage implements AfterViewInit, OnDestroy {
         }
         offsetX += snapX;
         offsetY += snapY;
+        if (this.preferences.snapToGrid()) {
+          offsetX = Math.round((origin.x + offsetX) / 24) * 24 - origin.x;
+          offsetY = Math.round((origin.y + offsetY) / 24) * 24 - origin.y;
+          guideX = origin.x + offsetX;
+          guideY = origin.y + offsetY;
+        }
       }
       this.snapGuide.set(
         guideX !== undefined || guideY !== undefined ? { x: guideX, y: guideY } : null,
@@ -2904,7 +2916,7 @@ export class CanvasPage implements AfterViewInit, OnDestroy {
   wheel(event: WheelEvent): void {
     event.preventDefault();
     if (event.ctrlKey || event.metaKey)
-      this.zoomAt(event.clientX, event.clientY, this.zoom() * (event.deltaY > 0 ? 0.9 : 1.1));
+      this.zoomAt(event.clientX, event.clientY, this.zoom() * (event.deltaY > 0 ? 1 - this.preferences.zoomSpeed() / 100 : 1 + this.preferences.zoomSpeed() / 100));
     else {
       this.panX.update((x) => x - event.deltaX);
       this.panY.update((y) => y - event.deltaY);
@@ -3706,10 +3718,11 @@ export class CanvasPage implements AfterViewInit, OnDestroy {
       datasetId: dataset?.id || chartSource?.id,
       chartConfig: type === 'chart' ? this.defaultChartConfig(chartSource) : undefined,
       budgetMode: type === 'budget' ? 'simple' : undefined,
-      budgetCurrency: type === 'budget' ? 'JOD' : undefined,
+      budgetCurrency: type === 'budget' ? this.preferences.defaultCurrency() : undefined,
       budgetPeriod: type === 'budget' ? 'one-time' : undefined,
       textAutoSize: type === 'text',
-      accent: '#d4111c',
+      accent: this.preferences.defaultNoteColor(),
+      fontSize: type === 'text' ? this.preferences.defaultFontSize() : undefined,
       shapeKind: type === 'shape' ? this.shapeKind() : undefined,
       shapeFill: type === 'shape' ? shapeThemes[this.shapeTheme()].fill : undefined,
       shapeStrokeWidth: type === 'shape' ? 2 : undefined,
@@ -4331,6 +4344,28 @@ export class CanvasPage implements AfterViewInit, OnDestroy {
     if (viewport) {
       this.panX.set(viewport.clientWidth / 2 - (target.x + target.width / 2) * this.zoom());
       this.panY.set(viewport.clientHeight / 2 - (target.y + target.height / 2) * this.zoom());
+    }
+  }
+  createDiagram(type: DiagramType): void {
+    this.finishEditing();
+    const diagram = createDiagramTemplate(type, this.centerPoint(), this.contextId());
+    this.snapshot();
+    this.items.update((items) => [...items, ...diagram.items]);
+    this.connections.update((connections) => [...connections, ...diagram.connections]);
+    this.selectedIds.set(diagram.items.map((item) => item.id));
+    this.selectedConnectionId.set(null);
+    this.paletteOpen.set(false);
+    this.tool.set('select');
+    const viewport = this.viewport()?.nativeElement;
+    if (viewport) {
+      const left = Math.min(...diagram.items.map((item) => item.x));
+      const top = Math.min(...diagram.items.map((item) => item.y));
+      const right = Math.max(...diagram.items.map((item) => item.x + item.width));
+      const bottom = Math.max(...diagram.items.map((item) => item.y + item.height));
+      const zoom = Math.max(this.preferences.minZoomPercent() / 100, Math.min(1, (viewport.clientWidth - 80) / (right - left), (viewport.clientHeight - 130) / (bottom - top)));
+      this.zoom.set(zoom);
+      this.panX.set(viewport.clientWidth / 2 - (left + right) / 2 * zoom);
+      this.panY.set(viewport.clientHeight / 2 - (top + bottom) / 2 * zoom);
     }
   }
   createErStarter(): void {

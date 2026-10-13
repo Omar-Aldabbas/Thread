@@ -9,6 +9,7 @@
     [class.placement-cursor]="pendingType() || tool() === 'text'"
     [class.connect-cursor]="tool() === 'connect'"
     [class.sketch-cursor]="tool() === 'sketch'"
+    [class.no-grid]="!preferences.showGrid()"
     [style.background-size]="gridSize()"
     [style.background-position]="gridPosition()"
     [style.--hover-intensity]="gridHoverIntensity()"
@@ -1068,7 +1069,7 @@
     </div>
   }
   @if (paletteOpen()) {
-    <app-canvas-add-palette (close)="setTool('select')" (chooseType)="chooseType($event)" (openFiles)="openMediaFiles()" (recordVoice)="toggleVoiceRecording()" (openMedia)="openMedia($event)" (sketch)="setTool('sketch')" (erStarter)="createErStarter()" />
+    <app-canvas-add-palette (close)="setTool('select')" (chooseType)="chooseType($event)" (openFiles)="openMediaFiles()" (recordVoice)="toggleVoiceRecording()" (openMedia)="openMedia($event)" (sketch)="setTool('sketch')" (erStarter)="createErStarter()" (chooseDiagram)="createDiagram($event)" />
   }
   @if (linkComposerOpen()) {
     <div class="link-dialog-backdrop" data-ui (pointerdown)="cancelLinkComposer()">

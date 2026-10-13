@@ -15,6 +15,8 @@ button { cursor:pointer; border:0; background:none; color:inherit; }
 .canvas-viewport { position:relative; flex:1; min-height:0; overflow:hidden; touch-action:none; user-select:none; background-color:var(--color-background); background-image:radial-gradient(circle,var(--canvas-dot, rgba(17,17,17,.18)) 1px,transparent 1.2px); cursor:default; }
 .canvas-viewport::before { position:absolute; inset:0; z-index:0; pointer-events:none; content:''; background-image:radial-gradient(circle,var(--color-primary) 1.35px,transparent 1.65px); background-size:inherit; background-position:inherit; mask-image:radial-gradient(circle 170px at var(--hover-x,-300px) var(--hover-y,-300px),#000 0%,transparent 100%); opacity:0; transition:opacity 180ms ease; }
 .canvas-viewport.grid-hover::before { opacity:var(--hover-intensity,.55); }
+.canvas-viewport.no-grid { background-image:none; }
+.canvas-viewport.no-grid::before { display:none; }
 .canvas-item.search-dimmed,.relationship-label.search-dimmed { opacity:.22; filter:grayscale(.65); transition:opacity 180ms ease,filter 180ms ease; }
 .canvas-item.search-dimmed:hover,.canvas-item.search-dimmed:focus-visible { opacity:.7; filter:none; }
 .canvas-item.search-match:not(.selected) { outline:2px solid var(--color-primary); outline-offset:3px; }

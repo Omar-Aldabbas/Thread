@@ -271,4 +271,7 @@ a {
 .chart-content app-thread-chart { flex:1; min-height:0; }
 @container (max-width:260px) { .smart-actions { gap:6px; } .smart-actions button { font-size:9px; } .budget-row,.budget-total { grid-template-columns:minmax(0,1fr) 65px; } .project-budget .budget-row,.project-budget .budget-total,.budget-column-head { grid-template-columns:minmax(0,1fr) 55px 55px; gap:4px; } .linked-label { display:none; } .chart-controls select { font-size:9px; } }
 @media(max-width:700px) { .tool-rail.canvas-action-bar { grid-template-columns:repeat(7,1fr); } .shape-tools { top:auto; right:8px; bottom:calc(72px + env(safe-area-inset-bottom)); left:8px; max-width:none; } }
+:root.reduced-motion *, :root.reduced-motion *::before, :root.reduced-motion *::after { animation-duration:0.01ms !important; transition-duration:0.01ms !important; scroll-behavior:auto !important; }
+:root.larger-controls button, :root.larger-controls select, :root.larger-controls input:not([type=checkbox]):not([type=radio]) { min-height:40px; }
+:root.high-contrast { --color-text-secondary:var(--color-text-primary); --color-text-muted:var(--color-text-primary); --color-border-light:var(--color-border); }
 

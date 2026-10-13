@@ -7,7 +7,15 @@ export const routes: Routes = [
     children: [
       {
         path: '',
-        redirectTo: 'spaces',
+        redirectTo: () => {
+          try {
+            const id = localStorage.getItem('thread-last-space');
+            const spaces = JSON.parse(localStorage.getItem('thread-spaces') || '[]');
+            if (localStorage.getItem('thread-reopen-last-space') === 'true' && id && Array.isArray(spaces) && spaces.some((space) => space.id === id))
+              return `/space/${encodeURIComponent(id)}`;
+          } catch {}
+          return 'spaces';
+        },
         pathMatch: 'full',
       },
       {

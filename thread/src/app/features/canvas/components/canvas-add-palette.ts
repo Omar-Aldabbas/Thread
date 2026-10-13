@@ -1,5 +1,6 @@
 import { Component, output } from '@angular/core';
 import type { ItemType } from '../canvas.model';
+import { diagramCatalog, DiagramType } from '../diagram-templates';
 
 @Component({
   selector: 'app-canvas-add-palette',
@@ -65,6 +66,17 @@ import type { ItemType } from '../canvas.model';
           ><small>Two linked entities with example keys</small></span
         >
       </button>
+      <details class="diagram-picker">
+        <summary>More diagram starters <span aria-hidden="true">⌄</span></summary>
+        @for (group of diagramGroups; track group) {
+          <div class="diagram-group">{{ group }}</div>
+          @for (diagram of diagramCatalog; track diagram.type) {
+            @if (diagram.group === group) {
+              <button type="button" (click)="chooseDiagram.emit(diagram.type)"><strong>{{ diagram.name }}</strong><small>{{ diagram.description }}</small></button>
+            }
+          }
+        }
+      </details>
     </section>
   `,
   styles: [
@@ -309,6 +321,13 @@ import type { ItemType } from '../canvas.model';
       .secondary-media {
         margin-top: 5px;
       }
+      .diagram-picker { margin-top:8px; border-top:1px solid var(--color-border-light); padding-top:8px; }
+      .diagram-picker summary { display:flex; justify-content:space-between; padding:8px 4px; color:var(--color-primary); font-size:12px; font-weight:750; cursor:pointer; }
+      .diagram-group { margin:9px 4px 3px; color:var(--color-text-muted); font-size:9px; font-weight:800; letter-spacing:.1em; text-transform:uppercase; }
+      .diagram-picker button { display:flex; flex-direction:column; gap:2px; width:100%; padding:7px 8px; text-align:left; border-radius:5px; }
+      .diagram-picker button:hover,.diagram-picker button:focus-visible { background:var(--color-primary-subtle); }
+      .diagram-picker button strong { font-size:11px; }
+      .diagram-picker button small { color:var(--color-text-muted); font-size:10px; }
       @media (max-width: 700px) {
         :host {
           inset: 0;
@@ -344,6 +363,9 @@ export class CanvasAddPalette {
   readonly openMedia = output<'gif' | 'sticker'>();
   readonly sketch = output<void>();
   readonly erStarter = output<void>();
+  readonly chooseDiagram = output<DiagramType>();
+  readonly diagramCatalog = diagramCatalog;
+  readonly diagramGroups = ['Ideas', 'Product', 'Process', 'Technical'];
   readonly quick: { type: ItemType; icon: string; label: string }[] = [
     { type: 'note', icon: '▤', label: 'Note' },
     { type: 'text', icon: 'T', label: 'Text' },
