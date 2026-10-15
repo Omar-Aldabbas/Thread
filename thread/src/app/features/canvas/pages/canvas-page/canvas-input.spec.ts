@@ -37,6 +37,7 @@ function canvas() {
   page.sketchPoints = signal([]);
   page.editingId = signal(null);
   page.richFocusId = signal(null);
+  page.richField = signal(null);
   page.cropId = signal(null);
   page.inspectorOpen = signal(false);
   page.selectedConnectionId = signal(null);
@@ -85,6 +86,19 @@ function pointer(viewport: HTMLElement, pointerType: string, pointerId = 1) {
 }
 
 afterEach(() => vi.unstubAllGlobals());
+
+describe('note text fields', () => {
+  it('keeps title markup separate from body markup', () => {
+    const { page } = canvas();
+    page.items.set([{ id: 'note', type: 'note', title: 'Heading', body: 'Body', x: 0, y: 0, width: 260, height: 170 }]);
+    page.richChanged('note', { html: '<p><strong>Heading</strong></p>', text: 'Heading' }, 'title');
+    expect(page.items()[0].titleHtml).toBe('<p><strong>Heading</strong></p>');
+    expect(page.items()[0].bodyHtml).toBeUndefined();
+    page.richChanged('note', { html: '<p>Body</p><p><br></p>', text: 'Body\n' }, 'body');
+    expect(page.items()[0].titleHtml).toBe('<p><strong>Heading</strong></p>');
+    expect(page.items()[0].bodyHtml).toBe('<p>Body</p><p><br></p>');
+  });
+});
 
 function canvasHit(viewport: HTMLElement, target: Element) {
   return {

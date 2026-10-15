@@ -39,12 +39,18 @@ export class RichTextHtmlPipe implements PipeTransform {
         if (tag === 'span') {
           const color = element.style.color.trim();
           const fontSize = element.style.fontSize.trim();
+          const fontFamily = element.style.fontFamily.trim();
           if (safeColor.test(color)) safeElement.style.color = color;
+          if (fontFamily === 'ui-monospace, monospace' || fontFamily === 'Inter, sans-serif') safeElement.style.fontFamily = fontFamily;
           if (/^\d+(?:\.\d+)?px$/.test(fontSize)) {
             const size = Number.parseFloat(fontSize);
             if (size >= 8 && size <= 96)
               safeElement.style.fontSize = `${size}px`;
           }
+        }
+        if (tag === 'p' || /^h[1-6]$/.test(tag)) {
+          const align = element.style.textAlign;
+          if (align === 'left' || align === 'center' || align === 'right') safeElement.style.textAlign = align;
         }
         if (tag === 'ol') {
           const start = Number(element.getAttribute('start'));

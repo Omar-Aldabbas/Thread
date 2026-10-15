@@ -10,10 +10,26 @@
   ViewEncapsulation,
   signal,
 } from '@angular/core';
-import { Editor } from '@tiptap/core';
+import { Editor, Extension } from '@tiptap/core';
 import StarterKit from '@tiptap/starter-kit';
 import { TextStyleKit } from '@tiptap/extension-text-style';
 import { ScrollDirective } from '../../../shared/scroll.directive';
+
+const TextAlignment = Extension.create({
+  name: 'threadTextAlignment',
+  addGlobalAttributes() {
+    return [{
+      types: ['paragraph', 'heading'],
+      attributes: {
+        textAlign: {
+          default: null,
+          parseHTML: (element) => element.style.textAlign || null,
+          renderHTML: (attributes) => attributes['textAlign'] ? { style: `text-align: ${attributes['textAlign']}` } : {},
+        },
+      },
+    }];
+  },
+});
 
 @Component({
   selector: 'app-rich-text-editor',
@@ -88,7 +104,7 @@ export class RichTextEditor implements AfterViewInit, OnDestroy {
   ngAfterViewInit(): void {
     this.editor = new Editor({
       element: this.mount.nativeElement,
-      extensions: [StarterKit, TextStyleKit],
+      extensions: [StarterKit, TextStyleKit, TextAlignment],
       content: this.html || '<p></p>',
       editorProps: { attributes: { class: 'tiptap' } },
       onUpdate: ({ editor }) => {
@@ -148,5 +164,17 @@ export class RichTextEditor implements AfterViewInit, OnDestroy {
     const chain = this.editor.chain().focus();
     if (this.lastSelection) chain.setTextSelection(this.lastSelection);
     chain.setColor(value).run();
+  }
+  family(value: 'sans' | 'mono'): void {
+    if (!this.editor) return;
+    const chain = this.editor.chain().focus();
+    if (this.lastSelection) chain.setTextSelection(this.lastSelection);
+    chain.setFontFamily(value === 'mono' ? 'ui-monospace, monospace' : 'Inter, sans-serif').run();
+  }
+  alignment(value: 'left' | 'center' | 'right'): void {
+    if (!this.editor) return;
+    const chain = this.editor.chain().focus();
+    if (this.lastSelection) chain.setTextSelection(this.lastSelection);
+    chain.updateAttributes('paragraph', { textAlign: value }).updateAttributes('heading', { textAlign: value }).run();
   }
 }

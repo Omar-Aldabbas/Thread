@@ -135,7 +135,7 @@ button { cursor:pointer; border:0; background:none; color:inherit; }
 .image-empty { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:9px; width:100%; height:100%; border:1px dashed var(--color-border); background:var(--color-surface-muted); color:var(--color-text-secondary); text-align:center; }
 .image-empty > span { color:var(--color-primary); font-size:30px; line-height:1; }.image-empty strong { color:var(--color-text-primary); font-size:13px; font-weight:650; }.image-empty button { padding:7px 11px; border:1px solid var(--color-primary); background:var(--color-primary); color:white; font-size:11px; font-weight:700; }.image-empty small { color:var(--color-text-muted); font-size:10px; }
 .image-frame img { object-fit:contain!important; }
-.rich-display { overflow-wrap:anywhere; white-space:normal; }.note-body app-rich-text-editor { display:block; min-height:40px; }.text-content app-rich-text-editor { display:block; min-width:150px; }
+.rich-display { overflow-wrap:anywhere; white-space:normal; }.rich-display p { min-height:1.5em; margin:0 0 .5em; }.rich-display p:empty::before { content:'\00a0'; }.rich-display p:last-child { margin-bottom:0; }.note-body app-rich-text-editor { display:block; min-height:40px; }.text-content app-rich-text-editor { display:block; min-width:150px; }
 @media(max-width:700px) { .profile-button { width:30px; height:30px; } }
 
 .canvas-item.note-item { background:var(--color-note); border-color:#e8dcb8; box-shadow:0 3px 11px rgba(84,65,18,.06); }

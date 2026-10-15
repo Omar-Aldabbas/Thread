@@ -320,24 +320,28 @@ import { diagramCatalog, DiagramType } from '../diagram-templates';
       .secondary-media {
         margin-top: 5px;
       }
-      .create-palette { width:min(560px,calc(100vw - 110px)); max-height:min(78dvh,680px); padding:16px; scrollbar-width:thin; }
-      .palette-tabs { display:none; }
-      .palette-columns { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:18px; }
-      .palette-column { min-width:0; }
+      .create-palette { display:grid; grid-template-columns:112px minmax(0,1fr); gap:12px; width:min(430px,calc(100vw - 110px)); max-height:calc(100dvh - 120px); padding:12px; scrollbar-width:none; }
+      .palette-tabs { display:flex; flex-direction:column; gap:4px; padding-right:10px; border-right:1px solid var(--color-border-light); }
+      .palette-tabs button { min-height:40px; padding:8px 10px; border-radius:7px; color:var(--color-text-secondary); text-align:left; font-size:12px; font-weight:650; }
+      .palette-tabs button:hover { background:var(--color-surface-muted); }
+      .palette-tabs button.active { background:var(--color-primary-subtle); color:var(--color-primary); }
+      .palette-columns,.palette-column { display:contents; }
+      .palette-category { display:none; min-width:0; }
+      .palette-category.mobile-active { display:block; }
       .palette-column .palette-section:first-child { margin-top:0; padding-top:0; border-top:0; }
       .palette-section { margin:14px 0 7px; padding-top:12px; font-size:10px; }
       .palette-section:first-of-type { margin-top:0; padding-top:0; }
-      .palette-grid { gap:6px; }
+      .palette-grid { grid-template-columns:1fr; gap:5px; }
       .palette-grid button { min-height:42px; padding:8px 10px; border-color:var(--color-border-light); border-radius:7px; font-size:12px; }
       .palette-media { min-height:50px; margin-top:6px; border-style:solid; border-color:var(--color-border-light); background:var(--color-surface); }
       .palette-media > span { background:transparent; }
       .palette-media small { font-size:10px; }
       .palette-feature-list { display:grid; gap:6px; }
       .palette-feature { min-height:48px; margin:0; padding:8px 10px; background:var(--color-surface); font-size:12px; }
-      .diagram-picker { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:6px; margin-top:6px; }
+      .diagram-picker { display:grid; grid-template-columns:1fr; gap:5px; margin-top:6px; }
       .diagram-picker button { min-height:42px; padding:7px; border:1px solid var(--color-border-light); border-radius:7px; }
       .diagram-picker button strong { font-size:10px; }
-      .diagram-picker button small { display:none; }
+      .diagram-picker button small { display:block; }
       .palette-grid button > svg,.palette-feature > svg { width:18px; height:18px; flex:none; color:var(--color-primary); }
       .palette-media svg { width:17px; height:17px; }
       .diagram-picker button { display:flex; flex-direction:column; gap:2px; width:100%; text-align:left; }
@@ -352,6 +356,7 @@ import { diagramCatalog, DiagramType } from '../diagram-templates';
           background: rgba(20, 20, 20, 0.08);
         }
         .create-palette {
+          display:block;
           top: auto;
           right: 8px;
           bottom: calc(70px + env(safe-area-inset-bottom));
@@ -361,14 +366,16 @@ import { diagramCatalog, DiagramType } from '../diagram-templates';
           padding: 10px;
           transform: none;
         }
-        .palette-columns { grid-template-columns:1fr; gap:0; }
-        .palette-tabs { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:4px; margin-bottom:8px; }
+        .palette-tabs { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:4px; margin-bottom:8px; padding:0; border:0; }
         .palette-tabs button { min-width:0; min-height:38px; padding:6px 2px; border-radius:7px; color:var(--color-text-secondary); font-size:11px; font-weight:700; }
         .palette-tabs button.active { background:var(--color-primary); color:var(--color-text-inverse); }
         .palette-category { display:none; }
         .palette-category.mobile-active { display:block; }
         .palette-category .palette-section { margin:0 0 7px; padding:0; border:0; }
         .create-palette { max-height:calc(100dvh - 155px); scrollbar-width:none; }
+        .palette-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
+        .diagram-picker { grid-template-columns:repeat(3,minmax(0,1fr)); }
+        .diagram-picker button small { display:none; }
         .palette-grid button {
           min-height: 38px;
         }

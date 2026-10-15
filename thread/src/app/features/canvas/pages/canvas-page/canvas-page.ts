@@ -215,6 +215,7 @@ export class CanvasPage implements AfterViewInit, OnDestroy {
   readonly pendingType = signal<ItemType | null>(null);
   readonly editingId = signal<string | null>(null);
   readonly richFocusId = signal<string | null>(null);
+  readonly richField = signal<EditField | null>(null);
   private richBefore: State | null = null;
   readonly placement = signal<{ x: number; y: number; width: number; height: number } | null>(null);
   readonly dropActive = signal(false);
@@ -3837,7 +3838,8 @@ export class CanvasPage implements AfterViewInit, OnDestroy {
     }
     this.selectedIds.set([id]);
     this.richBefore = this.state();
-    const rich = item.type === 'text' || (item.type === 'note' && field === 'body');
+    const rich = item.type === 'text' || item.type === 'note';
+    this.richField.set(rich ? (item.type === 'text' ? 'content' : field) : null);
     this.richFocusId.set(rich ? id : null);
     this.editingId.set(id);
     if (rich) return;
@@ -3861,12 +3863,14 @@ export class CanvasPage implements AfterViewInit, OnDestroy {
     if (this.richBefore) this.commit(this.richBefore);
     this.richBefore = null;
     this.richFocusId.set(null);
+    this.richField.set(null);
     this.editingId.set(null);
   }
-  richContent(id: string): string {
+  richContent(id: string, field: EditField = 'body'): string {
     const item = this.items().find((entry) => entry.id === id);
-    const content = item?.bodyHtml || (item?.type === 'text' ? item.title : item?.body) || '';
-    if (item?.bodyHtml) return content;
+    const storedHtml = field === 'title' ? item?.titleHtml : item?.bodyHtml;
+    const content = storedHtml || (field === 'title' || item?.type === 'text' ? item?.title : item?.body) || '';
+    if (storedHtml) return content;
     const escaped = content
       .replace(/&/g, '&amp;')
       .replace(/</g, '&lt;')
@@ -3874,12 +3878,14 @@ export class CanvasPage implements AfterViewInit, OnDestroy {
       .replace(/\n/g, '<br>');
     return `<p>${escaped}</p>`;
   }
-  richChanged(id: string, event: { html: string; text: string }): void {
+  richChanged(id: string, event: { html: string; text: string }, field: EditField = 'body'): void {
     const item = this.items().find((entry) => entry.id === id);
     if (!item) return;
     this.update(
       id,
-      item.type === 'text'
+      field === 'title'
+        ? { titleHtml: event.html, title: event.text }
+        : item.type === 'text'
         ? { bodyHtml: event.html, title: event.text }
         : { bodyHtml: event.html, body: event.text },
     );
@@ -4624,11 +4630,19 @@ export class CanvasPage implements AfterViewInit, OnDestroy {
     else this.setStyle(id, { textColor: color });
   }
   setFontFamily(id: string, event: Event): void {
+    if (this.richFocusId() === id) {
+      this.richEditors()[0]?.family((event.target as HTMLSelectElement).value as 'sans' | 'mono');
+      return;
+    }
     this.setStyle(id, {
       fontFamily: (event.target as HTMLSelectElement).value as CanvasItem['fontFamily'],
     });
   }
   setAlignment(id: string, event: Event): void {
+    if (this.richFocusId() === id) {
+      this.richEditors()[0]?.alignment((event.target as HTMLSelectElement).value as 'left' | 'center' | 'right');
+      return;
+    }
     this.setStyle(id, {
       textAlign: (event.target as HTMLSelectElement).value as CanvasItem['textAlign'],
     });

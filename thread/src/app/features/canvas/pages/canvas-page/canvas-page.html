@@ -482,18 +482,24 @@
               <div
                 class="note-title"
                 data-edit-field="title"
-                appScroll="y"
-                scrollbar="hover"
                 [style.font-size.px]="item.fontSize || 17"
                 [style.font-weight]="item.fontWeight || 650"
                 [style.text-align]="item.textAlign || 'left'"
                 dir="auto"
-                [attr.contenteditable]="editingId() === item.id"
-                [attr.data-edit-id]="editingId() === item.id ? item.id : null"
-                (keydown)="inlineKey($event)"
-                (blur)="inlineBlur($event, item.id, 'title')"
-                [textContent]="item.title || (editingId() === item.id ? '' : 'Note')"
-              ></div>
+              >
+                @if (editingId() === item.id && richField() === 'title') {
+                  <app-rich-text-editor
+                    [html]="richContent(item.id, 'title')"
+                    [focusOnInit]="true"
+                    (contentChanged)="richChanged(item.id, $event, 'title')"
+                    (finished)="finishEditing()"
+                  />
+                } @else if (item.titleHtml) {
+                  <div class="rich-display" [innerHTML]="item.titleHtml | richTextHtml"></div>
+                } @else {
+                  <div class="rich-display" [textContent]="item.title || 'Note'"></div>
+                }
+              </div>
               <div
                 class="note-body"
                 data-edit-field="body"
@@ -501,7 +507,7 @@
                 scrollbar="hover"
                 dir="auto"
               >
-                @if (editingId() === item.id) {
+                @if (editingId() === item.id && richField() === 'body') {
                   <app-rich-text-editor
                     [html]="richContent(item.id)"
                     [focusOnInit]="richFocusId() === item.id"

@@ -74,6 +74,7 @@ export interface CanvasItem {
   ordered?: boolean;
   textAutoSize?: boolean;
   title: string;
+  titleHtml?: string;
   body?: string;
   bodyHtml?: string;
   accent?: string;
