@@ -1073,7 +1073,7 @@
     </div>
   }
   @if (paletteOpen()) {
-    <app-canvas-add-palette (close)="setTool('select')" (chooseType)="chooseType($event)" (openFiles)="openMediaFiles()" (recordVoice)="toggleVoiceRecording()" (openMedia)="openMedia($event)" (sketch)="setTool('sketch')" (erStarter)="createErStarter()" (chooseDiagram)="createDiagram($event)" (designSystem)="setTool('system')" />
+    <app-canvas-add-palette (close)="setTool('select')" (chooseType)="chooseType($event)" (openFiles)="paletteOpen.set(false); openMediaFiles()" (recordVoice)="paletteOpen.set(false); toggleVoiceRecording()" (openMedia)="openMedia($event)" (sketch)="setTool('sketch')" (erStarter)="paletteOpen.set(false); createErStarter()" (chooseDiagram)="paletteOpen.set(false); createDiagram($event)" (designSystem)="setTool('system')" />
   }
   @if (architectureReviewOpen()) {
     <aside class="architecture-review" data-ui aria-label="Infrastructure review">
@@ -1258,11 +1258,11 @@
     </div>
   }
   @if (tool() === 'system') {
-    <div class="system-tools" data-ui aria-label="Design a system tools">
+    <div class="system-tools canvas-action-bar" data-ui role="toolbar" aria-label="Design a system tools">
       <div class="system-tools-heading">
         <div><strong>Design a system</strong><small>Choose a component, then tap the canvas</small></div>
-        <button type="button" (click)="setTool('shape')">Shapes</button>
-        <button type="button" (click)="setTool('select')" aria-label="Finish designing system">Done</button>
+        <button type="button" class="system-switch" (click)="setTool('shape')">Shapes</button>
+        <button type="button" class="action-done" (click)="setTool('select')" aria-label="Finish designing system">Done</button>
       </div>
       <div class="system-tools-components" appScroll="x" scrollbar="hover" aria-label="System components">
         @for (kind of architectureKinds; track kind.kind) {

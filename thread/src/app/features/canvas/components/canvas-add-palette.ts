@@ -1,9 +1,11 @@
 import { Component, output } from '@angular/core';
+import { LucideDynamicIcon, LucideStickyNote, LucideType, LucideCheck, LucideList, LucideSquareDashed, LucideFrame, LucideWallet, LucideTable2, LucideChartColumn, LucideDatabase, LucideImagePlus, LucideMic, LucideClapperboard, LucideSticker, LucideLink, LucidePencil, LucideWaypoints, LucideNetwork, LucideChevronDown } from '@lucide/angular';
 import type { ItemType } from '../canvas.model';
 import { diagramCatalog, DiagramType } from '../diagram-templates';
 
 @Component({
   selector: 'app-canvas-add-palette',
+  imports: [LucideDynamicIcon],
   template: `
     <button
       class="palette-backdrop"
@@ -12,71 +14,61 @@ import { diagramCatalog, DiagramType } from '../diagram-templates';
       aria-label="Close add menu"
     ></button>
     <section class="create-palette" data-ui aria-label="Add to canvas">
-      <button
-        class="palette-close"
-        type="button"
-        (click)="close.emit()"
-        aria-label="Close add menu"
-      >
-        ×
-      </button>
-      <button class="palette-feature palette-system" type="button" (click)="designSystem.emit()"><span aria-hidden="true">◇</span><span><strong>Design a system</strong><small>Components, connections, and review</small></span></button>
       <div class="palette-section">Quick</div>
       <div class="palette-grid">
         @for (entry of quick; track entry.type) {
           <button type="button" (click)="chooseType.emit(entry.type)">
-            <span aria-hidden="true">{{ entry.icon }}</span
-            >{{ entry.label }}
+            <svg [lucideIcon]="entry.icon" aria-hidden="true"></svg>{{ entry.label }}
           </button>
         }
       </div>
       <details class="palette-group">
-      <summary>Media <span aria-hidden="true">⌄</span></summary>
+      <summary>Media <svg [lucideIcon]="icons.chevron" aria-hidden="true"></svg></summary>
       <div class="palette-group-content">
       <button class="palette-media" type="button" (click)="openFiles.emit()">
-        <span aria-hidden="true">＋</span>Add media<small>Image · audio · video · document</small>
+        <span aria-hidden="true"><svg [lucideIcon]="icons.imagePlus"></svg></span>Add media<small>Image · audio · video · document</small>
       </button>
       <button class="palette-media" type="button" (click)="recordVoice.emit()">
-        <span aria-hidden="true">●</span>Record voice<small>Start a microphone recording</small>
+        <span aria-hidden="true"><svg [lucideIcon]="icons.mic"></svg></span>Record voice<small>Start a microphone recording</small>
       </button>
       <div class="palette-grid secondary-media">
         <button type="button" (click)="openMedia.emit('gif')">
-          <span aria-hidden="true">▣</span>GIF
+          <svg [lucideIcon]="icons.gif" aria-hidden="true"></svg>GIF
         </button>
         <button type="button" (click)="openMedia.emit('sticker')">
-          <span aria-hidden="true">✳</span>Sticker
+          <svg [lucideIcon]="icons.sticker" aria-hidden="true"></svg>Sticker
         </button>
         <button type="button" (click)="chooseType.emit('link')">
-          <span aria-hidden="true">↗</span>Link
+          <svg [lucideIcon]="icons.link" aria-hidden="true"></svg>Link
         </button>
       </div>
       </div>
       </details>
       <details class="palette-group">
-      <summary>Organize <span aria-hidden="true">⌄</span></summary>
+      <summary>Organize <svg [lucideIcon]="icons.chevron" aria-hidden="true"></svg></summary>
       <div class="palette-group-content">
       <div class="palette-grid">
         @for (entry of organize; track entry.type) {
           <button type="button" (click)="chooseType.emit(entry.type)">
-            <span aria-hidden="true">{{ entry.icon }}</span
-            >{{ entry.label }}
+            <svg [lucideIcon]="entry.icon" aria-hidden="true"></svg>{{ entry.label }}
           </button>
         }
       </div>
       <button class="palette-feature" type="button" (click)="sketch.emit()">
-        <span aria-hidden="true">✎</span>Sketch directly on canvas
+        <svg [lucideIcon]="icons.pencil" aria-hidden="true"></svg>Sketch directly on canvas
       </button>
       <button class="palette-feature" type="button" (click)="erStarter.emit()">
-        <span aria-hidden="true">◇</span
-        ><span
+        <svg [lucideIcon]="icons.database" aria-hidden="true"></svg><span
           ><strong>ER diagram starter</strong
           ><small>Two linked entities with example keys</small></span
         >
       </button>
       </div>
       </details>
+      <div class="palette-section">Systems</div>
+      <button class="palette-feature palette-system" type="button" (click)="designSystem.emit()"><svg [lucideIcon]="icons.network" aria-hidden="true"></svg><span><strong>Design a system</strong><small>Components, connections, and review</small></span></button>
       <details class="palette-group">
-      <summary>Mapping <span aria-hidden="true">⌄</span></summary>
+      <summary>Mapping <svg [lucideIcon]="icons.chevron" aria-hidden="true"></svg></summary>
       <div class="palette-group-content">
       <div class="diagram-picker">
         @for (diagram of diagramCatalog; track diagram.type) {
@@ -167,7 +159,7 @@ import { diagramCatalog, DiagramType } from '../diagram-templates';
         background: var(--color-primary-subtle);
         color: var(--color-primary);
       }
-      .palette-grid button span {
+      .palette-grid button > svg {
         width: 19px;
         flex: none;
         color: var(--color-primary);
@@ -228,7 +220,7 @@ import { diagramCatalog, DiagramType } from '../diagram-templates';
         text-align: left;
         font-size: 12px;
       }
-      .palette-feature > span:first-child {
+      .palette-feature > svg {
         flex: none;
         color: var(--color-primary);
         font-size: 18px;
@@ -242,7 +234,8 @@ import { diagramCatalog, DiagramType } from '../diagram-templates';
         color: var(--color-text-muted);
         font-size: 10px;
       }
-      .palette-system { border-color:var(--color-primary); background:var(--color-primary-subtle); }
+      .palette-system { border-color:var(--color-border-light); background:var(--color-surface); }
+      .palette-system:hover,.palette-system:focus-visible { border-color:var(--color-primary); background:var(--color-primary-subtle); }
       @media (min-width: 701px) and (max-width: 1024px) {
         :host {
           left: 72px;
@@ -277,16 +270,6 @@ import { diagramCatalog, DiagramType } from '../diagram-templates';
         transform: translateY(-50%);
       }
       .create-palette::-webkit-scrollbar { display: none; }
-      .palette-close {
-        position: absolute;
-        top: 7px;
-        right: 7px;
-        width: 24px;
-        height: 24px;
-        border-radius: 5px;
-        color: var(--color-text-muted);
-        font-size: 18px;
-      }
       .palette-section {
         margin: 7px 2px 4px;
         padding-top: 7px;
@@ -314,7 +297,7 @@ import { diagramCatalog, DiagramType } from '../diagram-templates';
         border-color: var(--color-primary);
         background: var(--color-primary-subtle);
       }
-      .palette-grid button span {
+      .palette-grid button > svg {
         width: 17px;
         font-size: 15px;
       }
@@ -336,8 +319,10 @@ import { diagramCatalog, DiagramType } from '../diagram-templates';
       .palette-group summary { display:flex; align-items:center; justify-content:space-between; min-height:36px; padding:7px 9px; color:var(--color-text-primary); font-size:11px; font-weight:700; cursor:pointer; list-style:none; }
       .palette-group summary::-webkit-details-marker { display:none; }
       .palette-group summary:focus-visible { outline:2px solid var(--color-primary); outline-offset:2px; }
-      .palette-group summary span { color:var(--color-primary); font-size:16px; line-height:1; transition:transform .15s ease; }
-      .palette-group[open] summary span { transform:rotate(180deg); }
+      .palette-group summary svg { width:16px; height:16px; color:var(--color-primary); transition:transform .15s ease; }
+      .palette-group[open] summary svg { transform:rotate(180deg); }
+      .palette-grid button > svg,.palette-feature > svg { width:18px; height:18px; flex:none; color:var(--color-primary); }
+      .palette-media svg { width:17px; height:17px; }
       .palette-group-content { padding:0 6px 7px; border-top:1px solid var(--color-border-light); }
       .diagram-picker { padding-top:5px; }
       .diagram-group { margin:9px 4px 3px; color:var(--color-text-muted); font-size:9px; font-weight:800; letter-spacing:.1em; text-transform:uppercase; }
@@ -362,9 +347,6 @@ import { diagramCatalog, DiagramType } from '../diagram-templates';
           padding: 10px;
           transform: none;
         }
-        .palette-close {
-          display: none;
-        }
         .palette-grid button {
           min-height: 38px;
         }
@@ -375,6 +357,7 @@ import { diagramCatalog, DiagramType } from '../diagram-templates';
   ],
 })
 export class CanvasAddPalette {
+  readonly icons = { chevron: LucideChevronDown, imagePlus: LucideImagePlus, mic: LucideMic, gif: LucideClapperboard, sticker: LucideSticker, link: LucideLink, pencil: LucidePencil, database: LucideDatabase, network: LucideNetwork };
   readonly close = output<void>();
   readonly chooseType = output<ItemType>();
   readonly openFiles = output<void>();
@@ -385,18 +368,18 @@ export class CanvasAddPalette {
   readonly chooseDiagram = output<DiagramType>();
   readonly diagramCatalog = diagramCatalog;
   readonly designSystem = output<void>();
-  readonly quick: { type: ItemType; icon: string; label: string }[] = [
-    { type: 'note', icon: '▤', label: 'Note' },
-    { type: 'text', icon: 'T', label: 'Text' },
-    { type: 'task', icon: '✓', label: 'Task' },
-    { type: 'list', icon: '☷', label: 'List' },
+  readonly quick = [
+    { type: 'note' as ItemType, icon: LucideStickyNote, label: 'Note' },
+    { type: 'text' as ItemType, icon: LucideType, label: 'Text' },
+    { type: 'task' as ItemType, icon: LucideCheck, label: 'Task' },
+    { type: 'list' as ItemType, icon: LucideList, label: 'List' },
   ];
-  readonly organize: { type: ItemType; icon: string; label: string }[] = [
-    { type: 'zone', icon: '□', label: 'Zone' },
-    { type: 'frame', icon: '▧', label: 'Frame' },
-    { type: 'budget', icon: '$', label: 'Budget' },
-    { type: 'table', icon: '▦', label: 'Table' },
-    { type: 'chart', icon: '▥', label: 'Chart' },
-    { type: 'er-entity', icon: '◇', label: 'ER entity' },
+  readonly organize = [
+    { type: 'zone' as ItemType, icon: LucideSquareDashed, label: 'Zone' },
+    { type: 'frame' as ItemType, icon: LucideFrame, label: 'Frame' },
+    { type: 'budget' as ItemType, icon: LucideWallet, label: 'Budget' },
+    { type: 'table' as ItemType, icon: LucideTable2, label: 'Table' },
+    { type: 'chart' as ItemType, icon: LucideChartColumn, label: 'Chart' },
+    { type: 'er-entity' as ItemType, icon: LucideDatabase, label: 'ER entity' },
   ];
 }

@@ -1,31 +1,32 @@
 import { Component, input, output, signal } from '@angular/core';
+import { LucideSearch, LucideX, LucideUndo2, LucideRedo2 } from '@lucide/angular';
 import { ThreadHeader } from '../../../shared/thread-header';
 
 @Component({
   selector: 'app-canvas-navigation',
-  imports: [ThreadHeader],
+  imports: [ThreadHeader, LucideSearch, LucideX, LucideUndo2, LucideRedo2],
   template: `
     <app-thread-header [title]="title()">
       <label class="canvas-search">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.8" cy="10.8" r="6.3"/><path d="m16 16 4.2 4.2"/></svg>
+        <svg lucideSearch aria-hidden="true"></svg>
         <input type="search" aria-label="Search canvas" placeholder="Find on canvas" [value]="query()" (input)="queryChange.emit($any($event.target).value)" (keydown.enter)="nextMatch.emit()" />
-        @if (query()) { <button type="button" (click)="queryChange.emit('')" aria-label="Clear search">×</button> }
+        @if (query()) { <button type="button" (click)="queryChange.emit('')" aria-label="Clear search"><svg lucideX aria-hidden="true"></svg></button> }
       </label>
       <button class="nav-action mobile-search" type="button" (click)="searchOpen.set(!searchOpen())" [attr.aria-expanded]="searchOpen()" aria-label="Search canvas" title="Search canvas">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.8" cy="10.8" r="6.3"/><path d="m16 16 4.2 4.2"/></svg>
+        <svg lucideSearch aria-hidden="true"></svg>
       </button>
       <span class="nav-separator" aria-hidden="true"></span>
       <button class="nav-action" type="button" (click)="undo.emit()" aria-label="Undo" title="Undo (Ctrl+Z)">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 8 4 12l5 4M4 12h10a6 6 0 0 1 6 6"/></svg>
+        <svg lucideUndo2 aria-hidden="true"></svg>
       </button>
       <button class="nav-action" type="button" (click)="redo.emit()" aria-label="Redo" title="Redo (Ctrl+Shift+Z)">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 8 5 4-5 4m5-4H10a6 6 0 0 0-6 6"/></svg>
+        <svg lucideRedo2 aria-hidden="true"></svg>
       </button>
     </app-thread-header>
     @if (searchOpen()) {
       <div class="mobile-search-panel" data-ui>
         <input type="search" autofocus aria-label="Search canvas" placeholder="Find an item on this canvas" [value]="query()" (input)="queryChange.emit($any($event.target).value)" (keydown.enter)="nextMatch.emit()" />
-        <button type="button" (click)="queryChange.emit(''); searchOpen.set(false)" aria-label="Close and clear search">×</button>
+        <button type="button" (click)="queryChange.emit(''); searchOpen.set(false)" aria-label="Close and clear search"><svg lucideX aria-hidden="true"></svg></button>
       </div>
     }
   `,
