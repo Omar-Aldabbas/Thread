@@ -268,6 +268,7 @@ export class CanvasPage implements AfterViewInit, OnDestroy {
   private pinch: { distance: number; x: number; y: number } | null = null;
   readonly inspectorOpen = signal(false);
   readonly connectionSourceId = signal<string | null>(null);
+  readonly connectionSourceLine = signal<{ connectionId: string; ratio: number; x: number; y: number } | null>(null);
   readonly connectionSourceEntity = computed(
     () => this.items().find((item) => item.id === this.connectionSourceId()) || null,
   );
@@ -1028,10 +1029,11 @@ export class CanvasPage implements AfterViewInit, OnDestroy {
     this.pendingAsset.set(null);
     this.mediaPicker.set(null);
     this.connectionSourceId.set(null);
+    this.connectionSourceLine.set(null);
     this.connectionTargetId.set(null);
   }
   cancelPlacement(event: MouseEvent): void {
-    if ((!this.pendingType() && !this.pendingAsset() && this.tool() !== 'text') ||
+    if ((!this.pendingType() && !this.pendingAsset() && this.tool() !== 'text' && this.tool() !== 'connect') ||
         (event.target as Element).closest('[data-ui]')) return;
     event.preventDefault();
     event.stopPropagation();
@@ -1823,7 +1825,10 @@ export class CanvasPage implements AfterViewInit, OnDestroy {
         x: point.x,
         y: point.y,
       };
-    } else if (this.tool() === 'connect') this.connectionSourceId.set(null);
+    } else if (this.tool() === 'connect') {
+      this.connectionSourceId.set(null);
+      this.connectionSourceLine.set(null);
+    }
     (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
   }
   itemPointerDown(event: PointerEvent, item: CanvasItem): void {
@@ -1887,6 +1892,10 @@ export class CanvasPage implements AfterViewInit, OnDestroy {
       this.isPanning.set(true);
     } else if (this.tool() === 'connect') {
       if (!isConnectableItem(item)) return;
+      if (this.connectionSourceLine()) {
+        this.connectLineToItem(item);
+        return;
+      }
       const source = this.connectionSourceId();
       if (source && source !== item.id) {
         this.addConnection(source, item.id);
@@ -2019,6 +2028,16 @@ export class CanvasPage implements AfterViewInit, OnDestroy {
     if (!isConnectableItem(item)) return;
     event.preventDefault();
     event.stopPropagation();
+    if (this.tool() === 'connect' && this.connectionSourceLine()) {
+      this.connectLineToItem(item);
+      return;
+    }
+    const sourceId = this.connectionSourceId();
+    if (this.tool() === 'connect' && sourceId && sourceId !== item.id) {
+      this.addConnection(sourceId, item.id, undefined, side);
+      this.setTool('select');
+      return;
+    }
     const anchor = sidePoint(item, side);
     this.session = {
       kind: 'connect',
@@ -2040,8 +2059,92 @@ export class CanvasPage implements AfterViewInit, OnDestroy {
     this.selectedConnectionId.set(connection.id);
     this.inspectorOpen.set(false);
   }
+  connectLineClick(event: PointerEvent, connection: CanvasConnection): void {
+    if (this.tool() !== 'connect' || !this.canConnectToLine(connection)) return;
+    event.preventDefault();
+    event.stopPropagation();
+    const point = this.nearestOnConnection(connection, this.point(event.clientX, event.clientY));
+    const sourceItemId = this.connectionSourceId();
+    const sourceLine = this.connectionSourceLine();
+    if (sourceItemId) {
+      if (sourceItemId === connection.sourceId || sourceItemId === connection.targetId) return;
+      if (this.connections().some((entry) => entry.sourceId === sourceItemId && entry.targetJunctionId && this.junctions().some((junction) => junction.id === entry.targetJunctionId && junction.parentConnectorId === connection.id))) return;
+      this.snapshot();
+      const junction = this.getOrCreateJunction(point);
+      const id = canvasId();
+      this.connections.update((entries) => [...entries, { id, sourceId: sourceItemId, targetId: connection.targetId, targetJunctionId: junction.id, direction: 'forward', kind: 'elbow' }]);
+      this.setTool('select');
+      this.selectedIds.set([]);
+      this.selectedConnectionId.set(id);
+      return;
+    }
+    if (sourceLine) {
+      const parent = this.connections().find((entry) => entry.id === sourceLine.connectionId);
+      if (!parent || parent.id === connection.id || parent.sourceId === connection.targetId || this.dependsOn(connection.id, parent.id) || this.dependsOn(parent.id, connection.id)) return;
+      this.snapshot();
+      const sourceJunction = this.getOrCreateJunction(sourceLine);
+      const targetJunction = this.getOrCreateJunction(point);
+      const id = canvasId();
+      this.connections.update((entries) => [...entries, { id, sourceId: parent.sourceId, sourceJunctionId: sourceJunction.id, targetId: connection.targetId, targetJunctionId: targetJunction.id, direction: 'forward', kind: 'elbow' }]);
+      this.setTool('select');
+      this.selectedIds.set([]);
+      this.selectedConnectionId.set(id);
+      return;
+    }
+    this.connectionSourceLine.set(point);
+    this.selectedConnectionId.set(connection.id);
+    this.selectedIds.set([]);
+  }
+  canConnectToLine(connection: CanvasConnection): boolean {
+    if (!this.canBranch(connection)) return false;
+    const sourceItemId = this.connectionSourceId();
+    if (sourceItemId) return sourceItemId !== connection.sourceId && sourceItemId !== connection.targetId;
+    const sourceLine = this.connectionSourceLine();
+    if (!sourceLine) return true;
+    const parent = this.connections().find((entry) => entry.id === sourceLine.connectionId);
+    return !!parent && parent.id !== connection.id && parent.sourceId !== connection.targetId && !this.dependsOn(connection.id, parent.id) && !this.dependsOn(parent.id, connection.id);
+  }
+  canConnectToItem(item: CanvasItem): boolean {
+    if (!isConnectableItem(item)) return false;
+    const sourceItemId = this.connectionSourceId();
+    if (sourceItemId) return item.id !== sourceItemId;
+    const sourceLine = this.connectionSourceLine();
+    if (!sourceLine) return true;
+    const parent = this.connections().find((entry) => entry.id === sourceLine.connectionId);
+    return !!parent && item.id !== parent.sourceId && item.id !== parent.targetId;
+  }
+  connectionLabelDown(event: PointerEvent, connection: CanvasConnection): void {
+    event.stopPropagation();
+    if (this.tool() === 'connect') this.connectLineClick(event, connection);
+    else {
+      this.selectConnection(event, connection);
+      this.inspectorOpen.set(false);
+    }
+  }
+  private connectLineToItem(item: CanvasItem): void {
+    const source = this.connectionSourceLine();
+    const parent = this.connections().find((entry) => entry.id === source?.connectionId);
+    if (!source || !parent || item.id === parent.sourceId || item.id === parent.targetId) return;
+    if (this.connections().some((entry) => entry.targetId === item.id && entry.sourceJunctionId && this.junctions().some((junction) => junction.id === entry.sourceJunctionId && junction.parentConnectorId === parent.id))) return;
+    this.snapshot();
+    const junction = this.getOrCreateJunction(source);
+    const id = canvasId();
+    this.connections.update((entries) => [...entries, { id, sourceId: parent.sourceId, sourceJunctionId: junction.id, targetId: item.id, direction: 'forward', kind: 'elbow' }]);
+    this.setTool('select');
+    this.selectedIds.set([]);
+    this.selectedConnectionId.set(id);
+  }
   private linePoints(connection: CanvasConnection): { x: number; y: number }[] {
-    return [...this.connectionPath(connection).matchAll(/[ML]\s*(-?[\d.]+)\s+(-?[\d.]+)/g)].map(
+    const path = this.connectionPath(connection);
+    if (path.includes(' C ')) {
+      const [x0, y0, x1, y1, x2, y2, x3, y3] = (path.match(/-?\d+(?:\.\d+)?(?:e[-+]?\d+)?/gi) || []).map(Number);
+      if ([x0, y0, x1, y1, x2, y2, x3, y3].every(Number.isFinite))
+        return Array.from({ length: 25 }, (_, index) => {
+          const t = index / 24, s = 1 - t;
+          return { x: s ** 3 * x0 + 3 * s ** 2 * t * x1 + 3 * s * t ** 2 * x2 + t ** 3 * x3, y: s ** 3 * y0 + 3 * s ** 2 * t * y1 + 3 * s * t ** 2 * y2 + t ** 3 * y3 };
+        });
+    }
+    return [...path.matchAll(/[ML]\s*(-?[\d.]+)\s+(-?[\d.]+)/g)].map(
       (match) => ({ x: Number(match[1]), y: Number(match[2]) }),
     );
   }
@@ -2145,7 +2248,6 @@ export class CanvasPage implements AfterViewInit, OnDestroy {
     for (const connection of this.visibleConnections()) {
       if (
         connection.id === excludeId ||
-        connection.kind === 'curved' ||
         this.dependsOn(connection.id, excludeId)
       )
         continue;
@@ -2203,7 +2305,7 @@ export class CanvasPage implements AfterViewInit, OnDestroy {
       this.junctionCandidate.set(null);
   }
   canBranch(connection: CanvasConnection): boolean {
-    return !connection.sourceFieldId && !connection.targetFieldId && connection.kind !== 'curved';
+    return !connection.sourceFieldId && !connection.targetFieldId;
   }
   branchDown(event: PointerEvent, connection: CanvasConnection): void {
     if ((this.tool() !== 'select' && this.tool() !== 'connect') || !this.canBranch(connection))
@@ -2411,6 +2513,22 @@ export class CanvasPage implements AfterViewInit, OnDestroy {
   pointerMove(event: PointerEvent): void {
     this.updateGridHover(event);
     if (this.pendingAsset()) this.assetPreview.set(this.point(event.clientX, event.clientY));
+    if (this.tool() === 'connect' && !this.session && (this.connectionSourceId() || this.connectionSourceLine())) {
+      const point = this.point(event.clientX, event.clientY);
+      const sourceLine = this.connectionSourceLine();
+      const sourceItem = this.items().find((item) => item.id === this.connectionSourceId());
+      const start = sourceLine
+        ? { x: sourceLine.x, y: sourceLine.y }
+        : sourceItem
+          ? sidePoint(sourceItem, this.closestSide(sourceItem, point))
+          : point;
+      const target = this.connectorTarget(point, sourceItem?.id || sourceLine?.connectionId || '');
+      const join = !target ? this.joinCandidate(point, sourceLine?.connectionId) : null;
+      const end = target ? sidePoint(target, this.closestSide(target, point)) : join || point;
+      this.connectionTargetId.set(target?.id || null);
+      this.junctionCandidate.set(join);
+      this.connectionPreview.set({ x1: start.x, y1: start.y, x2: end.x, y2: end.y });
+    }
     if (this.pointers.has(event.pointerId)) {
       this.pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
       if (this.pointers.size === 2 && this.pinch) {
@@ -2720,6 +2838,7 @@ export class CanvasPage implements AfterViewInit, OnDestroy {
   }
   clearGridHover(): void {
     this.viewport()?.nativeElement.classList.remove('grid-hover');
+    if (this.tool() === 'connect' && !this.session) this.clearConnectionDraft();
   }
   pointerUp(event: PointerEvent): void {
     const wasPinching = !!this.pinch;
@@ -2742,6 +2861,7 @@ export class CanvasPage implements AfterViewInit, OnDestroy {
     }
     const session = this.session;
     if (session?.pointerId !== event.pointerId) return;
+    let completedConnector = false;
     this.transformGuide.set(null);
     if (session?.kind === 'marquee' && this.marquee()) {
       const rect = this.marquee()!;
@@ -2787,10 +2907,11 @@ export class CanvasPage implements AfterViewInit, OnDestroy {
         ) {
           this.snapshot();
           const junction = this.getOrCreateJunction(join);
+          const id = canvasId();
           this.connections.update((entries) => [
             ...entries,
             {
-              id: canvasId(),
+              id,
               sourceId: session.itemId!,
               sourceSide: session.side,
               targetId: parent.targetId,
@@ -2799,15 +2920,18 @@ export class CanvasPage implements AfterViewInit, OnDestroy {
               kind: 'elbow',
             },
           ]);
-          this.selectedConnectionId.set(parent.id);
+          this.selectedConnectionId.set(id);
+          completedConnector = true;
         }
-      } else if (target)
+      } else if (target) {
         this.addConnection(
           session.itemId!,
           target.id,
           session.side,
           this.closestSide(target, point),
         );
+        completedConnector = true;
+      }
     }
     if (session?.kind === 'branch' && session.connectionId && session.moved) {
       const parent = this.connections().find(
@@ -2926,6 +3050,7 @@ export class CanvasPage implements AfterViewInit, OnDestroy {
     if (this.suppressCanvasClick) setTimeout(() => (this.suppressCanvasClick = false), 250);
     const target = event.currentTarget as HTMLElement;
     if (target.hasPointerCapture(event.pointerId)) target.releasePointerCapture(event.pointerId);
+    if (completedConnector && this.tool() === 'connect') this.setTool('select');
   }
   pointerCancel(event: PointerEvent): void {
     this.pointers.delete(event.pointerId);

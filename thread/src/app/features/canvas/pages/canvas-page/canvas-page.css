@@ -36,6 +36,12 @@ button { cursor:pointer; border:0; background:none; color:inherit; }
 @media(max-width:700px) { .search-feedback { top:8px; left:8px; transform:none; } }
 @media(prefers-reduced-motion:reduce) { .canvas-viewport::before,.canvas-item.search-dimmed,.relationship-label.search-dimmed { transition:none; } }
 .canvas-viewport.hand-cursor { cursor:grab; }.canvas-viewport.is-panning { cursor:grabbing; }.canvas-viewport.placement-cursor,.canvas-viewport.connect-cursor { cursor:crosshair; }
+.canvas-viewport.connect-cursor { --connect-pointer:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='32' viewBox='0 0 32 32'%3E%3Cpath d='M10 17l-2 2a5 5 0 0 0 7 7l4-4a5 5 0 0 0 0-7M22 15l2-2a5 5 0 0 0-7-7l-4 4a5 5 0 0 0 0 7' fill='white' stroke='%23d4111c' stroke-width='2.4' stroke-linecap='round'/%3E%3C/svg%3E") 10 10,crosshair; cursor:var(--connect-pointer); }
+.canvas-viewport.connect-cursor .canvas-item.connectable-target,.canvas-viewport.connect-cursor .canvas-item.connectable-target [data-edit-field],.canvas-viewport.connect-cursor .connections .connection-hit,.canvas-viewport.connect-cursor .relationship-label { cursor:var(--connect-pointer); }
+.canvas-viewport.connect-cursor .canvas-item:not(.connectable-target) { cursor:not-allowed; }
+.canvas-viewport.connect-cursor .connections .connection-hit:active { cursor:var(--connect-pointer); }
+.canvas-viewport.connect-cursor .connections .connection-hit.connect-ineligible { cursor:not-allowed; }
+.connect-source-marker { fill:var(--color-surface); stroke:var(--color-primary); pointer-events:none; }
 .world { position:absolute; left:0; top:0; width:0; height:0; transform-origin:0 0; }
 .connections { position:absolute; left:0; top:0; overflow:visible; pointer-events:none; }
 .connections .connection-hit { pointer-events:stroke; cursor:grab; }
@@ -340,6 +346,18 @@ button { cursor:pointer; border:0; background:none; color:inherit; }
 .creation-controls.system-mode .system-tools-components { grid-column:1 / -1; grid-row:1; min-width:0; flex-wrap:wrap; }
 .creation-controls.system-mode .creation-instruction { grid-column:1; grid-row:2; align-self:center; padding-left:4px; }
 .creation-controls.system-mode .system-tools-actions { grid-column:2; grid-row:2; padding:0; border:0; }
+.creation-controls.shape-mode { display:grid; grid-template-columns:minmax(0,1fr); gap:8px; }
+.shape-tools-choices { display:grid; grid-template-columns:repeat(6,minmax(0,1fr)); gap:6px; min-width:0; max-width:720px; }
+.creation-controls .shape-tools-choices > button.shape-choice { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:5px; width:100%; min-width:0; height:64px; padding:6px 4px; border:1px solid var(--color-border-light); border-radius:7px; background:var(--color-surface); color:var(--color-text-secondary); }
+.creation-controls .shape-tools-choices > button.shape-choice:hover { border-color:var(--color-primary); background:var(--color-primary-subtle); color:var(--color-primary); }
+.creation-controls .shape-tools-choices > button.shape-choice.active { border-color:var(--color-primary); background:var(--color-primary); color:white; }
+.creation-controls .shape-tools-choices .shape-choice svg { width:27px!important; height:27px!important; }
+.creation-controls .shape-tools-choices .shape-choice small { display:block; width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; text-align:center; font-size:10px; font-weight:600; line-height:1.2; }
+.shape-tools-footer { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:7px; min-width:0; }
+.shape-tools-footer .creation-instruction { padding-left:2px; }
+.creation-controls.connect-mode { gap:8px; }
+.creation-controls.connect-mode .creation-instruction { width:100%; padding-left:2px; }
+.creation-controls.connect-mode > button.connector-kind { min-width:78px; height:36px; padding:0 12px; border:1px solid var(--color-border-light); border-radius:6px; text-transform:capitalize; font-size:11px; font-weight:650; }
 @media (max-width:700px) {
   .sketch-tools.canvas-action-bar.creation-toolbar { right:8px; bottom:calc(72px + env(safe-area-inset-bottom)); left:8px; width:auto; padding:7px; overflow:visible; }
   .creation-controls { min-height:50px; }
@@ -347,6 +365,8 @@ button { cursor:pointer; border:0; background:none; color:inherit; }
   .creation-controls .system-tools-components .system-choice { width:100%; min-width:0; height:56px; }
   .creation-controls.system-mode .creation-instruction { font-size:10px; white-space:normal; }
   .creation-controls.system-mode .system-tools-actions { flex-wrap:wrap; justify-content:flex-end; }
+  .shape-tools-choices { grid-template-columns:repeat(4,minmax(0,1fr)); }
+  .creation-controls .shape-tools-choices > button.shape-choice { height:62px; }
 }
 
 /* Keep mode labels readable; wrap secondary controls on narrower desktops. */
@@ -420,10 +440,7 @@ button { cursor:pointer; border:0; background:none; color:inherit; }
 .shape-label[data-shape=cylinder] { inset:27% 12% 18%; }
 .shape-label[data-shape=document] { inset:12% 12% 30%; }
 .shape-label[data-shape=cloud] { inset:38% 21% 23%; }
-.sketch-tools.canvas-action-bar > button.shape-choice { display:flex; flex-direction:column; flex:none; gap:3px; width:76px; height:56px; padding:6px; }
-.shape-choice svg { width:28px!important; height:25px!important; }
 .shape-choice svg path { fill:var(--color-surface); stroke:currentColor; stroke-width:5; stroke-linejoin:round; }
-.shape-choice small { font-size:8px; line-height:1.2; white-space:nowrap; }
 .shape-choice.active svg path { fill:#ffffff26; }
 .system-tools-components { display:flex; gap:6px; flex:none; }
 .system-tools-components .system-choice { display:flex; flex-direction:column; align-items:center; flex:none; gap:2px; width:76px; min-height:56px; padding:5px; border:1px solid var(--color-border-light); border-radius:6px; }
@@ -448,6 +465,7 @@ button { cursor:pointer; border:0; background:none; color:inherit; }
 
 /* The reusable controls draw their own borders and surfaces. */
 .inspector-body thread-select,.er-inline-options thread-select,.er-field thread-select.er-inline-type,.er-field thread-select.er-inline-key,.sketch-tools.canvas-action-bar > thread-select,.selection-toolbar.canvas-action-bar thread-select,.er-connect-panel thread-select { padding:0; border:0; border-radius:0; background:transparent; height:auto; }
+.sketch-tools.canvas-action-bar thread-select { padding:0; border:0; border-radius:0; background:transparent; height:auto; }
 .er-field thread-select { min-height:30px; font-size:10px; }
 .sketch-tools.canvas-action-bar > thread-select { flex:none; width:110px; min-width:110px; max-width:150px; }
 .selection-toolbar.canvas-action-bar thread-select { flex:none; width:90px; max-width:110px; }

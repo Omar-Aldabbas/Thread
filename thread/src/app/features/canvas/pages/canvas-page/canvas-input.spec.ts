@@ -42,6 +42,7 @@ function canvas() {
   page.inspectorOpen = signal(false);
   page.selectedConnectionId = signal(null);
   page.connectionSourceId = signal(null);
+  page.connectionSourceLine = signal(null);
   page.mediaPicker = signal(null);
   page.sketchEraser = signal(false);
   page.selectedIds = signal([]);

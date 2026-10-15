@@ -218,17 +218,19 @@
                     : 'url(#arrow)'
                   : null
             "
-            (pointerdown)="routeDown($event, connection)"
+            (pointerdown)="tool() === 'connect' ? connectLineClick($event, connection) : routeDown($event, connection)"
           />
           <path
             class="connection-hit"
+            [class.connect-ineligible]="tool() === 'connect' && !canConnectToLine(connection)"
             [attr.d]="connectionPath(connection)"
             fill="none"
             stroke="transparent"
-            [attr.stroke-width]="(tool() === 'select' ? 18 : 0) / zoom()"
+            [attr.stroke-width]="(tool() === 'select' || tool() === 'connect' ? 18 : 0) / zoom()"
+            [attr.aria-label]="tool() === 'connect' ? (canConnectToLine(connection) ? 'Connect to this line' : 'This line cannot accept that connection') : null"
             (pointerenter)="hoveredConnectionId.set(connection.id)"
             (pointerleave)="hoveredConnectionId.set(null)"
-            (pointerdown)="routeDown($event, connection)"
+            (pointerdown)="tool() === 'connect' ? connectLineClick($event, connection) : routeDown($event, connection)"
             (pointermove)="pointerMove($event)"
             (pointerup)="pointerUp($event)"
             (pointercancel)="pointerCancel($event)"
@@ -243,6 +245,9 @@
             [attr.r]="3.5 / zoom()"
             [attr.stroke-width]="1.5 / zoom()"
           />
+        }
+        @if (connectionSourceLine(); as sourceLine) {
+          <circle class="connect-source-marker" [attr.cx]="sourceLine.x" [attr.cy]="sourceLine.y" [attr.r]="8 / zoom()" [attr.stroke-width]="2 / zoom()" />
         }
         @if (connectionPreview(); as preview) {
           <path
@@ -272,12 +277,8 @@
             type="button"
             [style.left.px]="connectionLabelX(connection)"
             [style.top.px]="connectionLabelY(connection)"
-            (pointerdown)="$event.stopPropagation(); selectConnection($event, connection)"
-            (click)="
-              $event.stopPropagation();
-              inspectorOpen.set(false);
-              selectedConnectionId.set(connection.id)
-            "
+            (pointerdown)="connectionLabelDown($event, connection)"
+            (click)="$event.stopPropagation()"
             [attr.aria-label]="'Relationship ' + (connection.label || 'between entities')"
           >
             @if (connection.sourceCardinality) {
@@ -299,6 +300,7 @@
           [class.search-match]="searching() && matchesSearch(item)"
           [class.selected]="selectedIds().includes(item.id)"
           [class.connection-source]="tool() === 'connect' && connectionSourceId() === item.id"
+          [class.connectable-target]="tool() === 'connect' && canConnectToItem(item)"
           [class.zone]="item.type === 'zone' || item.type === 'workspace'"
           [class.frame-item]="item.type === 'frame'"
           [class.note-item]="item.type === 'note'"
@@ -1113,7 +1115,7 @@
       Tap the canvas to place {{ pendingAsset()?.name }} · Esc or right click to cancel
     </div>
   }
-  @if (pendingType() && tool() !== 'system') {
+  @if (pendingType() && tool() !== 'system' && tool() !== 'shape') {
     <div class="hint-pill" [class.tool-instruction]="tool() === 'shape'" data-ui>
       Tap the canvas to place {{ pendingType() === 'er-entity' ? 'an ER entity' : pendingType() }} ·
       Esc or right click to cancel
@@ -1132,13 +1134,10 @@
         System
       </button>
       <button class="sketch-tab" [class.active]="tool() === 'connect'" (click)="setTool('connect')">
-        Connector
-      </button>
-      <button class="sketch-tab" [class.active]="tool() === 'text'" (click)="setTool('text')">
-        Text
+        Connect
       </button>
       </div>
-      <div class="creation-controls" [class.system-mode]="tool() === 'system'">
+      <div class="creation-controls" [class.system-mode]="tool() === 'system'" [class.shape-mode]="tool() === 'shape'" [class.connect-mode]="tool() === 'connect'">
       @if (tool() === 'sketch') {
         <button
           [class.active]="!sketchEraser()"
@@ -1215,6 +1214,7 @@
         </button>
       }
       @if (tool() === 'shape') {
+        <div class="shape-tools-choices" aria-label="Choose a shape">
         @for (kind of shapeKinds; track kind) {
           <button
             class="shape-choice"
@@ -1227,8 +1227,11 @@
             ><small>{{ shapeNames[kind] }}</small>
           </button>
         }
+        </div>
       }
       @if (tool() === 'shape') {
+        <div class="shape-tools-footer">
+        <span class="creation-instruction">Choose a shape, then tap the canvas once</span>
         <thread-select
           aria-label="Shape color theme"
           [value]="shapeTheme()"
@@ -1238,6 +1241,7 @@
             <thread-option [value]="index" label="{{ theme.name }}"></thread-option>
           }
         </thread-select>
+        </div>
       }
       @if (tool() === 'system') {
         <span class="creation-instruction">Place one component · Esc or right click cancels</span>
@@ -1256,6 +1260,7 @@
         </div>
       }
       @if (tool() === 'connect') {
+        <span class="creation-instruction">{{ connectionSourceId() || connectionSourceLine() ? 'Now choose a second item or connector line' : 'Choose an item or connector line, then another' }}</span>
         @for (kind of ['straight', 'elbow', 'curved']; track kind) {
           <button
             class="connector-kind"
@@ -1266,7 +1271,7 @@
           </button>
         }
       }
-      @if (tool() === 'text') { <span class="creation-instruction">Tap the canvas to place text</span> }
+      @if (tool() === 'text') { <span class="creation-instruction">Tap the canvas once to place text</span> }
       </div>
       <button class="action-done" (click)="setTool('select')" aria-label="Finish using this tool">
         Done
@@ -1274,13 +1279,6 @@
     </div>
   }
   @if (tool() === 'connect') {
-    <div class="hint-pill tool-instruction" data-ui>
-      {{
-        connectionSourceId()
-          ? 'Tap the target card to complete the connection'
-          : 'Tap one card, then another to connect them'
-      }}
-    </div>
     @if (connectionSourceId(); as sourceId) {
       @if (connectionSourceEntity()?.type === 'er-entity') {
         <div class="er-connect-panel" data-ui>
