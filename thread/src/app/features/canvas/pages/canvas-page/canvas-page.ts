@@ -1,4 +1,5 @@
 import { CommonModule, isPlatformBrowser } from '@angular/common';
+import { LucideHouse, LucidePencil, LucideEraser, LucideUndo2, LucideRedo2, LucideX, LucideArrowUpRight, LucideTimer } from '@lucide/angular';
 import {
   AfterViewInit,
   Component,
@@ -91,6 +92,7 @@ import type {
   providers: [DatasetStore],
   imports: [
     CommonModule,
+    LucideHouse, LucidePencil, LucideEraser, LucideUndo2, LucideRedo2, LucideX, LucideArrowUpRight, LucideTimer,
     RichTextEditor,
     RichTextHtmlPipe,
     MediaPicker,
@@ -1010,6 +1012,7 @@ export class CanvasPage implements AfterViewInit, OnDestroy {
     this.datasetStore.replace(state.datasets || []);
   }
   setTool(tool: Tool): void {
+    if (tool === 'add' && this.paletteOpen()) tool = 'select';
     this.cancelConnectorGesture();
     this.finishEditing();
     this.tool.set(tool);
@@ -1025,6 +1028,19 @@ export class CanvasPage implements AfterViewInit, OnDestroy {
     this.mediaPicker.set(null);
     this.connectionSourceId.set(null);
     this.connectionTargetId.set(null);
+  }
+  cancelPlacement(event: MouseEvent): void {
+    if ((!this.pendingType() && !this.pendingAsset() && this.tool() !== 'text') ||
+        (event.target as Element).closest('[data-ui]')) return;
+    event.preventDefault();
+    event.stopPropagation();
+    if (this.session) {
+      this.pointerCancel({
+        pointerId: this.session.pointerId,
+        currentTarget: this.viewport()?.nativeElement,
+      } as unknown as PointerEvent);
+    }
+    this.setTool('select');
   }
   chooseType(type: ItemType): void {
     this.finishEditing();
@@ -1498,11 +1514,13 @@ export class CanvasPage implements AfterViewInit, OnDestroy {
   keyDown(event: KeyboardEvent): void {
     const target = event.target as HTMLElement;
     if (event.key === 'Escape' && this.session) {
+      const wasPlacing = this.session.kind === 'place';
       const viewport = this.viewport()?.nativeElement;
       this.pointerCancel({
         pointerId: this.session.pointerId,
         currentTarget: viewport,
       } as unknown as PointerEvent);
+      if (wasPlacing) this.setTool('select');
       return;
     }
     if (['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName) || target.isContentEditable) {
@@ -2749,7 +2767,7 @@ export class CanvasPage implements AfterViewInit, OnDestroy {
         },
         box?.width && box.width > 10 ? box : undefined,
       );
-      if (this.tool() !== 'system') this.pendingType.set(null);
+      this.pendingType.set(null);
     }
     if (session?.kind === 'connect' && session.itemId) {
       const point = this.point(event.clientX, event.clientY);
@@ -3762,10 +3780,10 @@ export class CanvasPage implements AfterViewInit, OnDestroy {
     this.items.update((items) => [...items, item]);
     this.selectedIds.set([item.id]);
     this.selectedConnectionId.set(null);
-    this.pendingType.set(systemOption ? 'shape' : null);
+    this.pendingType.set(null);
     if (type === 'link') this.pendingLink = null;
     this.paletteOpen.set(false);
-    this.tool.set(systemOption ? 'system' : 'select');
+    this.tool.set('select');
     if (type === 'er-entity') {
       this.inspectorOpen.set(false);
       setTimeout(() => {

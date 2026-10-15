@@ -1,5 +1,6 @@
 ﻿import { Component, inject } from '@angular/core';
 import { signal } from '@angular/core';
+import { LucideDynamicIcon, LucideSun, LucideMoon, LucideMonitor } from '@lucide/angular';
 import { Router } from '@angular/router';
 import { PreferencesService, ThemeChoice } from '../../shared/preferences.service';
 import { ThreadHeader } from '../../shared/thread-header';
@@ -9,7 +10,7 @@ import { createWorkspaceBackup, parseWorkspaceBackup, restoreWorkspaceBackup } f
 @Component({
   selector: 'app-settings-page',
   standalone: true,
-  imports: [ThreadHeader, ScrollDirective],
+  imports: [ThreadHeader, ScrollDirective, LucideDynamicIcon],
   template: `
     <main class="settings-page">
       <app-thread-header title="Settings" />
@@ -51,7 +52,7 @@ import { createWorkspaceBackup, parseWorkspaceBackup, restoreWorkspaceBackup } f
                 [class.selected]="preferences.theme() === option.value"
                 (click)="preferences.setTheme(option.value)"
               >
-                <span class="theme-icon">{{ option.icon }}</span
+                <span class="theme-icon"><svg [lucideIcon]="option.icon" aria-hidden="true"></svg></span
                 ><strong>{{ option.label }}</strong
                 ><small>{{ option.description }}</small>
               </button>
@@ -347,10 +348,10 @@ export class SettingsPage {
   private readonly router = inject(Router);
   readonly dataMessage = signal('');
   readonly spaces = signal<{ id: string; title: string }[]>(this.readSpaces());
-  readonly themes: { value: ThemeChoice; label: string; icon: string; description: string }[] = [
-    { value: 'light', label: 'Light', icon: '☀', description: 'Warm and bright' },
-    { value: 'dark', label: 'Dark', icon: '◐', description: 'Quiet after hours' },
-    { value: 'system', label: 'System', icon: '◫', description: 'Match your device' },
+  readonly themes = [
+    { value: 'light' as ThemeChoice, label: 'Light', icon: LucideSun, description: 'Warm and bright' },
+    { value: 'dark' as ThemeChoice, label: 'Dark', icon: LucideMoon, description: 'Quiet after hours' },
+    { value: 'system' as ThemeChoice, label: 'System', icon: LucideMonitor, description: 'Match your device' },
   ];
   back(): void {
     this.router.navigate(['/spaces']);

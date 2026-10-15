@@ -1,8 +1,8 @@
-﻿<section class="spaces-page">
+<section class="spaces-page">
   <!-- TOP BAR -->
   <app-thread-header title="Spaces">
       <div class="search">
-        <span class="search-symbol"> âŒ• </span>
+        <span class="search-symbol"><svg lucideSearch aria-hidden="true"></svg></span>
 
         <input
           type="text"
@@ -12,7 +12,7 @@
         />
 
         @if (searchQuery()) {
-          <button type="button" (click)="clearSearch()">×</button>
+          <button type="button" (click)="clearSearch()"><svg lucideX aria-hidden="true"></svg></button>
         }
       </div>
 
@@ -83,9 +83,7 @@
         [class.active]="activeTool() === 'select'"
         (click)="setTool('select')"
       >
-        <svg viewBox="0 0 24 24" aria-hidden="true">
-          <path d="M5 3L18 12L12 13.5L9.5 20L5 3Z" />
-        </svg>
+        <svg lucideMousePointer2 aria-hidden="true"></svg>
 
         <span class="tool-key">Select</span>
       </button>
@@ -97,11 +95,7 @@
         [class.active]="activeTool() === 'hand'"
         (click)="setTool('hand')"
       >
-        <svg viewBox="0 0 24 24" aria-hidden="true">
-          <path
-            d="M7.5 11V6.5C7.5 5.7 8.1 5 9 5C9.8 5 10.5 5.7 10.5 6.5V10M10.5 10V5C10.5 4.2 11.2 3.5 12 3.5C12.8 3.5 13.5 4.2 13.5 5V10M13.5 10V6C13.5 5.2 14.2 4.5 15 4.5C15.8 4.5 16.5 5.2 16.5 6V11M16.5 11V8.5C16.5 7.7 17.2 7 18 7C18.8 7 19.5 7.7 19.5 8.5V14C19.5 18 16.5 21 12.5 21H11C8.8 21 7 20 5.7 18.2L3.2 14.7C2.7 14 2.8 13 3.5 12.5C4.2 12 5.2 12.1 5.8 12.8L7.5 15"
-          />
-        </svg>
+        <svg lucideHand aria-hidden="true"></svg>
 
         <span class="tool-key">Pan</span>
       </button>
@@ -113,9 +107,7 @@
         [class.active]="activeTool() === 'add'"
         (click)="addSpaceFromToolbar()"
       >
-        <svg viewBox="0 0 24 24" aria-hidden="true">
-          <path d="M12 5V19M5 12H19" />
-        </svg>
+        <svg lucidePlus aria-hidden="true"></svg>
 
         <span class="tool-key">Add</span>
       </button>
@@ -134,7 +126,7 @@
             <strong> Edit Space </strong>
           </div>
 
-          <button type="button" (click)="editingSpaceId.set(null)">×</button>
+          <button type="button" (click)="editingSpaceId.set(null)"><svg lucideX aria-hidden="true"></svg></button>
         </div>
 
         <div class="editor-section">

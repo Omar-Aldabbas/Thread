@@ -1,4 +1,5 @@
 import { Component, Input, signal } from '@angular/core';
+import { LucideX } from '@lucide/angular';
 import { CanvasItem, ThreadDataset } from '../../canvas.model';
 import { ScrollDirective } from '../../../../shared/scroll.directive';
 import { ThreadOption, ThreadSelect } from '../../../../shared/controls/thread-controls';
@@ -7,7 +8,7 @@ import type { CanvasPage } from '../../pages/canvas-page/canvas-page';
 @Component({
   selector: 'app-canvas-table',
   standalone: true,
-  imports: [ScrollDirective, ThreadOption, ThreadSelect],
+  imports: [ScrollDirective, ThreadOption, ThreadSelect, LucideX],
   host: { '[class.menu-open]': 'activeColumnId() !== null || activeAddMenu() !== null' },
   templateUrl: './canvas-table.html',
   styleUrl: './canvas-table.css',

@@ -1,32 +1,34 @@
 import { Component, OnDestroy, OnInit, signal, viewChild, ElementRef } from '@angular/core';
+import { LucideX, LucidePlus, LucideMusic2, LucideShuffle, LucideSkipBack, LucidePlay, LucidePause, LucideSkipForward, LucideRepeat } from '@lucide/angular';
 
 type Track = { id: string; name: string; blob: Blob; url?: string };
 
 @Component({
   selector: 'app-canvas-music-player',
   standalone: true,
+  imports: [LucideX, LucidePlus, LucideMusic2, LucideShuffle, LucideSkipBack, LucidePlay, LucidePause, LucideSkipForward, LucideRepeat],
   template: `
     <section class="playlist-player" aria-label="Your music">
       <header><div><strong>Your music</strong><small>Files stay in this browser</small></div>
-        <label class="add-music">+ Add files<input type="file" accept="audio/*" multiple (change)="addFiles($event)" /></label>
+        <label class="add-music"><svg lucidePlus aria-hidden="true"></svg> Add files<input type="file" accept="audio/*" multiple (change)="addFiles($event)" /></label>
       </header>
       @if (tracks().length) {
-        <div class="now-playing"><span class="cover">♫</span><div><strong>{{ currentTrack()?.name || 'Choose a track' }}</strong><small>{{ tracks().length }} tracks in playlist</small></div></div>
+        <div class="now-playing"><span class="cover"><svg lucideMusic2 aria-hidden="true"></svg></span><div><strong>{{ currentTrack()?.name || 'Choose a track' }}</strong><small>{{ tracks().length }} tracks in playlist</small></div></div>
         <audio #player (timeupdate)="syncTime()" (loadedmetadata)="syncTime()" (ended)="onEnded()" (play)="playing.set(true)" (pause)="playing.set(false)"></audio>
         <label class="seek"><span>{{ time(currentTime()) }}</span><input type="range" min="0" [max]="duration() || 1" step="0.1" [value]="currentTime()" (input)="seek($event)" aria-label="Seek track" /><span>{{ time(duration()) }}</span></label>
         <div class="player-controls">
-          <button [class.active]="shuffle()" (click)="shuffle.set(!shuffle())" aria-label="Toggle shuffle" title="Shuffle">⇄</button>
-          <button (click)="previous()" aria-label="Previous track" title="Previous">⏮</button>
-          <button class="play" (click)="toggle()" [attr.aria-label]="playing() ? 'Pause' : 'Play'">{{ playing() ? 'Ⅱ' : '▶' }}</button>
-          <button (click)="next()" aria-label="Next track" title="Next">⏭</button>
-          <button [class.active]="repeat()" (click)="repeat.set(!repeat())" aria-label="Toggle repeat" title="Repeat">↻</button>
+          <button [class.active]="shuffle()" (click)="shuffle.set(!shuffle())" aria-label="Toggle shuffle" title="Shuffle"><svg lucideShuffle aria-hidden="true"></svg></button>
+          <button (click)="previous()" aria-label="Previous track" title="Previous"><svg lucideSkipBack aria-hidden="true"></svg></button>
+          <button class="play" (click)="toggle()" [attr.aria-label]="playing() ? 'Pause' : 'Play'">@if (playing()) { <svg lucidePause aria-hidden="true"></svg> } @else { <svg lucidePlay aria-hidden="true"></svg> }</button>
+          <button (click)="next()" aria-label="Next track" title="Next"><svg lucideSkipForward aria-hidden="true"></svg></button>
+          <button [class.active]="repeat()" (click)="repeat.set(!repeat())" aria-label="Toggle repeat" title="Repeat"><svg lucideRepeat aria-hidden="true"></svg></button>
         </div>
         <label class="player-volume">Volume <input type="range" min="0" max="1" step="0.05" [value]="volume()" (input)="setVolume($event)" /></label>
         <div class="track-list" aria-label="Playlist">
           @for (track of tracks(); track track.id; let index = $index) {
             <div class="track" [class.selected]="currentId() === track.id">
               <button (click)="select(index)" [attr.aria-label]="'Play ' + track.name"><span>{{ index + 1 }}</span>{{ track.name }}</button>
-              <button class="remove" (click)="remove(track.id)" [attr.aria-label]="'Remove ' + track.name" title="Remove">×</button>
+              <button class="remove" (click)="remove(track.id)" [attr.aria-label]="'Remove ' + track.name" title="Remove"><svg lucideX aria-hidden="true"></svg></button>
             </div>
           }
         </div>
@@ -38,10 +40,10 @@ type Track = { id: string; name: string; blob: Blob; url?: string };
     .playlist-player{padding:14px 16px;border-top:1px solid var(--color-border-light);font-size:11px}
     header,.now-playing,.player-controls,.seek,.player-volume,.track{display:flex;align-items:center}
     header{justify-content:space-between;gap:8px} header strong,.now-playing strong{display:block;font-size:12px} header small,.now-playing small{display:block;color:var(--color-text-muted);font-size:10px;margin-top:3px}
-    .add-music{padding:7px 9px;border-radius:7px;background:var(--color-primary-subtle);color:var(--color-primary);font-weight:700;cursor:pointer;white-space:nowrap}.add-music input{display:none}
+    .add-music{display:flex;align-items:center;gap:4px;padding:7px 9px;border-radius:7px;background:var(--color-primary-subtle);color:var(--color-primary);font-weight:700;cursor:pointer;white-space:nowrap}.add-music input{display:none}
     .now-playing{gap:9px;margin:13px 0 8px;min-width:0}.now-playing>div{min-width:0}.now-playing strong{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.cover{display:grid;place-items:center;width:34px;height:34px;flex:none;border-radius:8px;background:var(--color-primary-subtle);color:var(--color-primary);font-size:20px}
     .seek{gap:7px;color:var(--color-text-muted);font-variant-numeric:tabular-nums;font-size:10px}.seek input,.player-volume input{flex:1;min-width:0;accent-color:var(--color-primary)}
-    .player-controls{justify-content:center;gap:13px;margin:9px 0}.player-controls button{width:26px;height:26px;border:0;background:none;color:var(--color-text-secondary);cursor:pointer;font-size:17px}.player-controls button.active{color:var(--color-primary)}.player-controls .play{width:34px;height:34px;border-radius:50%;background:var(--color-primary);color:white}
+    .player-controls{justify-content:center;gap:13px;margin:9px 0}.player-controls button{display:grid;place-items:center;width:26px;height:26px;border:0;background:none;color:var(--color-text-secondary);cursor:pointer;font-size:17px}.player-controls button.active{color:var(--color-primary)}.player-controls .play{width:34px;height:34px;border-radius:50%;background:var(--color-primary);color:white}
     .player-volume{gap:8px;color:var(--color-text-muted);font-size:10px}.track-list{max-height:160px;overflow:auto;margin-top:10px}.track{border-radius:6px}.track.selected{background:var(--color-primary-subtle)}.track button{border:0;background:none;color:var(--color-text-secondary);cursor:pointer}.track button:first-child{display:flex;align-items:center;gap:9px;min-width:0;flex:1;padding:7px;text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.track span{color:var(--color-text-muted)}.track .remove{font-size:18px;padding:3px 8px}.empty,.error{color:var(--color-text-muted);font-size:10px;line-height:1.4}.error{color:var(--color-primary)}
   `],
 })

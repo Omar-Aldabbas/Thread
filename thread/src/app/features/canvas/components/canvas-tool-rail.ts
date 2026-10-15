@@ -1,11 +1,11 @@
 import { Component, input, output } from '@angular/core';
-import { LucideMousePointer2, LucideHand, LucidePlus, LucidePencil } from '@lucide/angular';
+import { LucideMousePointer2, LucideHand, LucidePlus, LucideShapes } from '@lucide/angular';
 import type { ItemType } from '../canvas.model';
 import type { Tool } from '../pages/canvas-page/canvas-page.types';
 
 @Component({
   selector: 'app-canvas-tool-rail',
-  imports: [LucideMousePointer2, LucideHand, LucidePlus, LucidePencil],
+  imports: [LucideMousePointer2, LucideHand, LucidePlus, LucideShapes],
   template: `
     <nav class="tool-rail" data-ui aria-label="Canvas tools">
       <button type="button" [class.active]="tool() === 'select' && !pendingType()" [attr.aria-pressed]="tool() === 'select' && !pendingType()" (click)="toolChange.emit('select')" aria-label="Select" title="Select (V): select, edit, and move objects" data-shortcut="V">
@@ -19,8 +19,8 @@ import type { Tool } from '../pages/canvas-page/canvas-page.types';
       <button type="button" [class.active]="paletteOpen() || (!!pendingType() && tool() !== 'system')" [attr.aria-pressed]="paletteOpen() || (!!pendingType() && tool() !== 'system')" (click)="toolChange.emit('add')" aria-label="Add content" title="Add content (N)" data-shortcut="N">
         <svg lucidePlus aria-hidden="true"></svg><small>Add</small>
       </button>
-      <button type="button" [class.active]="tool() === 'sketch' || tool() === 'shape' || tool() === 'connect' || tool() === 'text' || tool() === 'system'" [attr.aria-pressed]="tool() === 'sketch' || tool() === 'shape' || tool() === 'connect' || tool() === 'text' || tool() === 'system'" (click)="toolChange.emit('sketch')" aria-label="Sketch" title="Sketch (P)" data-shortcut="P">
-        <svg lucidePencil aria-hidden="true"></svg><small>Sketch</small>
+      <button type="button" [class.active]="tool() === 'sketch' || tool() === 'shape' || tool() === 'connect' || tool() === 'text' || tool() === 'system'" [attr.aria-pressed]="tool() === 'sketch' || tool() === 'shape' || tool() === 'connect' || tool() === 'text' || tool() === 'system'" (click)="toolChange.emit('sketch')" aria-label="Creation tools" title="Creation tools (P)" data-shortcut="P">
+        <svg lucideShapes aria-hidden="true"></svg><small>Tools</small>
       </button>
     </nav>
   `,

@@ -168,7 +168,7 @@
     </div>
     @if (rowMenu(); as options) {
       <section class="budget-settings-panel" data-ui aria-label="Category options" (pointerdown)="$event.stopPropagation()">
-        <header><strong>Category options</strong><button type="button" aria-label="Close options" (click)="rowMenu.set(null)">×</button></header>
+        <header><strong>Category options</strong><button type="button" aria-label="Close options" (click)="rowMenu.set(null)"><svg lucideX aria-hidden="true"></svg></button></header>
         <label>Move to group
           <thread-select [value]="options.group" (change)="page.setBudgetGroup(item, options.rowId, $event); rowMenu.set(null)">
             <thread-option value="" label="Ungrouped"></thread-option>
@@ -182,7 +182,7 @@
     }
     @if (groupMenu(); as activeGroup) {
       <section class="budget-settings-panel" data-ui aria-label="Group options" (pointerdown)="$event.stopPropagation()">
-        <header><strong>Group options</strong><button type="button" aria-label="Close options" (click)="groupMenu.set(null)">×</button></header>
+        <header><strong>Group options</strong><button type="button" aria-label="Close options" (click)="groupMenu.set(null)"><svg lucideX aria-hidden="true"></svg></button></header>
         <label>Rename
           <input [value]="activeGroup" (change)="page.renameBudgetGroup(item, activeGroup, $event); groupMenu.set(null)" />
         </label>
@@ -193,7 +193,7 @@
     }
     @if (periodMenuOpen()) {
       <section class="budget-settings-panel" data-ui aria-label="Next month options" (pointerdown)="$event.stopPropagation()">
-        <header><strong>Next month</strong><button type="button" aria-label="Close options" (click)="periodMenuOpen.set(false)">×</button></header>
+        <header><strong>Next month</strong><button type="button" aria-label="Close options" (click)="periodMenuOpen.set(false)"><svg lucideX aria-hidden="true"></svg></button></header>
         <button class="budget-panel-action" type="button" (click)="page.changeBudgetMonth(item, 1, true); periodMenuOpen.set(false)">Copy planned amounts</button>
         <button class="budget-panel-action" type="button" (click)="page.changeBudgetMonth(item, 1, false); periodMenuOpen.set(false)">Start at zero</button>
       </section>
@@ -229,7 +229,7 @@
     </div>
     @if (settingsOpen()) {
       <section class="budget-settings-panel" data-ui aria-label="Budget settings" (pointerdown)="$event.stopPropagation()">
-        <header><strong>Budget settings</strong><button type="button" aria-label="Close settings" (click)="settingsOpen.set(false)">×</button></header>
+        <header><strong>Budget settings</strong><button type="button" aria-label="Close settings" (click)="settingsOpen.set(false)"><svg lucideX aria-hidden="true"></svg></button></header>
         <label>Period
           <thread-select [value]="item.budgetPeriod || 'one-time'" (change)="page.setBudgetPeriod(item, $event)">
             <thread-option value="one-time" label="One-time"></thread-option>

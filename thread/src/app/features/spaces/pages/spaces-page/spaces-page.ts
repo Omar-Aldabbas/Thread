@@ -10,6 +10,7 @@ import {
   viewChild,
 } from '@angular/core';
 import { isPlatformBrowser } from '@angular/common';
+import { LucideMousePointer2, LucideHand, LucidePlus, LucideX, LucideSearch } from '@lucide/angular';
 import { Router } from '@angular/router';
 import { PreferencesService } from '../../../../shared/preferences.service';
 import { ThreadHeader } from '../../../../shared/thread-header';
@@ -43,7 +44,7 @@ interface DragSession {
 
 @Component({
   selector: 'app-spaces-page',
-  imports: [ThreadHeader, ScrollDirective, SpaceCardView],
+  imports: [ThreadHeader, ScrollDirective, SpaceCardView, LucideMousePointer2, LucideHand, LucidePlus, LucideX, LucideSearch],
   templateUrl: './spaces-page.html',
   styleUrl: './spaces-page.css',
 })

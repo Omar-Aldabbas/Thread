@@ -1,5 +1,5 @@
-import { Component, output } from '@angular/core';
-import { LucideDynamicIcon, LucideStickyNote, LucideType, LucideCheck, LucideList, LucideSquareDashed, LucideFrame, LucideWallet, LucideTable2, LucideChartColumn, LucideDatabase, LucideImagePlus, LucideMic, LucideClapperboard, LucideSticker, LucideLink, LucidePencil, LucideWaypoints, LucideNetwork, LucideChevronDown } from '@lucide/angular';
+import { Component, output, signal } from '@angular/core';
+import { LucideDynamicIcon, LucideStickyNote, LucideType, LucideCheck, LucideList, LucideSquareDashed, LucideFrame, LucideWallet, LucideTable2, LucideChartColumn, LucideDatabase, LucideImagePlus, LucideMic, LucideClapperboard, LucideSticker, LucideLink, LucidePencil, LucideNetwork } from '@lucide/angular';
 import type { ItemType } from '../canvas.model';
 import { diagramCatalog, DiagramType } from '../diagram-templates';
 
@@ -14,6 +14,14 @@ import { diagramCatalog, DiagramType } from '../diagram-templates';
       aria-label="Close add menu"
     ></button>
     <section class="create-palette" data-ui aria-label="Add to canvas">
+      <nav class="palette-tabs" aria-label="Add categories">
+        @for (category of categories; track category.id) {
+          <button type="button" [class.active]="activeCategory() === category.id" [attr.aria-current]="activeCategory() === category.id ? 'page' : null" (click)="activeCategory.set(category.id)">{{ category.label }}</button>
+        }
+      </nav>
+      <div class="palette-columns">
+      <div class="palette-column">
+      <div class="palette-category" [class.mobile-active]="activeCategory() === 'quick'">
       <div class="palette-section">Quick</div>
       <div class="palette-grid">
         @for (entry of quick; track entry.type) {
@@ -22,9 +30,28 @@ import { diagramCatalog, DiagramType } from '../diagram-templates';
           </button>
         }
       </div>
-      <details class="palette-group">
-      <summary>Media <svg [lucideIcon]="icons.chevron" aria-hidden="true"></svg></summary>
-      <div class="palette-group-content">
+      </div>
+      <div class="palette-category" [class.mobile-active]="activeCategory() === 'create'">
+      <div class="palette-section">Create &amp; map</div>
+      <div class="palette-feature-list">
+        <button class="palette-feature" type="button" (click)="sketch.emit()">
+          <svg [lucideIcon]="icons.pencil" aria-hidden="true"></svg><span><strong>Draw</strong><small>Sketch freely on the canvas</small></span>
+        </button>
+        <button class="palette-feature" type="button" (click)="designSystem.emit()"><svg [lucideIcon]="icons.network" aria-hidden="true"></svg><span><strong>Design a system</strong><small>Components and connections</small></span></button>
+        <button class="palette-feature" type="button" (click)="erStarter.emit()">
+          <svg [lucideIcon]="icons.database" aria-hidden="true"></svg><span><strong>ER diagram starter</strong><small>Two linked entities with keys</small></span>
+        </button>
+      </div>
+      <div class="diagram-picker">
+        @for (diagram of diagramCatalog; track diagram.type) {
+          <button type="button" (click)="chooseDiagram.emit(diagram.type)"><strong>{{ diagram.name }}</strong><small>{{ diagram.description }}</small></button>
+        }
+      </div>
+      </div>
+      </div>
+      <div class="palette-column">
+      <div class="palette-category" [class.mobile-active]="activeCategory() === 'media'">
+      <div class="palette-section">Media</div>
       <button class="palette-media" type="button" (click)="openFiles.emit()">
         <span aria-hidden="true"><svg [lucideIcon]="icons.imagePlus"></svg></span>Add media<small>Image · audio · video · document</small>
       </button>
@@ -43,10 +70,8 @@ import { diagramCatalog, DiagramType } from '../diagram-templates';
         </button>
       </div>
       </div>
-      </details>
-      <details class="palette-group">
-      <summary>Organize <svg [lucideIcon]="icons.chevron" aria-hidden="true"></svg></summary>
-      <div class="palette-group-content">
+      <div class="palette-category" [class.mobile-active]="activeCategory() === 'organize'">
+      <div class="palette-section">Organize</div>
       <div class="palette-grid">
         @for (entry of organize; track entry.type) {
           <button type="button" (click)="chooseType.emit(entry.type)">
@@ -54,29 +79,9 @@ import { diagramCatalog, DiagramType } from '../diagram-templates';
           </button>
         }
       </div>
-      <button class="palette-feature" type="button" (click)="sketch.emit()">
-        <svg [lucideIcon]="icons.pencil" aria-hidden="true"></svg>Sketch directly on canvas
-      </button>
-      <button class="palette-feature" type="button" (click)="erStarter.emit()">
-        <svg [lucideIcon]="icons.database" aria-hidden="true"></svg><span
-          ><strong>ER diagram starter</strong
-          ><small>Two linked entities with example keys</small></span
-        >
-      </button>
-      </div>
-      </details>
-      <div class="palette-section">Systems</div>
-      <button class="palette-feature palette-system" type="button" (click)="designSystem.emit()"><svg [lucideIcon]="icons.network" aria-hidden="true"></svg><span><strong>Design a system</strong><small>Components, connections, and review</small></span></button>
-      <details class="palette-group">
-      <summary>Mapping <svg [lucideIcon]="icons.chevron" aria-hidden="true"></svg></summary>
-      <div class="palette-group-content">
-      <div class="diagram-picker">
-        @for (diagram of diagramCatalog; track diagram.type) {
-          <button type="button" (click)="chooseDiagram.emit(diagram.type)"><strong>{{ diagram.name }}</strong><small>{{ diagram.description }}</small></button>
-        }
       </div>
       </div>
-      </details>
+      </div>
     </section>
   `,
   styles: [
@@ -315,18 +320,27 @@ import { diagramCatalog, DiagramType } from '../diagram-templates';
       .secondary-media {
         margin-top: 5px;
       }
-      .palette-group { margin-top:5px; border:1px solid var(--color-border-light); border-radius:7px; }
-      .palette-group summary { display:flex; align-items:center; justify-content:space-between; min-height:36px; padding:7px 9px; color:var(--color-text-primary); font-size:11px; font-weight:700; cursor:pointer; list-style:none; }
-      .palette-group summary::-webkit-details-marker { display:none; }
-      .palette-group summary:focus-visible { outline:2px solid var(--color-primary); outline-offset:2px; }
-      .palette-group summary svg { width:16px; height:16px; color:var(--color-primary); transition:transform .15s ease; }
-      .palette-group[open] summary svg { transform:rotate(180deg); }
+      .create-palette { width:min(560px,calc(100vw - 110px)); max-height:min(78dvh,680px); padding:16px; scrollbar-width:thin; }
+      .palette-tabs { display:none; }
+      .palette-columns { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:18px; }
+      .palette-column { min-width:0; }
+      .palette-column .palette-section:first-child { margin-top:0; padding-top:0; border-top:0; }
+      .palette-section { margin:14px 0 7px; padding-top:12px; font-size:10px; }
+      .palette-section:first-of-type { margin-top:0; padding-top:0; }
+      .palette-grid { gap:6px; }
+      .palette-grid button { min-height:42px; padding:8px 10px; border-color:var(--color-border-light); border-radius:7px; font-size:12px; }
+      .palette-media { min-height:50px; margin-top:6px; border-style:solid; border-color:var(--color-border-light); background:var(--color-surface); }
+      .palette-media > span { background:transparent; }
+      .palette-media small { font-size:10px; }
+      .palette-feature-list { display:grid; gap:6px; }
+      .palette-feature { min-height:48px; margin:0; padding:8px 10px; background:var(--color-surface); font-size:12px; }
+      .diagram-picker { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:6px; margin-top:6px; }
+      .diagram-picker button { min-height:42px; padding:7px; border:1px solid var(--color-border-light); border-radius:7px; }
+      .diagram-picker button strong { font-size:10px; }
+      .diagram-picker button small { display:none; }
       .palette-grid button > svg,.palette-feature > svg { width:18px; height:18px; flex:none; color:var(--color-primary); }
       .palette-media svg { width:17px; height:17px; }
-      .palette-group-content { padding:0 6px 7px; border-top:1px solid var(--color-border-light); }
-      .diagram-picker { padding-top:5px; }
-      .diagram-group { margin:9px 4px 3px; color:var(--color-text-muted); font-size:9px; font-weight:800; letter-spacing:.1em; text-transform:uppercase; }
-      .diagram-picker button { display:flex; flex-direction:column; gap:2px; width:100%; padding:7px 8px; text-align:left; border-radius:5px; }
+      .diagram-picker button { display:flex; flex-direction:column; gap:2px; width:100%; text-align:left; }
       .diagram-picker button:hover,.diagram-picker button:focus-visible { background:var(--color-primary-subtle); }
       .diagram-picker button strong { font-size:11px; }
       .diagram-picker button small { color:var(--color-text-muted); font-size:10px; }
@@ -347,17 +361,26 @@ import { diagramCatalog, DiagramType } from '../diagram-templates';
           padding: 10px;
           transform: none;
         }
+        .palette-columns { grid-template-columns:1fr; gap:0; }
+        .palette-tabs { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:4px; margin-bottom:8px; }
+        .palette-tabs button { min-width:0; min-height:38px; padding:6px 2px; border-radius:7px; color:var(--color-text-secondary); font-size:11px; font-weight:700; }
+        .palette-tabs button.active { background:var(--color-primary); color:var(--color-text-inverse); }
+        .palette-category { display:none; }
+        .palette-category.mobile-active { display:block; }
+        .palette-category .palette-section { margin:0 0 7px; padding:0; border:0; }
+        .create-palette { max-height:calc(100dvh - 155px); scrollbar-width:none; }
         .palette-grid button {
           min-height: 38px;
         }
-        .palette-feature:not(.palette-system) small { display:none; }
-        .palette-feature { min-height:34px; }
+        .palette-feature { min-height:48px; }
       }
     `,
   ],
 })
 export class CanvasAddPalette {
-  readonly icons = { chevron: LucideChevronDown, imagePlus: LucideImagePlus, mic: LucideMic, gif: LucideClapperboard, sticker: LucideSticker, link: LucideLink, pencil: LucidePencil, database: LucideDatabase, network: LucideNetwork };
+  readonly categories = [{ id: 'quick', label: 'Quick' }, { id: 'create', label: 'Create' }, { id: 'media', label: 'Media' }, { id: 'organize', label: 'Organize' }] as const;
+  readonly activeCategory = signal<(typeof this.categories)[number]['id']>('quick');
+  readonly icons = { imagePlus: LucideImagePlus, mic: LucideMic, gif: LucideClapperboard, sticker: LucideSticker, link: LucideLink, pencil: LucidePencil, database: LucideDatabase, network: LucideNetwork };
   readonly close = output<void>();
   readonly chooseType = output<ItemType>();
   readonly openFiles = output<void>();

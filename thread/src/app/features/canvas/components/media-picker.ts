@@ -1,4 +1,5 @@
 import { Component, EventEmitter, Input, OnDestroy, OnInit, Output, computed, inject, signal } from '@angular/core';
+import { LucideX } from '@lucide/angular';
 import { GifResult, StickerAsset, stickers } from '../media-catalog';
 import { GiphyService } from '../giphy.service';
 import { ScrollDirective } from '../../../shared/scroll.directive';
@@ -15,7 +16,7 @@ export interface PickedMedia {
 @Component({
   selector: 'app-media-picker',
   standalone: true,
-  imports: [ScrollDirective],
+  imports: [ScrollDirective, LucideX],
   template: `
     <aside
       class="media-picker"
@@ -27,7 +28,7 @@ export interface PickedMedia {
           <small>ADD MEDIA</small>
           <h2>{{ kind === 'gif' ? 'GIFs' : 'Stickers' }}</h2>
         </div>
-        <button type="button" (click)="closed.emit()" aria-label="Close picker">×</button>
+        <button type="button" (click)="closed.emit()" aria-label="Close picker"><svg lucideX aria-hidden="true"></svg></button>
       </header>
       <input
         class="media-search"

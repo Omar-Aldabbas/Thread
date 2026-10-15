@@ -1,4 +1,5 @@
 import { DOCUMENT } from '@angular/common';
+import { LucideChevronDown, LucideCheck, LucideMinus, LucideX } from '@lucide/angular';
 import { AfterViewInit, Component, ContentChildren, ElementRef, EventEmitter, Input, OnDestroy, Output, QueryList, ViewChild, booleanAttribute, inject, signal } from '@angular/core';
 import { ControlPopover, controlChange } from './control-popover';
 import { hexToHsv, hsvToHex, normalizeHex } from './color-utils';
@@ -23,9 +24,10 @@ export class ThreadOption {
 
 @Component({
   selector: 'thread-select', standalone: true, styleUrl: './thread-controls.css', host: { 'data-control': 'select', 'data-ui': '', '[attr.data-size]': 'size()', '(pointerdown)': '$event.stopPropagation()' },
+  imports: [LucideChevronDown, LucideCheck],
   template: `
     <button #trigger class="thread-select-trigger" type="button" role="combobox" aria-haspopup="listbox" [attr.aria-label]="accessibleLabel()" [attr.aria-expanded]="opened()" [attr.aria-controls]="menuId" [title]="selectedLabel()" [disabled]="disabled()" (click)="toggle()" (keydown)="triggerKey($event)">
-      <span>{{ selectedLabel() }}</span><svg viewBox="0 0 20 20" aria-hidden="true"><path d="m5 7 5 5 5-5" /></svg>
+      <span>{{ selectedLabel() }}</span><svg lucideChevronDown aria-hidden="true"></svg>
     </button>
     <span hidden><ng-content /></span>
     <div #panel class="thread-control-panel thread-select-panel" data-ui [hidden]="!opened()" (pointerdown)="$event.stopPropagation()" (keydown)="menuKey($event)">
@@ -33,7 +35,7 @@ export class ThreadOption {
       <div class="thread-option-list" role="listbox" [id]="menuId" [attr.aria-label]="accessibleLabel()">
         @for (option of filtered(); track option) {
           <button class="thread-option" type="button" role="option" [id]="menuId + '-' + $index" [class.is-active]="active() === $index" [attr.aria-selected]="value === option.optionValue()" [disabled]="option.disabled()" (pointerdown)="$event.preventDefault()" (pointerenter)="active.set($index)" (click)="choose(option)">
-            <span>{{ option.label() }}</span><svg viewBox="0 0 20 20" aria-hidden="true" [class.is-visible]="value === option.optionValue()"><path d="m4 10 4 4 8-8" /></svg>
+            <span>{{ option.label() }}</span><svg lucideCheck aria-hidden="true" [class.is-visible]="value === option.optionValue()"></svg>
           </button>
         } @empty { <p class="thread-control-empty">No matching options</p> }
       </div>
@@ -96,7 +98,8 @@ export class ThreadSelect implements OnDestroy {
 
 @Component({
   selector: 'thread-checkbox', standalone: true, styleUrl: './thread-controls.css', host: { 'data-control': 'checkbox', 'data-ui': '', '(pointerdown)': '$event.stopPropagation()' },
-  template: `<button #trigger type="button" class="thread-checkbox-trigger" role="checkbox" [attr.aria-label]="accessibleLabel()" [attr.aria-checked]="indeterminate() ? 'mixed' : checked" [disabled]="disabled()" [class.is-checked]="checked || indeterminate()" (click)="toggle(); $event.stopPropagation()" (keydown)="$event.stopPropagation()"><svg viewBox="0 0 20 20" aria-hidden="true">@if (indeterminate()) { <path d="M5 10h10" /> } @else { <path d="m4 10 4 4 8-8" /> }</svg></button>`,
+  imports: [LucideMinus, LucideCheck],
+  template: `<button #trigger type="button" class="thread-checkbox-trigger" role="checkbox" [attr.aria-label]="accessibleLabel()" [attr.aria-checked]="indeterminate() ? 'mixed' : checked" [disabled]="disabled()" [class.is-checked]="checked || indeterminate()" (click)="toggle(); $event.stopPropagation()" (keydown)="$event.stopPropagation()">@if (indeterminate()) { <svg lucideMinus aria-hidden="true"></svg> } @else { <svg lucideCheck aria-hidden="true"></svg> }</button>`,
 })
 export class ThreadCheckbox implements AfterViewInit, OnDestroy {
   readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
@@ -120,13 +123,14 @@ export class ThreadCheckbox implements AfterViewInit, OnDestroy {
 
 @Component({
   selector: 'thread-color', standalone: true, styleUrl: './thread-controls.css', host: { 'data-control': 'color', 'data-ui': '', '(pointerdown)': '$event.stopPropagation()' },
+  imports: [LucideChevronDown, LucideCheck, LucideX],
   template: `
-    <button #trigger type="button" class="thread-color-trigger" [attr.aria-label]="accessibleLabel() + ': ' + value" aria-haspopup="dialog" [attr.aria-expanded]="opened()" [disabled]="disabled()" (click)="toggle()" (keydown)="$event.stopPropagation()"><span [style.background]="value"></span><svg viewBox="0 0 20 20" aria-hidden="true"><path d="m5 7 5 5 5-5" /></svg></button>
+    <button #trigger type="button" class="thread-color-trigger" [attr.aria-label]="accessibleLabel() + ': ' + value" aria-haspopup="dialog" [attr.aria-expanded]="opened()" [disabled]="disabled()" (click)="toggle()" (keydown)="$event.stopPropagation()"><span [style.background]="value"></span><svg lucideChevronDown aria-hidden="true"></svg></button>
     <div #panel class="thread-control-panel thread-color-panel" data-ui role="dialog" [attr.aria-label]="accessibleLabel()" [hidden]="!opened()" (pointerdown)="$event.stopPropagation()" (keydown)="$event.stopPropagation()">
-      <header><strong>{{ accessibleLabel() }}</strong><button type="button" (click)="close()" aria-label="Close color picker">×</button></header>
+      <header><strong>{{ accessibleLabel() }}</strong><button type="button" (click)="close()" aria-label="Close color picker"><svg lucideX aria-hidden="true"></svg></button></header>
       <div class="thread-color-plane" tabindex="0" role="slider" aria-label="Saturation and brightness" aria-valuemin="0" aria-valuemax="100" [attr.aria-valuenow]="saturation() * 100" [attr.aria-valuetext]="colorDescription()" [style.background-color]="hueColor()" (pointerdown)="planeDown($event)" (pointermove)="planeMove($event)" (pointerup)="endGesture($event)" (pointercancel)="cancelGesture($event)" (keydown)="planeKey($event)"><i [style.left.%]="saturation() * 100" [style.top.%]="(1 - brightness()) * 100" [style.background]="value"></i></div>
       <div class="thread-hue-slider" tabindex="0" role="slider" aria-label="Hue" aria-valuemin="0" aria-valuemax="360" [attr.aria-valuenow]="hue()" (pointerdown)="hueDown($event)" (pointermove)="hueMove($event)" (pointerup)="endGesture($event)" (pointercancel)="cancelGesture($event)" (keydown)="hueKey($event)"><i [style.left.%]="hue() / 360 * 100"></i></div>
-      <div class="thread-color-swatches">@for (color of palette; track color) { <button type="button" [style.background]="color" [class.is-selected]="value === color" [attr.aria-label]="'Use ' + color" [attr.aria-pressed]="value === color" (click)="commit(color)">@if (value === color) { <svg viewBox="0 0 20 20" aria-hidden="true" [style.color]="contrast(color)"><path d="m4 10 4 4 8-8" /></svg> }</button> }</div>
+      <div class="thread-color-swatches">@for (color of palette; track color) { <button type="button" [style.background]="color" [class.is-selected]="value === color" [attr.aria-label]="'Use ' + color" [attr.aria-pressed]="value === color" (click)="commit(color)">@if (value === color) { <svg lucideCheck aria-hidden="true" [style.color]="contrast(color)"></svg> }</button> }</div>
       <label class="thread-hex-label">HEX<input [value]="value" maxlength="7" aria-label="Hex color" spellcheck="false" [attr.aria-invalid]="invalid()" (change)="hexChanged($event)" (keydown.enter)="hexChanged($event)" /></label>
       @if (invalid()) { <p class="thread-control-error" role="status">Use a hex color, for example #D4111C.</p> }
       <footer><span [style.background]="value"></span><code>{{ value.toUpperCase() }}</code><button type="button" (click)="close()">Done</button></footer>

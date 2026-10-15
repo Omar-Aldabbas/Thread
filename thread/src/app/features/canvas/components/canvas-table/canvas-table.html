@@ -24,7 +24,7 @@
           (click)="page.clearTableFilter()"
           aria-label="Clear filter"
         >
-          ×
+          <svg lucideX aria-hidden="true"></svg>
         </button>
       </div>
     }
@@ -117,7 +117,7 @@
                     (click)="page.removeTableRow(item, row.id)"
                     aria-label="Remove row"
                   >
-                    ×
+                    <svg lucideX aria-hidden="true"></svg>
                   </button>
                 </td>
               </tr>
@@ -180,7 +180,7 @@
                 (click)="activeColumnId.set(null)"
                 aria-label="Close column options"
               >
-                ×
+                <svg lucideX aria-hidden="true"></svg>
               </button>
             </div>
             <label
@@ -286,7 +286,7 @@
     </div>
     @if (activeAddMenu(); as menu) {
       <section class="table-add-panel" data-ui [attr.aria-label]="menu === 'column' ? 'Add column' : 'Add calculation'" (pointerdown)="$event.stopPropagation()">
-        <header><strong>{{ menu === 'column' ? 'Add column' : 'Add calculation' }}</strong><button type="button" (click)="activeAddMenu.set(null)" aria-label="Close">×</button></header>
+        <header><strong>{{ menu === 'column' ? 'Add column' : 'Add calculation' }}</strong><button type="button" (click)="activeAddMenu.set(null)" aria-label="Close"><svg lucideX aria-hidden="true"></svg></button></header>
         @if (menu === 'column') {
           <label>Name <input #newColumnName placeholder="Column name" /></label>
           <label>Type

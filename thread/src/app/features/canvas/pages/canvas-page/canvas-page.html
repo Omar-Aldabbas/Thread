@@ -18,6 +18,7 @@
     (pointerup)="pointerUp($event)"
     (pointercancel)="pointerCancel($event)"
     (wheel)="wheel($event)"
+    (contextmenu)="cancelPlacement($event)"
     (auxclick)="preventMiddleAutoScroll($event)"
     (dragover)="dragOver($event)"
     (dragleave)="dragLeave()"
@@ -31,7 +32,7 @@
         title="Jump to next match">
         <span role="status">{{ searchMatchCount() }} {{ searchMatchCount() === 1 ? 'match' : 'matches' }} on this canvas</span>
         @if (searchMatchCount()) {
-          <span class="search-feedback-arrow" aria-hidden="true">↗</span>
+          <span class="search-feedback-arrow" aria-hidden="true"><svg lucideArrowUpRight aria-hidden="true"></svg></span>
         }
       </button>
     }
@@ -54,9 +55,7 @@
           aria-label="Show zone path"
           title="Zone path"
         >
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
-            <path d="m3 10 9-7 9 7v10a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1z" />
-          </svg>
+          <svg lucideHouse aria-hidden="true"></svg>
         </button>
         <div class="route-trail" [attr.aria-hidden]="!routeExpanded()">
           <button type="button" [attr.tabindex]="routeExpanded() ? 0 : -1" (click)="navigate(null)">{{ spaceName() }}</button>
@@ -615,7 +614,7 @@
             <app-sketch-renderer [item]="item" />
           } @else if (item.type === 'link') {
             <div class="link-content">
-              <span class="link-icon">↗</span>
+              <span class="link-icon"><svg lucideArrowUpRight aria-hidden="true"></svg></span>
               @if (item.url) {
                 <a class="link-title" [href]="item.url" target="_blank" rel="noopener noreferrer"
                   (pointerdown)="$event.stopPropagation()" (click)="$event.stopPropagation()">{{ item.title || item.url }}</a>
@@ -926,14 +925,14 @@
     aria-label="Open timer and music"
     title="Timer & music"
   >
-    <span aria-hidden="true">◷</span
+    <span aria-hidden="true"><svg lucideTimer></svg></span
     ><small>{{ timerRunning() ? formatTimer() : 'Timer & music' }}</small>
   </button>
   @if (activityOpen()) {
     <aside class="activity-panel" data-ui aria-label="Canvas session tools">
       <header>
         <div>
-          <span class="activity-icon">◷</span>
+          <span class="activity-icon"><svg lucideTimer aria-hidden="true"></svg></span>
           <div><strong>Focus session</strong><small>Make a little room to think</small></div>
         </div>
         <button
@@ -941,7 +940,7 @@
           (click)="activityOpen.set(false)"
           aria-label="Close session tools"
         >
-          ×
+          <svg lucideX aria-hidden="true"></svg>
         </button>
       </header>
       <section class="activity-timer">
@@ -1063,7 +1062,7 @@
   }
   @if (activityError() && !activityOpen()) {
     <button class="recording-error-toast" data-ui (click)="activityOpen.set(true)">
-      {{ activityError() }} <span>×</span>
+      {{ activityError() }} <span><svg lucideX aria-hidden="true"></svg></span>
     </button>
   }
   <app-canvas-tool-rail [tool]="tool()" [pendingType]="pendingType()" [paletteOpen]="paletteOpen()" (toolChange)="setTool($event)" />
@@ -1077,13 +1076,13 @@
   }
   @if (architectureReviewOpen()) {
     <aside class="architecture-review" data-ui aria-label="Infrastructure review">
-      <header><div><small>INFRASTRUCTURE</small><h2>Map review</h2></div><button type="button" (click)="architectureReviewOpen.set(false)" aria-label="Close infrastructure review">×</button></header>
+      <header><div><small>INFRASTRUCTURE</small><h2>Map review</h2></div><button type="button" (click)="architectureReviewOpen.set(false)" aria-label="Close infrastructure review"><svg lucideX aria-hidden="true"></svg></button></header>
       @if (architectureReview().count) {
         <div class="architecture-summary"><strong>{{ architectureReview().count }}</strong><span>components</span><strong>{{ architectureReview().monthlyCost | number:'1.0-0' }}</strong><span>estimated monthly cost</span></div>
         <p>Check ownership, connections, and the business purpose of services.</p>
         @if (architectureReview().issues.length) {
           <div class="architecture-issues"><strong>{{ architectureReview().issues.length }} things to review</strong>
-            @for (issue of architectureReview().issues; track $index) { <button type="button" (click)="focusArchitectureIssue(issue.itemId)">{{ issue.message }} <span aria-hidden="true">↗</span></button> }
+            @for (issue of architectureReview().issues; track $index) { <button type="button" (click)="focusArchitectureIssue(issue.itemId)">{{ issue.message }} <span aria-hidden="true"><svg lucideArrowUpRight aria-hidden="true"></svg></span></button> }
           </div>
         } @else { <p class="architecture-clear">No missing details found by this basic review.</p> }
       } @else { <p>Add a component or start an infrastructure map to review it here.</p><button type="button" class="architecture-start" (click)="startArchitectureMap()">Start infrastructure map</button> }
@@ -1092,7 +1091,7 @@
   @if (linkComposerOpen()) {
     <div class="link-dialog-backdrop" data-ui (pointerdown)="cancelLinkComposer()">
       <form class="link-dialog" (pointerdown)="$event.stopPropagation()" (keydown.escape)="cancelLinkComposer(); $event.stopPropagation()" (submit)="prepareLink($event)" aria-label="Add link">
-        <header><strong>Add link</strong><button type="button" (click)="cancelLinkComposer()" aria-label="Close">×</button></header>
+        <header><strong>Add link</strong><button type="button" (click)="cancelLinkComposer()" aria-label="Close"><svg lucideX aria-hidden="true"></svg></button></header>
         <label>Title<input type="text" required autofocus placeholder="What should the link say?" [value]="linkTitleDraft()" (input)="linkTitleDraft.set($any($event.target).value)" /></label>
         <label>URL<input type="text" inputmode="url" required placeholder="https://example.com" [value]="linkUrlDraft()" (input)="linkUrlDraft.set($any($event.target).value)" /></label>
         @if (linkDraftError()) { <small role="alert">{{ linkDraftError() }}</small> }
@@ -1105,17 +1104,18 @@
   }
   @if (pendingAsset()) {
     <div class="hint-pill" data-ui>
-      Tap the canvas to place {{ pendingAsset()?.name }} · Esc to cancel
+      Tap the canvas to place {{ pendingAsset()?.name }} · Esc or right click to cancel
     </div>
   }
   @if (pendingType() && tool() !== 'system') {
     <div class="hint-pill" [class.tool-instruction]="tool() === 'shape'" data-ui>
       Tap the canvas to place {{ pendingType() === 'er-entity' ? 'an ER entity' : pendingType() }} ·
-      Esc to cancel
+      Esc or right click to cancel
     </div>
   }
-  @if (tool() === 'sketch' || tool() === 'shape' || tool() === 'connect' || tool() === 'text') {
-    <div class="sketch-tools canvas-action-bar" appScroll="x" scrollbar="hover" data-ui>
+  @if (tool() === 'sketch' || tool() === 'shape' || tool() === 'system' || tool() === 'connect' || tool() === 'text') {
+    <div class="sketch-tools canvas-action-bar creation-toolbar" data-ui role="toolbar" [attr.aria-label]="tool() === 'system' ? 'Design a system tools' : 'Canvas creation tools'">
+      <div class="creation-modes" aria-label="Creation modes">
       <button class="sketch-tab" [class.active]="tool() === 'sketch'" (click)="setTool('sketch')">
         Draw
       </button>
@@ -1131,26 +1131,22 @@
       <button class="sketch-tab" [class.active]="tool() === 'text'" (click)="setTool('text')">
         Text
       </button>
-      <button class="sketch-tab" (click)="openMedia('sticker')">Stickers</button>
-      <button class="sketch-tab" (click)="create('er-entity')">ER entity</button>
+      </div>
+      <div class="creation-controls" [class.system-mode]="tool() === 'system'">
       @if (tool() === 'sketch') {
         <button
           [class.active]="!sketchEraser()"
           (click)="sketchEraser.set(false)"
           aria-label="Draw"
         >
-          <svg viewBox="0 0 24 24" aria-hidden="true">
-            <path d="m4 20 4.5-1 11-11a2 2 0 0 0-3-3l-11 11L4 20ZM14 7l3 3" />
-          </svg>
+          <svg lucidePencil aria-hidden="true"></svg>
         </button>
         <button
           [class.active]="sketchEraser()"
           (click)="sketchEraser.set(true)"
           aria-label="Erase sketch marks"
         >
-          <svg viewBox="0 0 24 24" aria-hidden="true">
-            <path d="m8 4-6 8 6 8h11a3 3 0 0 0 3-3V7a3 3 0 0 0-3-3H8Zm3 5 6 6m0-6-6 6" />
-          </svg>
+          <svg lucideEraser aria-hidden="true"></svg>
         </button>
         <thread-select
           size="compact"
@@ -1206,14 +1202,10 @@
           (change)="sketchColor.set($any($event.target).value)"
         ></thread-color>
         <button (click)="undoSketchStroke()" aria-label="Undo stroke">
-          <svg viewBox="0 0 24 24" aria-hidden="true">
-            <path d="M8 8 4 12l4 4M4 12h10a6 6 0 0 1 0 12" />
-          </svg>
+          <svg lucideUndo2 aria-hidden="true"></svg>
         </button>
         <button (click)="redoSketchStroke()" aria-label="Redo stroke">
-          <svg viewBox="0 0 24 24" aria-hidden="true">
-            <path d="m16 8 4 4-4 4m4-4H10a6 6 0 0 0 0 12" />
-          </svg>
+          <svg lucideRedo2 aria-hidden="true"></svg>
         </button>
       }
       @if (tool() === 'shape') {
@@ -1241,6 +1233,22 @@
           }
         </thread-select>
       }
+      @if (tool() === 'system') {
+        <span class="creation-instruction">Place one component · Esc or right click cancels</span>
+        <div class="system-tools-components" aria-label="System components">
+          @for (kind of architectureKinds; track kind.kind) {
+            <button type="button" class="system-choice" [class.active]="systemKind() === kind.kind" (click)="systemKind.set(kind.kind)" [attr.aria-label]="'Place ' + kind.label" [title]="kind.description">
+              <svg viewBox="0 0 100 100" aria-hidden="true"><path [attr.d]="shapePaths[kind.shape]" /></svg>
+              <small>{{ kind.shortLabel }}</small>
+            </button>
+          }
+        </div>
+        <div class="system-tools-actions">
+          <button type="button" (click)="startArchitectureMap()">Starter map</button>
+          <button type="button" (click)="setTool('connect')">Connect</button>
+          <button type="button" (click)="openArchitectureReview()">Review</button>
+        </div>
+      }
       @if (tool() === 'connect') {
         @for (kind of ['straight', 'elbow', 'curved']; track kind) {
           <button
@@ -1252,31 +1260,11 @@
           </button>
         }
       }
+      @if (tool() === 'text') { <span class="creation-instruction">Tap the canvas to place text</span> }
+      </div>
       <button class="action-done" (click)="setTool('select')" aria-label="Finish using this tool">
         Done
       </button>
-    </div>
-  }
-  @if (tool() === 'system') {
-    <div class="system-tools canvas-action-bar" data-ui role="toolbar" aria-label="Design a system tools">
-      <div class="system-tools-heading">
-        <div><strong>Design a system</strong><small>Choose a component, then tap the canvas</small></div>
-        <button type="button" class="system-switch" (click)="setTool('shape')">Shapes</button>
-        <button type="button" class="action-done" (click)="setTool('select')" aria-label="Finish designing system">Done</button>
-      </div>
-      <div class="system-tools-components" appScroll="x" scrollbar="hover" aria-label="System components">
-        @for (kind of architectureKinds; track kind.kind) {
-          <button type="button" class="system-choice" [class.active]="systemKind() === kind.kind" (click)="systemKind.set(kind.kind)" [attr.aria-label]="'Place ' + kind.label" [title]="kind.description">
-            <svg viewBox="0 0 100 100" aria-hidden="true"><path [attr.d]="shapePaths[kind.shape]" /></svg>
-            <small>{{ kind.shortLabel }}</small>
-          </button>
-        }
-      </div>
-      <div class="system-tools-actions">
-        <button type="button" (click)="startArchitectureMap()">Starter map</button>
-        <button type="button" (click)="setTool('connect')">Connect</button>
-        <button type="button" (click)="openArchitectureReview()">Review</button>
-      </div>
     </div>
   }
   @if (tool() === 'connect') {
@@ -1327,8 +1315,6 @@
   ) {
     <div
       class="selection-toolbar canvas-action-bar"
-      appScroll="x"
-      scrollbar="hover"
       role="toolbar"
       aria-label="Selected item actions"
       data-ui
@@ -1476,7 +1462,7 @@
             <h2>Field settings</h2>
           </div>
           <button type="button" aria-label="Close field settings" (click)="closeErField()">
-            ×
+            <svg lucideX aria-hidden="true"></svg>
           </button>
         </header>
         <div class="er-settings-body" appScroll="y" scrollbar="auto">
@@ -1631,7 +1617,7 @@
             {{ selectedIds().length > 1 ? selectedIds().length + ' selected' : selected()?.architecture ? 'Infrastructure component' : selected()?.type }}
           </h2>
         </div>
-        <button (click)="inspectorOpen.set(false)" aria-label="Close">×</button>
+        <button (click)="inspectorOpen.set(false)" aria-label="Close"><svg lucideX aria-hidden="true"></svg></button>
       </div>
       <div class="inspector-body">
         @if (selectedIds().length === 1 && selected(); as item) {
@@ -1840,7 +1826,7 @@
             /></label>
             @if (item.url) {
               <div class="link-details"><small>Destination</small><strong>{{ linkHost(item.url) }}</strong></div>
-              <a class="inspector-action link-open" [href]="item.url" target="_blank" rel="noopener noreferrer">Open link ↗</a>
+              <a class="inspector-action link-open" [href]="item.url" target="_blank" rel="noopener noreferrer">Open link <svg lucideArrowUpRight aria-hidden="true"></svg></a>
             }
           }
         }
@@ -1874,7 +1860,7 @@
           <h2>Relationship</h2>
         </div>
         <button (click)="inspectorOpen.set(false)" aria-label="Close relationship details">
-          ×
+          <svg lucideX aria-hidden="true"></svg>
         </button>
       </div>
       @if (selectedConnection(); as connection) {
